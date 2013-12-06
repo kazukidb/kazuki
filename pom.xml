@@ -117,12 +117,12 @@
       <version>6.8.7</version>
       <scope>test</scope>
     </dependency>
-<dependency>
-    <groupId>com.beust</groupId>
-    <artifactId>jcommander</artifactId>
-    <version>1.32</version>
+    <dependency>
+      <groupId>com.beust</groupId>
+      <artifactId>jcommander</artifactId>
+      <version>1.32</version>
       <scope>test</scope>
-</dependency>
+    </dependency>
   </dependencies>
 
   <build>
