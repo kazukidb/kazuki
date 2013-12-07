@@ -2,5 +2,5 @@
 
 More docs coming soon.
 
-Pull requests seem to work!
+Pull requests seem to work.
 
