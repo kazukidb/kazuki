@@ -32,6 +32,9 @@
     <guava.version>15.0</guava.version>
     <jackson.version>2.3.0</jackson.version>
     <joda-time.version>2.3</joda-time.version>
+
+    <packageVersion.dir>io/kazuki/v0</packageVersion.dir>
+    <packageVersion.package>io.kazuki.v0</packageVersion.package>
   </properties>
 
   <dependencies>
