@@ -20,6 +20,7 @@ public class EncodingHelper {
     return mapper.writeValueAsString(value);
   }
 
+  @SuppressWarnings("unchecked")
   public static <T> Map<String, Object> asJsonMap(T value) throws Exception {
     return mapper.convertValue(value, LinkedHashMap.class);
   }
@@ -28,6 +29,7 @@ public class EncodingHelper {
     return mapper.convertValue(objectMap, clazz);
   }
 
+  @SuppressWarnings("unchecked")
   public static Map<String, Object> parseJsonString(String value) throws Exception {
     if (value == null || value.length() == 0 || value.equals("null")) {
       throw new KazukiException("Invalid entity 'value'");
@@ -45,7 +47,7 @@ public class EncodingHelper {
   public static byte[] convertToSmile(Object value) throws KazukiException {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
-      SmileGenerator smile = smileFactory.createJsonGenerator(out);
+      SmileGenerator smile = smileFactory.createGenerator(out);
       mapper.writeValue(smile, value);
 
       byte[] smileBytes = out.toByteArray();
@@ -59,7 +61,7 @@ public class EncodingHelper {
   public static <T> T parseSmile(byte[] valueBytes, Class<T> clazz) throws KazukiException {
     try {
       ByteArrayInputStream in = new ByteArrayInputStream(valueBytes);
-      SmileParser smile = smileFactory.createJsonParser(in);
+      SmileParser smile = smileFactory.createParser(in);
 
       return mapper.readValue(smile, clazz);
     } catch (Exception e) {
