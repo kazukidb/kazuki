@@ -53,6 +53,7 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
     this.database = database;
     this.schemaManager = schemaManager;
     this.sequences = sequences;
+    this.initialize();
   }
 
   @Override

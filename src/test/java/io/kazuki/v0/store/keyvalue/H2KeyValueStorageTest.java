@@ -6,8 +6,6 @@ import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.SchemaManager;
-import io.kazuki.v0.store.keyvalue.H2KeyValueStorage;
-import io.kazuki.v0.store.keyvalue.KeyValueStorage;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -28,6 +26,7 @@ public class H2KeyValueStorageTest {
   public void testDemo() throws Exception {
     KeyValueStorage store = inject.getInstance(KeyValueStorage.class);
     store.initialize();
+    store.clear(false);
     SchemaManager manager = inject.getInstance(SchemaManager.class);
 
     Schema schema =
@@ -65,6 +64,8 @@ public class H2KeyValueStorageTest {
 
     foo1Found = store.retrieve(foo1Key, Foo.class);
     System.out.println("retrieved value = " + dump(foo1Found));
+
+    store.clear(false);
   }
 
   public String dump(Object object) throws Exception {

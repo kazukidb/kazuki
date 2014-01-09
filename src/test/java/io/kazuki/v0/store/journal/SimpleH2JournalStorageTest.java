@@ -6,6 +6,7 @@ import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.SchemaManager;
 import io.kazuki.v0.store.keyvalue.H2KeyValueStorage;
+import io.kazuki.v0.store.keyvalue.KeyValueStorage;
 
 import java.util.Iterator;
 
@@ -23,8 +24,12 @@ public class SimpleH2JournalStorageTest {
   private final ObjectMapper mapper = new ObjectMapper();
 
   public void testDemo() throws Exception {
+    KeyValueStorage _underlying = inject.getInstance(KeyValueStorage.class);
+    _underlying.clear(false);
+
     SimpleH2JournalStorage store = inject.getInstance(SimpleH2JournalStorage.class);
     store.initialize();
+
     SchemaManager manager = inject.getInstance(SchemaManager.class);
 
     Schema schema =
@@ -47,6 +52,8 @@ public class SimpleH2JournalStorageTest {
         j += 1;
       }
     }
+    
+    _underlying.clear(false);
   }
 
   public String dump(Object object) throws Exception {

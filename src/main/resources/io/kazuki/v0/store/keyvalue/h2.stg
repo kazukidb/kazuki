@@ -46,11 +46,11 @@ h2_init_key_values_index() ::=<<
 >>
 
 h2_populate_key_types() ::=<< 
-  insert
+  merge
     into "_key_types" ("_key_type", "_type_name")
   values
     (0, '$key'),
-    (1, '$schema');
+    (1, '$schema')
 >>
 
 h2_get_type_name() ::=<< 
@@ -66,11 +66,11 @@ h2_get_type_id() ::=<<
 >>
 
 h2_populate_sequences() ::=<< 
-  insert
+  merge
     into "_sequences" ("_key_type", "_next_id")
   values
     (0, 2),
-    (1, 1);
+    (1, 1)
 >>
 
 h2_get_entity_types() ::=<< 
