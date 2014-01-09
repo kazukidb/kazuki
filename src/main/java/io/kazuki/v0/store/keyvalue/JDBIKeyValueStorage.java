@@ -1,7 +1,13 @@
-package io.kazuki.v0.store;
+package io.kazuki.v0.store.keyvalue;
 
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.internal.sequence.SequenceServiceDatabaseImpl;
+import io.kazuki.v0.internal.v2schema.Schema;
+import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
+import io.kazuki.v0.internal.v2schema.compact.StructureTransform;
+import io.kazuki.v0.store.KazukiException;
+import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.SchemaManager;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,16 +37,25 @@ import org.skife.jdbi.v2.tweak.HandleCallback;
 public abstract class JDBIKeyValueStorage implements KeyValueStorage {
   public static int MULTIGET_MAX_KEYS = 3000;
 
-  @Inject
-  protected IDBI database;
+  protected final IDBI database;
 
-  @Inject
-  protected SequenceServiceDatabaseImpl sequences;
+  protected final SchemaManager schemaManager;
+
+  protected final SequenceServiceDatabaseImpl sequences;
 
   protected abstract String getPrefix();
 
   protected final Lock nukeLock = new ReentrantLock();
 
+  @Inject
+  public JDBIKeyValueStorage(IDBI database, SchemaManager schemaManager,
+      SequenceServiceDatabaseImpl sequences) {
+    this.database = database;
+    this.schemaManager = schemaManager;
+    this.sequences = sequences;
+  }
+
+  @Override
   public void initialize() {
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
@@ -57,17 +72,33 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
   @Override
   public <T> Key create(final String type, Class<T> clazz, final T inValue, boolean strictType)
       throws KazukiException {
+    return create(type, clazz, inValue, null, strictType);
+  }
+
+  @Override
+  public <T> Key create(final String type, Class<T> clazz, final T inValue, final Long idOverride,
+      boolean strictType) throws KazukiException {
     if (type == null || (strictType && ((type.contains("@") || type.contains("$"))))) {
       throw new KazukiException("Invalid entity 'type'");
     }
 
     try {
-      final Key newKey = sequences.nextKey(type);
+      final Key newKey = idOverride == null ? sequences.nextKey(type) : new Key(type, idOverride);
+      final Schema schema = schemaManager.retrieveSchema(type);
 
       return database.inTransaction(new TransactionCallback<Key>() {
         @Override
         public Key inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          byte[] storeValueBytes = EncodingHelper.convertToSmile(inValue);
+          Object storeValue = EncodingHelper.asJsonMap(inValue);
+
+          if (schema != null) {
+            FieldTransform fieldTransform = new FieldTransform(schema);
+            StructureTransform structureTransform = new StructureTransform(schema);
+            storeValue =
+                structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
+          }
+
+          byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
 
           DateTime createdDate = new DateTime();
           int inserted =
@@ -95,7 +126,18 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
         return null;
       }
 
-      return EncodingHelper.asValue(EncodingHelper.parseSmile(objectBytes), clazz);
+      final Schema schema = schemaManager.retrieveSchema(realKey.getType());
+
+      Object storedValue =
+          EncodingHelper.parseSmile(objectBytes, schema != null ? List.class : Map.class);
+
+      if (schema != null) {
+        FieldTransform fieldTransform = new FieldTransform(schema);
+        StructureTransform structureTransform = new StructureTransform(schema);
+        storedValue = fieldTransform.unpack(structureTransform.unpack((List<Object>) storedValue));
+      }
+
+      return EncodingHelper.asValue((Map<String, Object>) storedValue, clazz);
     } catch (Exception e) {
       throw new KazukiException(e);
     }
@@ -138,8 +180,17 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
 
           Map<String, Object> first = results.iterator().next();
 
-          dbFound.put(realKey, EncodingHelper.asValue(
-              EncodingHelper.parseSmile((byte[]) first.get("_value")), clazz));
+          Object storedValue = EncodingHelper.parseSmile((byte[]) first.get("_value"), List.class);
+
+          final Schema schema = schemaManager.retrieveSchema(realKey.getType());
+          if (schema != null) {
+            FieldTransform fieldTransform = new FieldTransform(schema);
+            StructureTransform structureTransform = new StructureTransform(schema);
+            storedValue =
+                fieldTransform.unpack(structureTransform.unpack((List<Object>) storedValue));
+          }
+
+          dbFound.put(realKey, EncodingHelper.asValue((Map<String, Object>) storedValue, clazz));
         }
 
         return dbFound;
@@ -157,14 +208,24 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
           final int typeId = sequences.getTypeId(realKey.getType(), false);
           final long keyId = realKey.getId();
 
-          Map<String, Object> original =
-              (Map<String, Object>) EncodingHelper.parseSmile(getObjectBytes(realKey));
+          byte[] objectBytes = getObjectBytes(realKey);
 
-          if (original == null) {
+          if (objectBytes == null) {
             return false;
           }
 
-          int updated = doUpdate(handle, typeId, keyId, EncodingHelper.convertToSmile(inValue));
+          Object storeValue = EncodingHelper.asJsonMap(inValue);
+
+          final Schema schema = schemaManager.retrieveSchema(realKey.getType());
+
+          if (schema != null) {
+            FieldTransform fieldTransform = new FieldTransform(schema);
+            StructureTransform structureTransform = new StructureTransform(schema);
+            storeValue =
+                structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
+          }
+
+          int updated = doUpdate(handle, typeId, keyId, EncodingHelper.convertToSmile(storeValue));
 
           return updated == 0;
         }
@@ -227,10 +288,18 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
     }
   }
 
-  @Override
   public <T> Iterator<T> iterator(final String type, final Class<T> clazz) throws Exception {
+    return iterator(type, clazz, 0L, null);
+  }
+
+  @Override
+  public <T> Iterator<T> iterator(final String type, final Class<T> clazz, final Long offset,
+      final Long limit) throws Exception {
+    final SchemaManager schemas = schemaManager;
+
     return new Iterator<T>() {
-      private final Iterator<String> inner = createKeyIterator(type);
+      private final Iterator<String> inner = createKeyIterator(type, offset, limit);
+      private final Schema schema = schemas.retrieveSchema(type);
       private String nextKey = advance();
 
       public String advance() {
@@ -263,11 +332,18 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
       @Override
       public T next() {
         try {
-          Map<String, Object> result = loadFriendlyEntity(Key.valueOf(nextKey));
+          Object result =
+              loadFriendlyEntity(Key.valueOf(nextKey), schema != null ? List.class : Map.class);
 
           nextKey = advance();
 
-          return EncodingHelper.asValue(result, clazz);
+          if (schema != null) {
+            FieldTransform fieldTransform = new FieldTransform(schema);
+            StructureTransform structureTransform = new StructureTransform(schema);
+            result = fieldTransform.unpack(structureTransform.unpack((List<Object>) result));
+          }
+
+          return EncodingHelper.asValue((Map<String, Object>) result, clazz);
         } catch (Exception e) {
           if (!(e instanceof RuntimeException)) {
             throw new RuntimeException(e);
@@ -312,7 +388,7 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
     });
   }
 
-  private Iterator<String> createKeyIterator(final String type) {
+  private Iterator<String> createKeyIterator(final String type, final Long offset, final Long limit) {
     return database.withHandle(new HandleCallback<Iterator<String>>() {
       @Override
       public Iterator<String> withHandle(Handle handle) throws Exception {
@@ -320,6 +396,8 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
 
         Query<Map<String, Object>> select = handle.createQuery(getPrefix() + "key_ids_of_type");
         select.bind("key_type", typeId);
+        select.bind("offset", offset);
+        select.bind("limit", limit);
 
         List<String> inefficentButExpedient = new ArrayList<String>();
 
@@ -384,7 +462,7 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
     return (int) (new DateTime().withZone(DateTimeZone.UTC).getMillis() / 1000);
   }
 
-  private Map<String, Object> loadFriendlyEntity(final Key realKey) throws Exception {
+  private <T> T loadFriendlyEntity(final Key realKey, Class<T> clazz) throws Exception {
     byte[] objectBytes = getObjectBytes(realKey);
 
     if (objectBytes == null) {
@@ -392,7 +470,7 @@ public abstract class JDBIKeyValueStorage implements KeyValueStorage {
     }
 
     try {
-      return (Map<String, Object>) EncodingHelper.parseSmile(objectBytes);
+      return (T) EncodingHelper.parseSmile(objectBytes, clazz);
     } catch (Exception e) {
       throw new KazukiException(e);
     }

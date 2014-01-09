@@ -1,6 +1,6 @@
 package io.kazuki.v0.internal.helper;
 
-import io.kazuki.v0.store.JDBIKeyValueStorage;
+import io.kazuki.v0.store.keyvalue.JDBIKeyValueStorage;
 
 import java.util.StringTokenizer;
 

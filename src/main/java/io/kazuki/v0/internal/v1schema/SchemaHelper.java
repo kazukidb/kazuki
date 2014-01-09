@@ -1,15 +1,11 @@
-package io.kazuki.v0.internal.v1schema;
-
-import java.util.Collections;
-
-public class SchemaHelper {
-    public static SchemaDefinition getEmptySchema() {
-        SchemaDefinition newDefinition = new SchemaDefinition(
-                Collections.<Attribute> emptyList(),
-                Collections.<IndexDefinition> emptyList(),
-                Collections.<CounterDefinition> emptyList(),
-                Collections.<FulltextDefinition> emptyList());
-
-        return newDefinition;
-    }
-}
+//package io.kazuki.v0.internal.v1schema;
+//
+//import java.util.Collections;
+//
+//public class SchemaHelper {
+//  public static SchemaDefinition getEmptySchema() {
+//    SchemaDefinition newDefinition = new SchemaDefinition(Collections.<Attribute>emptyList());
+//
+//    return newDefinition;
+//  }
+//}

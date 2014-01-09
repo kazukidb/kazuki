@@ -141,6 +141,8 @@ h2_key_ids_of_type() ::=<<
   select "_key_id"
     from "_key_values"
    where "_key_type" = :key_type
+   limit :limit
+  offset :offset
 >>
 
 h2_key_updates_from_to() ::=<<

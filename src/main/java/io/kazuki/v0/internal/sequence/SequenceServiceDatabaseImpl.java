@@ -77,12 +77,12 @@ public class SequenceServiceDatabaseImpl implements SequenceService {
     return counter.peekNext();
   }
 
-  public Integer getTypeId(final String type, final boolean create) throws Exception {
+  public Integer getTypeId(final String type, final boolean create) throws KazukiException {
     return getTypeId(type, create, true);
   }
 
   public Integer getTypeId(final String type, final boolean create, final boolean strict)
-      throws Exception {
+      throws KazukiException {
     if (type == null) {
       throw new KazukiException("Invalid entity 'type'");
     }

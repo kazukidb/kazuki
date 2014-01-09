@@ -56,12 +56,12 @@ public class EncodingHelper {
     }
   }
 
-  public static Map<String, Object> parseSmile(byte[] valueBytes) throws KazukiException {
+  public static <T> T parseSmile(byte[] valueBytes, Class<T> clazz) throws KazukiException {
     try {
       ByteArrayInputStream in = new ByteArrayInputStream(valueBytes);
       SmileParser smile = smileFactory.createJsonParser(in);
 
-      return mapper.readValue(smile, LinkedHashMap.class);
+      return mapper.readValue(smile, clazz);
     } catch (Exception e) {
       throw new KazukiException(e);
     }

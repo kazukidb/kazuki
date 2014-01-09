@@ -1,4 +1,13 @@
-package io.kazuki.v0.store;
+package io.kazuki.v0.store.keyvalue;
+
+
+import io.kazuki.v0.internal.v2schema.Attribute;
+import io.kazuki.v0.internal.v2schema.Schema;
+import io.kazuki.v0.store.Foo;
+import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.SchemaManager;
+import io.kazuki.v0.store.keyvalue.H2KeyValueStorage;
+import io.kazuki.v0.store.keyvalue.KeyValueStorage;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -19,6 +28,13 @@ public class H2KeyValueStorageTest {
   public void testDemo() throws Exception {
     KeyValueStorage store = inject.getInstance(KeyValueStorage.class);
     store.initialize();
+    SchemaManager manager = inject.getInstance(SchemaManager.class);
+
+    Schema schema =
+        new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
+            true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
+
+    manager.createSchema("foo", schema);
 
     Key foo1Key = store.create("foo", Foo.class, new Foo("k", "v"), false);
     System.out.println("created key = " + foo1Key);

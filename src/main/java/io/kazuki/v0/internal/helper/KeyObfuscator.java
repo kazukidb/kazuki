@@ -35,18 +35,26 @@ public class KeyObfuscator {
   private static ConcurrentHashMap<String, SecretKey> keyCache =
       new ConcurrentHashMap<String, SecretKey>();
 
-  public static String encrypt(String type, Long id) throws Exception {
+  public static String encrypt(String type, Long id) throws KazukiException {
     StringBuilder encryptedIdentifier = new StringBuilder();
     encryptedIdentifier.append("@");
     encryptedIdentifier.append(type);
     encryptedIdentifier.append(":");
 
-    byte[] plain = ByteBuffer.allocate(8).putLong(id).array();
-    byte[] encrypted = getCipher(type, Cipher.ENCRYPT_MODE).doFinal(plain);
+    try {
+      byte[] plain = ByteBuffer.allocate(8).putLong(id).array();
+      byte[] encrypted = getCipher(type, Cipher.ENCRYPT_MODE).doFinal(plain);
 
-    encryptedIdentifier.append(Hex.encodeHex(encrypted));
+      encryptedIdentifier.append(Hex.encodeHex(encrypted));
 
-    return encryptedIdentifier.toString();
+      return encryptedIdentifier.toString();
+    } catch (Exception e) {
+      if (e instanceof KazukiException) {
+        throw (KazukiException) e;
+      }
+
+      throw new KazukiException("error while encrypting id!", e);
+    }
   }
 
   public static Key decrypt(String encryptedText) throws Exception {
@@ -74,11 +82,15 @@ public class KeyObfuscator {
     return new Key(type, id);
   }
 
-  private static Cipher getCipher(String type, int mode) throws Exception {
-    Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding");
-    cipher.init(mode, getKey(type), paramSpec);
+  private static Cipher getCipher(String type, int mode) throws KazukiException {
+    try {
+      Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding");
+      cipher.init(mode, getKey(type), paramSpec);
 
-    return cipher;
+      return cipher;
+    } catch (Exception e) {
+      throw new KazukiException("error while creating cipher instance!", e);
+    }
   }
 
   private static SecretKey getKey(String type) throws Exception {

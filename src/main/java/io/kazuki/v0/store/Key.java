@@ -11,7 +11,7 @@ public class Key {
   private final String type;
   private final Long id;
 
-  public Key(String type, Long id) throws Exception {
+  public Key(String type, Long id) throws KazukiException {
     this.identifier = type + ":" + Long.toString(id);
     this.encryptedIdentifier = KeyObfuscator.encrypt(type, id);
     this.type = type;

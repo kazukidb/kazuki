@@ -1,4 +1,4 @@
-package io.kazuki.v0.store;
+package io.kazuki.v0.store.keyvalue;
 
 import io.kazuki.v0.internal.helper.H2TypeHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
@@ -6,6 +6,10 @@ import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.internal.sequence.SequenceHelper;
 import io.kazuki.v0.internal.sequence.SequenceService;
 import io.kazuki.v0.internal.sequence.SequenceServiceDatabaseImpl;
+import io.kazuki.v0.store.SchemaManager;
+import io.kazuki.v0.store.journal.SimpleH2JournalStorage;
+
+import javax.inject.Inject;
 
 import org.h2.Driver;
 import org.skife.jdbi.v2.DBI;
@@ -22,6 +26,12 @@ import com.jolbox.bonecp.BoneCPDataSource;
 public class H2KeyValueStorage extends JDBIKeyValueStorage {
   protected String getPrefix() {
     return H2TypeHelper.DATABASE_PREFIX;
+  }
+
+  @Inject
+  public H2KeyValueStorage(IDBI database, SchemaManager schemaManager,
+      SequenceServiceDatabaseImpl sequences) {
+    super(database, schemaManager, sequences);
   }
 
   public static class H2KeyValueStorageModule extends AbstractModule {
@@ -43,18 +53,18 @@ public class H2KeyValueStorage extends JDBIKeyValueStorage {
       binder.bind(String.class).annotatedWith(Names.named("db.prefix"))
           .toInstance(H2TypeHelper.DATABASE_PREFIX);
 
-      binder.bind(Boolean.class).annotatedWith(Names.named("nuke.allowed"))
-          .toInstance(Boolean.valueOf(System.getProperty("nuke.allowed", "false")));
-
       SequenceServiceDatabaseImpl sequenceService =
           new SequenceServiceDatabaseImpl(new SequenceHelper(Boolean.valueOf(System.getProperty(
               "strict.type.creation", "true"))), dbi, H2TypeHelper.DATABASE_PREFIX,
               SequenceServiceDatabaseImpl.DEFAULT_INCREMENT);
+
       binder.bind(SequenceService.class).toInstance(sequenceService);
       binder.bind(SequenceServiceDatabaseImpl.class).toInstance(sequenceService);
       binder.bind(SqlTypeHelper.class).to(H2TypeHelper.class).asEagerSingleton();
 
       binder.bind(KeyValueStorage.class).to(H2KeyValueStorage.class).asEagerSingleton();
+      binder.bind(SimpleH2JournalStorage.class).asEagerSingleton();
+      binder.bind(SchemaManager.class).asEagerSingleton();
     }
   }
 }
