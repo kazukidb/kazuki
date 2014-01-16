@@ -1,6 +1,6 @@
 package io.kazuki.v0.internal.helper;
 
-import io.kazuki.v0.internal.v1schema.AttributeType;
+import io.kazuki.v0.internal.v2schema.Attribute.Type;
 
 public class H2TypeHelper implements SqlTypeHelper {
   public static final String DATABASE_PREFIX = "h2:h2_";
@@ -11,7 +11,7 @@ public class H2TypeHelper implements SqlTypeHelper {
   }
 
   @Override
-  public String getSqlType(AttributeType type) {
+  public String getSqlType(Type type) {
     switch (type) {
       case BOOLEAN:
         return "BOOLEAN";
@@ -35,7 +35,6 @@ public class H2TypeHelper implements SqlTypeHelper {
         return "BIGINT UNSIGNED";
       case UTC_DATE_SECS:
         return "BIGINT";
-      case REFERENCE:
       case UTF8_SMALLSTRING:
         return "VARCHAR(255)";
       case CHAR_ONE:

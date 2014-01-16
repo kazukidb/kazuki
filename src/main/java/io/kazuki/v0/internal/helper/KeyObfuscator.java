@@ -57,7 +57,7 @@ public class KeyObfuscator {
     }
   }
 
-  public static Key decrypt(String encryptedText) throws Exception {
+  public static Key decrypt(String encryptedText) throws KazukiException {
     if (encryptedText == null || encryptedText.length() == 0 || !encryptedText.contains(":")) {
       throw new KazukiException("Invalid key");
     }
@@ -74,12 +74,16 @@ public class KeyObfuscator {
 
     String type = parts[0];
 
-    byte[] encrypted = Hex.decodeHex(parts[1].toCharArray());
-    byte[] decrypted = getCipher(type, Cipher.DECRYPT_MODE).doFinal(encrypted);
+    try {
+      byte[] encrypted = Hex.decodeHex(parts[1].toCharArray());
+      byte[] decrypted = getCipher(type, Cipher.DECRYPT_MODE).doFinal(encrypted);
 
-    Long id = ByteBuffer.allocate(8).put(decrypted).getLong(0);
+      Long id = ByteBuffer.allocate(8).put(decrypted).getLong(0);
 
-    return new Key(type, id);
+      return new Key(type, id);
+    } catch (Exception e) {
+      throw new KazukiException(e);
+    }
   }
 
   private static Cipher getCipher(String type, int mode) throws KazukiException {

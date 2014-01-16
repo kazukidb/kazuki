@@ -18,7 +18,7 @@ public class Key {
     this.id = id;
   }
 
-  public static Key valueOf(String key) throws Exception {
+  public static Key valueOf(String key) throws KazukiException {
     if (key == null || key.length() == 0) {
       throw new KazukiException("Invalid key");
     }

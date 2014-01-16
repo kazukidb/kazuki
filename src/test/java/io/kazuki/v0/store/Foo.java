@@ -20,4 +20,15 @@ public class Foo {
   public String getFooValue() {
     return fooValue;
   }
+
+  @Override
+  public int hashCode() {
+    return fooKey.hashCode() ^ fooValue.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return (other instanceof Foo) && ((Foo) other).fooKey.equals(fooKey)
+        && ((Foo) other).fooValue.equals(fooValue);
+  }
 }

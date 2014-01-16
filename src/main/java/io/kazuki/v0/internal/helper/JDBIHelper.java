@@ -1,7 +1,6 @@
 package io.kazuki.v0.internal.helper;
 
-import io.kazuki.v0.store.keyvalue.JDBIKeyValueStorage;
-
+import java.util.Map;
 import java.util.StringTokenizer;
 
 import javax.sql.DataSource;
@@ -14,20 +13,22 @@ import org.skife.jdbi.v2.ClasspathStatementLocator;
 import org.skife.jdbi.v2.DBI;
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
+import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.StatementContext;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
+import org.skife.jdbi.v2.Update;
 import org.skife.jdbi.v2.exceptions.UnableToCreateStatementException;
 import org.skife.jdbi.v2.exceptions.UnableToExecuteStatementException;
 import org.skife.jdbi.v2.tweak.StatementLocator;
 
 public class JDBIHelper {
-  public static DBI getDBI(DataSource datasource) {
+  public static DBI getDBI(Class<?> clazz, DataSource datasource) {
     DBI dbi = new DBI(datasource);
 
     final ClasspathGroupLoader theLoader =
-        new ClasspathGroupLoader(AngleBracketTemplateLexer.class, JDBIKeyValueStorage.class
-            .getPackage().getName().replaceAll("\\.", "/"));
+        new ClasspathGroupLoader(AngleBracketTemplateLexer.class, clazz.getPackage().getName()
+            .replaceAll("\\.", "/"));
 
     dbi.setStatementLocator(new StatementLocator() {
       private final StringTemplateGroupLoader loader = theLoader;
@@ -48,6 +49,16 @@ public class JDBIHelper {
     });
 
     return dbi;
+  }
+
+  public static Query<Map<String, Object>> getBoundQuery(Handle handle, String dbPrefix,
+      String tableParameterName, String tableName, String queryName) {
+    return handle.createQuery(dbPrefix + queryName).define(tableParameterName, tableName);
+  }
+
+  public static Update getBoundStatement(Handle handle, String dbPrefix, String tableParameterName,
+      String tableName, String queryName) {
+    return handle.createStatement(dbPrefix + queryName).define(tableParameterName, tableName);
   }
 
   public static void createTable(IDBI database, final String tableDrop, final String tableDefinition) {

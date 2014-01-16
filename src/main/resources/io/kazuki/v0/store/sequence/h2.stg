@@ -1,0 +1,96 @@
+group sql;
+
+h2_seq_seq_create_table(sequence_table_name) ::=<<
+  create table if not exists "<sequence_table_name>" (
+    "_key_type" smallint unsigned not null PRIMARY KEY,
+    "_next_id"  bigint unsigned not null
+  )
+>>
+
+h2_seq_seq_list(sequence_table_name) ::=<<
+  select "_key_type", "_next_id" from "<sequence_table_name>"
+>>
+
+h2_seq_seq_insert(sequence_table_name) ::=<< 
+  insert
+    into "<sequence_table_name>" ("_key_type", "_next_id")
+  values (:key_type, :next_id);
+>>
+
+h2_seq_seq_init(sequence_table_name) ::=<< 
+  merge
+    into "<sequence_table_name>" ("_key_type", "_next_id")
+  values
+    (0, 2),
+    (1, 1)
+>>
+
+h2_seq_seq_next(sequence_table_name) ::=<< 
+  select "_next_id"
+    from "<sequence_table_name>"
+   where "_key_type" = :key_type
+>>
+
+h2_seq_seq_inc(sequence_table_name) ::=<< 
+  update "<sequence_table_name>"
+    set "_next_id" = "_next_id" + :increment
+   where "_key_type" = :key_type
+>>
+
+h2_seq_seq_set(sequence_table_name) ::=<< 
+  update "<sequence_table_name>"
+    set "_next_id" = :next_id
+   where "_key_type" = :key_type
+>>
+
+h2_seq_seq_truncate(sequence_table_name) ::=<< 
+  truncate table "<sequence_table_name>"
+>>
+
+h2_seq_seq_reset(sequence_table_name) ::=<< 
+  update "<sequence_table_name>" set "_next_id" = 0 where "_key_type" > 1
+>>
+
+h2_seq_types_create_table(key_types_table_name) ::=<<
+  create table if not exists "<key_types_table_name>" (
+    "_key_type"     smallint unsigned not null PRIMARY KEY,
+    "_type_name"    varchar(100) not null UNIQUE
+  )
+>>
+
+h2_seq_types_init(key_types_table_name) ::=<< 
+  merge
+    into "<key_types_table_name>" ("_key_type", "_type_name")
+  values
+    (0, '$key'),
+    (1, '$schema')
+>>
+
+h2_seq_types_get_id(key_types_table_name) ::=<< 
+  select "_key_type"
+    from "<key_types_table_name>"
+   where "_type_name" = :type_name;
+>>
+
+h2_seq_types_get_name(key_types_table_name) ::=<< 
+  select "_type_name"
+    from "<key_types_table_name>"
+   where "_key_type" = :key_type;
+>>
+
+h2_seq_types_list(key_types_table_name) ::=<< 
+  select "_type_name"
+    from "<key_types_table_name>"
+>>
+
+h2_seq_types_create(key_types_table_name) ::=<< 
+  insert
+    into "<key_types_table_name>" ("_key_type", "_type_name")
+  values (:key_type, :type_name);
+>>
+
+h2_seq_types_truncate(key_types_table_name) ::=<< 
+  truncate table "<key_types_table_name>"
+>>
+
+
