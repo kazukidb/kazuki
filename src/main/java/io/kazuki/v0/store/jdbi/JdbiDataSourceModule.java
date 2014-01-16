@@ -40,6 +40,9 @@ public class JdbiDataSourceModule extends PrivateModule {
     datasource.setUsername(config.getJdbcUser());
     datasource.setPassword(config.getJdbcPassword());
 
+    datasource.setMinConnectionsPerPartition(config.getPoolMinConnections());
+    datasource.setMaxConnectionsPerPartition(config.getPoolMaxConnections());
+
     bind(BoneCPDataSource.class).annotatedWith(Names.named(name)).toInstance(datasource);
     expose(BoneCPDataSource.class).annotatedWith(Names.named(name));
 
