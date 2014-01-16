@@ -30,17 +30,27 @@ public class SimpleJournalStore implements JournalStore {
 
   @Override
   public <T> Iterator<T> getIteratorAbsolute(String type, Class<T> clazz, Long offset, Long limit)
-      throws Exception {
+      throws KazukiException {
     return store.iterator(type, clazz, offset, limit);
   }
 
   @Override
   public <T> Iterator<T> getIteratorRelative(String type, Class<T> clazz, Long offset, Long limit)
-      throws Exception {
+      throws KazukiException {
     //
     // TODO: implement partition offset lookup
     //
     return getIteratorAbsolute(type, clazz, offset, limit);
+  }
+
+  @Override
+  public Long approximateSize(String type) throws KazukiException {
+    return store.approximateSize(type);
+  }
+
+  @Override
+  public void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException {
+    store.clear(preserveTypes, preserveCounters);
   }
 
   @Override

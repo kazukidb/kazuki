@@ -12,6 +12,7 @@ import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.SequenceService;
+import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -55,8 +56,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
   protected final String tableName;
 
-  public KeyValueStoreJdbiBaseImpl(IDBI database, SchemaStore schemaService, SequenceService sequences,
-      String groupName, String storeName, String partitionName) {
+  public KeyValueStoreJdbiBaseImpl(IDBI database, SchemaStore schemaService,
+      SequenceService sequences, String groupName, String storeName, String partitionName) {
     this.database = database;
     this.schemaService = schemaService;
     this.sequences = sequences;
@@ -277,6 +278,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
         return deleted != 0;
       }
     });
+  }
+
+  @Override
+  public Long approximateSize(String type) throws KazukiException {
+    return ((SequenceServiceJdbiImpl) sequences).peekKey(type).getId();
   }
 
   public void clear(final boolean preserveTypes, final boolean preserveCounters) {
