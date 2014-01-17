@@ -1,11 +1,11 @@
 package io.kazuki.v0.store.journal;
 
 public interface PartitionInfo {
-  public String getPartitionId();
+  String getPartitionId();
 
-  public long getMinId();
+  long getMinId();
 
-  public long getMaxId();
+  long getMaxId();
 
-  public long getSize();
+  long getSize();
 }

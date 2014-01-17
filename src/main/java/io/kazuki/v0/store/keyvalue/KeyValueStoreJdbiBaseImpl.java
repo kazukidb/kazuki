@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.inject.Inject;
+
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.skife.jdbi.v2.Handle;
@@ -34,7 +36,6 @@ import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.Update;
 import org.skife.jdbi.v2.tweak.HandleCallback;
 
-import com.google.inject.Inject;
 
 /**
  * Abstract implementation of key-value storage based on JDBI.

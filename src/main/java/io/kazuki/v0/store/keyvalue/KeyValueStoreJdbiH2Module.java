@@ -4,8 +4,8 @@ import io.kazuki.v0.internal.helper.H2TypeHelper;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
-import io.kazuki.v0.store.schema.SchemaStoreImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
+import io.kazuki.v0.store.schema.SchemaStoreImpl;
 import io.kazuki.v0.store.sequence.SequenceService;
 
 import javax.annotation.Nullable;

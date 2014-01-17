@@ -2,9 +2,10 @@ package io.kazuki.v0.store.jdbi;
 
 import io.kazuki.v0.internal.helper.JDBIHelper;
 
+import javax.inject.Inject;
+
 import org.skife.jdbi.v2.IDBI;
 
-import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.jolbox.bonecp.BoneCPDataSource;
 

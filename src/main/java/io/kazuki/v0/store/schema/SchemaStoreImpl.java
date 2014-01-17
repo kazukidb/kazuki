@@ -8,7 +8,7 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.sequence.SequenceService;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 
 public class SchemaStoreImpl implements SchemaStore {

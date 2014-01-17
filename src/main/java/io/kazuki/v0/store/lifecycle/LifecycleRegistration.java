@@ -1,6 +1,5 @@
 package io.kazuki.v0.store.lifecycle;
 
-import com.google.inject.Inject;
 
 /**
  * Objects should implement LifecycleRegistration so that the container will inject the singleton
@@ -21,6 +20,5 @@ import com.google.inject.Inject;
  * </pre>
  */
 public interface LifecycleRegistration {
-  @Inject
   public void register(Lifecycle lifecycle);
 }

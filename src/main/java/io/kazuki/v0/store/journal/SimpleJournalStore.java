@@ -7,7 +7,8 @@ import io.kazuki.v0.store.schema.TypeValidation;
 import java.util.Collection;
 import java.util.Iterator;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
+
 
 public class SimpleJournalStore implements JournalStore {
   private final KeyValueStore store;

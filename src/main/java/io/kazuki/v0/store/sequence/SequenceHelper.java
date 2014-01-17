@@ -6,12 +6,14 @@ import io.kazuki.v0.store.KazukiException;
 import java.util.List;
 import java.util.Map;
 
+import javax.inject.Inject;
+
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.Update;
 
 import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
+
 
 public class SequenceHelper {
   private final boolean strictTypeCreation;

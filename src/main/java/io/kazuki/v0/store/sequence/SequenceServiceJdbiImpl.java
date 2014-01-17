@@ -1,8 +1,8 @@
 package io.kazuki.v0.store.sequence;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
-import io.kazuki.v0.internal.availability.Releasable;
 import io.kazuki.v0.internal.availability.AvailabilityManager.ProtectedCommand;
+import io.kazuki.v0.internal.availability.Releasable;
 import io.kazuki.v0.internal.helper.JDBIHelper;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
@@ -17,13 +17,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.inject.Inject;
+
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.tweak.HandleCallback;
 
-import com.google.inject.Inject;
 
 public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegistration {
   public static final long DEFAULT_INCREMENT_BLOCK_SIZE = 100000L;

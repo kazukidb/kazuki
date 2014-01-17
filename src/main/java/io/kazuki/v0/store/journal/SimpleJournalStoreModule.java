@@ -5,6 +5,7 @@ import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Module;
 import com.google.inject.Key;
 import com.google.inject.name.Names;
 
+
 public class SimpleJournalStoreModule extends KeyValueStoreJdbiH2Module {
   public SimpleJournalStoreModule(String name, String propertiesPath) {
     super(name, propertiesPath);
