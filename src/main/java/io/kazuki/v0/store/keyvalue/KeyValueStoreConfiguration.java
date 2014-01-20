@@ -1,5 +1,7 @@
 package io.kazuki.v0.store.keyvalue;
 
+import io.kazuki.v0.store.config.ConfigurationBuilder;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 
@@ -15,11 +17,11 @@ public class KeyValueStoreConfiguration {
       @JsonProperty("groupName") String groupName, @JsonProperty("storeName") String storeName,
       @JsonProperty("partitionName") String partitionName,
       @JsonProperty("strictTypeCreation") boolean strictTypeCreation) {
-    Preconditions.checkNotNull(dbType, "dbType must not be null");
+    Preconditions.checkNotNull(dbType, "dbType");
     Preconditions.checkArgument(!dbType.contains("_") && !dbType.contains(":"), "invalid dbType");
-    Preconditions.checkNotNull(groupName, "groupName must not be null");
-    Preconditions.checkNotNull(storeName, "storeName must not be null");
-    Preconditions.checkNotNull(partitionName, "partitionName must not be null");
+    Preconditions.checkNotNull(groupName, "groupName");
+    Preconditions.checkNotNull(storeName, "storeName");
+    Preconditions.checkNotNull(partitionName, "partitionName");
 
     this.dbType = dbType;
     this.dbPrefix = dbType + ":" + dbType + "_";
@@ -51,5 +53,48 @@ public class KeyValueStoreConfiguration {
 
   public boolean isStrictTypeCreation() {
     return strictTypeCreation;
+  }
+
+  public static class Builder implements ConfigurationBuilder<KeyValueStoreConfiguration> {
+    private String dbType;
+    private String groupName;
+    private String storeName;
+    private String partitionName;
+    private boolean strictTypeCreation = true;
+
+    public Builder withDbType(String dbType) {
+      this.dbType = dbType;
+
+      return this;
+    }
+
+    public Builder withGroupName(String groupName) {
+      this.groupName = groupName;
+
+      return this;
+    }
+
+    public Builder withStoreName(String storeName) {
+      this.storeName = storeName;
+
+      return this;
+    }
+
+    public Builder withPartitionName(String partitionName) {
+      this.partitionName = partitionName;
+
+      return this;
+    }
+
+    public Builder withStrictTypeCreation(boolean strictTypeCreation) {
+      this.strictTypeCreation = strictTypeCreation;
+
+      return this;
+    }
+
+    public KeyValueStoreConfiguration build() {
+      return new KeyValueStoreConfiguration(dbType, groupName, storeName, partitionName,
+          strictTypeCreation);
+    }
   }
 }

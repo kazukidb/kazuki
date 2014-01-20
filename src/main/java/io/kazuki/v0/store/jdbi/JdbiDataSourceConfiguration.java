@@ -1,6 +1,9 @@
 package io.kazuki.v0.store.jdbi;
 
+import io.kazuki.v0.store.config.ConfigurationBuilder;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 
 public class JdbiDataSourceConfiguration {
   private final String jdbcDriver;
@@ -15,6 +18,11 @@ public class JdbiDataSourceConfiguration {
       @JsonProperty("jdbcPassword") String jdbcPassword,
       @JsonProperty("poolMinConnections") int poolMinConnections,
       @JsonProperty("poolMaxConnections") int poolMaxConnections) {
+    Preconditions.checkNotNull(jdbcDriver, "jdbcDriver");
+    Preconditions.checkNotNull(jdbcUrl, "jdbcUrl");
+    Preconditions.checkNotNull(jdbcUser, "jdbcUser");
+    Preconditions.checkNotNull(jdbcPassword, "jdbcPassword");
+
     this.jdbcDriver = jdbcDriver;
     this.jdbcUrl = jdbcUrl;
     this.jdbcUser = jdbcUser;
@@ -45,5 +53,55 @@ public class JdbiDataSourceConfiguration {
 
   public int getPoolMaxConnections() {
     return poolMaxConnections;
+  }
+
+  public static class Builder implements ConfigurationBuilder<JdbiDataSourceConfiguration> {
+    private String jdbcDriver;
+    private String jdbcUrl;
+    private String jdbcUser;
+    private String jdbcPassword;
+    private int poolMinConnections;
+    private int poolMaxConnections;
+
+    public Builder withJdbcDriver(String jdbcDriver) {
+      this.jdbcDriver = jdbcDriver;
+
+      return this;
+    }
+
+    public Builder withJdbcUrl(String jdbcUrl) {
+      this.jdbcUrl = jdbcUrl;
+
+      return this;
+    }
+
+    public Builder withJdbcUser(String jdbcUser) {
+      this.jdbcUser = jdbcUser;
+
+      return this;
+    }
+
+    public Builder withJdbcPassword(String jdbcPassword) {
+      this.jdbcPassword = jdbcPassword;
+
+      return this;
+    }
+
+    public Builder withPoolMinConnections(int poolMinConnections) {
+      this.poolMinConnections = poolMinConnections;
+
+      return this;
+    }
+
+    public Builder withPoolMaxConnections(int poolMaxConnections) {
+      this.poolMaxConnections = poolMaxConnections;
+
+      return this;
+    }
+
+    public JdbiDataSourceConfiguration build() {
+      return new JdbiDataSourceConfiguration(jdbcDriver, jdbcUrl, jdbcUser, jdbcPassword,
+          poolMinConnections, poolMaxConnections);
+    }
   }
 }

@@ -29,9 +29,9 @@ public class SequenceHelper {
 
   public SequenceHelper(String dbPrefix, String groupName, String storeName,
       boolean strictTypeCreation) {
-    Preconditions.checkNotNull(dbPrefix, "dbPrefix must not be null");
-    Preconditions.checkNotNull(groupName, "groupName must not be null");
-    Preconditions.checkNotNull(storeName, "storeName must not be null");
+    Preconditions.checkNotNull(dbPrefix, "dbPrefix");
+    Preconditions.checkNotNull(groupName, "groupName");
+    Preconditions.checkNotNull(storeName, "storeName");
 
     this.dbPrefix = dbPrefix;
     this.sequenceTableName = "_" + groupName + "_" + storeName + "__seq";
@@ -57,7 +57,7 @@ public class SequenceHelper {
     doCreate |= !strictTypeCreation;
 
     if (type == null || type.length() == 0 || type.indexOf(":") != -1 || type.length() > 72) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     if (typeCodes.containsKey(type)) {
@@ -76,7 +76,7 @@ public class SequenceHelper {
 
     if (result == null || result.isEmpty()) {
       if (!doCreate) {
-        throw new KazukiException("Invalid entity 'type'");
+        throw new IllegalArgumentException("Invalid entity 'type'");
       }
 
       typeId = getNextId(handle, 0, 1L).intValue();
@@ -134,7 +134,7 @@ public class SequenceHelper {
   public String getTypeName(Handle handle, Map<Integer, String> typeNames, Integer id)
       throws KazukiException {
     if (id == null || id < 0) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     if (typeNames.containsKey(id)) {
@@ -148,7 +148,7 @@ public class SequenceHelper {
     List<Map<String, Object>> result = query.list();
 
     if (result == null || result.isEmpty()) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     String typeName = (String) result.iterator().next().get("_type_name");

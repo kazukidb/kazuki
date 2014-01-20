@@ -2,17 +2,27 @@ package io.kazuki.v0.store.lifecycle;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 /**
  * The Lifecycle is a singleton instance (as hopefully enforced by the DI container) through which
  * application lifecycle is controlled. This Lifecycle instance is used by a controller object in
  * the app that invokes Lifecycle methods to inform components of application state changes.
  */
 public class Lifecycle {
+  private final Logger log = LoggerFactory.getLogger(getClass());
+
   private final ConcurrentLinkedQueue<LifecycleAware> listeners =
       new ConcurrentLinkedQueue<LifecycleAware>();
 
   /** Registers a listener with the lifecycle, thus 'subscribing' to events */
   public void register(LifecycleAware listener) {
+    if (log.isDebugEnabled()) {
+      log.debug("Registering Lifecycle listener {}", listener.toString());
+    }
+
     listeners.add(listener);
   }
 
@@ -62,8 +72,16 @@ public class Lifecycle {
    * Sends the event synchronously to each listener in order.
    */
   private void fireEvent(LifecycleEvent event) {
+    log.info("Firing lifecycle event {} to all listeners", event.name());
+
     for (LifecycleAware listener : listeners) {
+      if (log.isDebugEnabled()) {
+        log.debug("Firing lifecycle event {} to listener {}", event.name(), listener.toString());
+      }
+
       listener.eventFired(event);
     }
+
+    log.debug("Fired lifecycle event {}", event.name());
   }
 }

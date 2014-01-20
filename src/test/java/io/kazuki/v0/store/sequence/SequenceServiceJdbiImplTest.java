@@ -23,14 +23,15 @@ public class SequenceServiceJdbiImplTest {
 
   public SequenceServiceJdbiImplTest() {
     inject =
-        Guice.createInjector(new LifecycleModule(), new JdbiDataSourceModule("foo",
+        Guice.createInjector(new LifecycleModule("foo"), new JdbiDataSourceModule("foo",
             "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
             "test/io/kazuki/v0/store/sequence/sequence.properties"));
   }
 
   @Test
   public void testDemo() throws Exception {
-    final Lifecycle lifecycle = inject.getInstance(Lifecycle.class);
+    final Lifecycle lifecycle =
+        inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
 
     final SequenceServiceJdbiImpl seq =
         (SequenceServiceJdbiImpl) inject.getInstance(com.google.inject.Key.<SequenceService>get(

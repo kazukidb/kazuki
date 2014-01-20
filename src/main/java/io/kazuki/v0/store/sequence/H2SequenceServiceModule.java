@@ -3,6 +3,9 @@ package io.kazuki.v0.store.sequence;
 import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
+import io.kazuki.v0.store.lifecycle.Lifecycle;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
 
@@ -12,37 +15,54 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
+import com.google.inject.Scopes;
 import com.google.inject.name.Names;
 import com.jolbox.bonecp.BoneCPDataSource;
 
 public class H2SequenceServiceModule extends PrivateModule {
   private final String name;
   private final String propertiesPath;
+  private final AtomicReference<SequenceServiceConfiguration> config;
 
   public H2SequenceServiceModule(String name, @Nullable String propertiesPath) {
-    Preconditions.checkNotNull(name, "name must not be null");
+    Preconditions.checkNotNull(name, "name");
 
     this.name = name;
     this.propertiesPath = propertiesPath;
+    this.config = new AtomicReference<SequenceServiceConfiguration>();
+  }
+
+  public H2SequenceServiceModule withConfiguration(SequenceServiceConfiguration config) {
+    this.config.set(config);
+
+    return this;
   }
 
   @Override
   protected void configure() {
+    bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name))).in(Scopes.SINGLETON);
+
     Provider<BoneCPDataSource> provider =
         binder().getProvider(Key.get(BoneCPDataSource.class, Names.named(name)));
 
-    bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider))
-        .asEagerSingleton();
+    bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider)).in(
+        Scopes.SINGLETON);
 
-    bind(SequenceServiceConfiguration.class).toProvider(
-        new ConfigurationProvider<SequenceServiceConfiguration>(name,
-            SequenceServiceConfiguration.class, propertiesPath, true)).asEagerSingleton();
+    SequenceServiceConfiguration theConfig = config.get();
 
-    bind(SequenceHelper.class).asEagerSingleton();
-    bind(AvailabilityManager.class).asEagerSingleton();
+    if (theConfig != null) {
+      bind(SequenceServiceConfiguration.class).toInstance(theConfig);
+    } else {
+      bind(SequenceServiceConfiguration.class).toProvider(
+          new ConfigurationProvider<SequenceServiceConfiguration>(name,
+              SequenceServiceConfiguration.class, propertiesPath, true)).in(Scopes.SINGLETON);
+    }
+
+    bind(SequenceHelper.class).in(Scopes.SINGLETON);
+    bind(AvailabilityManager.class).in(Scopes.SINGLETON);
 
     bind(SequenceService.class).annotatedWith(Names.named(name)).to(SequenceServiceJdbiImpl.class)
-        .asEagerSingleton();
+        .in(Scopes.SINGLETON);
 
     expose(SequenceService.class).annotatedWith(Names.named(name));
   }

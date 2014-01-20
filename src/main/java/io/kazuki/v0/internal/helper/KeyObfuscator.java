@@ -1,6 +1,5 @@
 package io.kazuki.v0.internal.helper;
 
-import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 
 import java.nio.ByteBuffer;
@@ -15,6 +14,8 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.google.common.base.Throwables;
+
 public class KeyObfuscator {
   private static final String keyString = System.getProperty("key.encrypt.password", "changeme");
   private static final byte[] saltBytes = System.getProperty("key.encrypt.salt", "asalt")
@@ -26,7 +27,7 @@ public class KeyObfuscator {
       ivBytes =
           Hex.decodeHex(System.getProperty("key.encrypt.iv", "0123456789ABCDEF").toCharArray());
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw Throwables.propagate(e);
     }
   }
 
@@ -35,7 +36,7 @@ public class KeyObfuscator {
   private static ConcurrentHashMap<String, SecretKey> keyCache =
       new ConcurrentHashMap<String, SecretKey>();
 
-  public static String encrypt(String type, Long id) throws KazukiException {
+  public static String encrypt(String type, Long id) {
     StringBuilder encryptedIdentifier = new StringBuilder();
     encryptedIdentifier.append("@");
     encryptedIdentifier.append(type);
@@ -49,17 +50,13 @@ public class KeyObfuscator {
 
       return encryptedIdentifier.toString();
     } catch (Exception e) {
-      if (e instanceof KazukiException) {
-        throw (KazukiException) e;
-      }
-
-      throw new KazukiException("error while encrypting id!", e);
+      throw Throwables.propagate(e);
     }
   }
 
-  public static Key decrypt(String encryptedText) throws KazukiException {
+  public static Key decrypt(String encryptedText) {
     if (encryptedText == null || encryptedText.length() == 0 || !encryptedText.contains(":")) {
-      throw new KazukiException("Invalid key");
+      throw new IllegalArgumentException("Invalid key");
     }
 
     if (!encryptedText.startsWith("@")) {
@@ -69,7 +66,7 @@ public class KeyObfuscator {
     String[] parts = encryptedText.substring(1).split(":");
 
     if (parts.length != 2 || parts[1].length() != 16) {
-      throw new KazukiException("Invalid key");
+      throw new IllegalArgumentException("Invalid key");
     }
 
     String type = parts[0];
@@ -82,18 +79,18 @@ public class KeyObfuscator {
 
       return new Key(type, id);
     } catch (Exception e) {
-      throw new KazukiException(e);
+      throw Throwables.propagate(e);
     }
   }
 
-  private static Cipher getCipher(String type, int mode) throws KazukiException {
+  private static Cipher getCipher(String type, int mode) {
     try {
       Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding");
       cipher.init(mode, getKey(type), paramSpec);
 
       return cipher;
     } catch (Exception e) {
-      throw new KazukiException("error while creating cipher instance!", e);
+      throw Throwables.propagate(e);
     }
   }
 

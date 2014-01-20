@@ -24,14 +24,15 @@ import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
 public class H2KeyValueStorageTest {
-  private final Injector inject = Guice.createInjector(new LifecycleModule(),
+  private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
       new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence"));
 
   private final ObjectMapper mapper = new ObjectMapper();
 
   @Test
   public void testDemo() throws Exception {
-    final Lifecycle lifecycle = inject.getInstance(Lifecycle.class);
+    final Lifecycle lifecycle =
+        inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
 
     KeyValueStore store =
         inject.getInstance(com.google.inject.Key.get(KeyValueStore.class, Names.named("foo")));

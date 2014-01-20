@@ -35,6 +35,8 @@ import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.Update;
 import org.skife.jdbi.v2.tweak.HandleCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,6 +44,8 @@ import org.skife.jdbi.v2.tweak.HandleCallback;
  */
 public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
   public static int MULTIGET_MAX_KEYS = 3000;
+
+  protected final Logger log = LoggerFactory.getLogger(getClass());
 
   protected final IDBI database;
 
@@ -52,8 +56,6 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
   protected abstract String getPrefix();
 
   protected final Lock nukeLock = new ReentrantLock();
-
-  protected final String tablePrefix = "foo";
 
   protected final String tableName;
 
@@ -79,7 +81,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
   @Override
   public void initialize() {
-    System.out.println("init kv");
+    log.info("Intitializing KeyValueStore {}", this.toString());
 
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
@@ -89,6 +91,10 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
         return null;
       }
     });
+
+    if (log.isDebugEnabled()) {
+      log.debug("Intitialized KeyValueStore {}", this.toString());
+    }
   }
 
   @Override
@@ -102,7 +108,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       TypeValidation typeSafety) throws KazukiException {
     if (type == null
         || (TypeValidation.STRICT.equals(typeSafety) && ((type.contains("@") || type.contains("$"))))) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     try {
@@ -174,7 +180,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
     }
 
     if (keys.size() > MULTIGET_MAX_KEYS) {
-      throw new KazukiException("Multiget max is " + MULTIGET_MAX_KEYS + " keys");
+      throw new IllegalArgumentException("Multiget max is " + MULTIGET_MAX_KEYS + " keys");
     }
 
     return database.inTransaction(new TransactionCallback<Map<Key, T>>() {
@@ -283,7 +289,9 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
   @Override
   public Long approximateSize(String type) throws KazukiException {
-    return ((SequenceServiceJdbiImpl) sequences).peekKey(type).getId();
+    Key nextId = ((SequenceServiceJdbiImpl) sequences).peekKey(type);
+
+    return (nextId == null) ? 0L : nextId.getId();
   }
 
   public void clear(final boolean preserveTypes, final boolean preserveCounters) {

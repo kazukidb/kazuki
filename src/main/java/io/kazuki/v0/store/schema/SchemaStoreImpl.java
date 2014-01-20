@@ -10,11 +10,19 @@ import io.kazuki.v0.store.sequence.SequenceService;
 
 import javax.inject.Inject;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Throwables;
+
 
 public class SchemaStoreImpl implements SchemaStore {
   private static final String SCHEMA_PREFIX = "$schema";
+
+  private final Logger log = LoggerFactory.getLogger(getClass());
+
+  private final SequenceService sequences;
   private KeyValueStore store;
-  private SequenceService sequences;
 
   @Inject
   public SchemaStoreImpl(SequenceService sequences) {
@@ -23,6 +31,10 @@ public class SchemaStoreImpl implements SchemaStore {
 
   @Inject
   public synchronized void setKeyValueStorage(KeyValueStore store) {
+    if (log.isDebugEnabled()) {
+      log.debug("Setting schema KeyValueStore for {}", this.toString());
+    }
+
     this.store = store;
   }
 
@@ -115,7 +127,11 @@ public class SchemaStoreImpl implements SchemaStore {
   private Integer getTypeIdPossiblyNull(String type, boolean val) {
     try {
       return sequences.getTypeId(type, val);
-    } catch (KazukiException e) {
+    } catch (Exception e) {
+      if (!(e instanceof IllegalArgumentException)) {
+        throw Throwables.propagate(e);
+      }
+
       return null;
     }
   }

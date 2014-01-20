@@ -3,15 +3,15 @@ package io.kazuki.v0.internal.helper;
 import io.kazuki.v0.internal.v2schema.Attribute.Type;
 
 public interface SqlTypeHelper {
-  public String getPrefix();
+  String getPrefix();
 
-  public String getSqlType(Type type);
+  String getSqlType(Type type);
 
-  public String getInsertIgnore();
+  String getInsertIgnore();
 
-  public String getPKConflictResolve();
+  String getPKConflictResolve();
 
-  public String quote(String name);
+  String quote(String name);
 
-  public String getTableOptions();
+  String getTableOptions();
 }

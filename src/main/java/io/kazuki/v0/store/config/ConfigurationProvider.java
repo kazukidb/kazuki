@@ -11,11 +11,16 @@ import java.util.Properties;
 
 import javax.annotation.Nullable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.inject.Provider;
 
 public class ConfigurationProvider<T> implements Provider<T> {
+  private final Logger log = LoggerFactory.getLogger(getClass());
+
   private final String propertyPrefix;
   private final Class<T> configClass;
   private final String propertiesPath;
@@ -27,8 +32,8 @@ public class ConfigurationProvider<T> implements Provider<T> {
 
   public ConfigurationProvider(String propertyPrefix, Class<T> configClass,
       @Nullable String propertiesPath, boolean includeSystemProperties) {
-    Preconditions.checkNotNull(propertyPrefix, "propertyPrefix must not be null");
-    Preconditions.checkNotNull(propertyPrefix, "configClass must not be null");
+    Preconditions.checkNotNull(propertyPrefix, "propertyPrefix");
+    Preconditions.checkNotNull(propertyPrefix, "configClass");
 
     if (!propertyPrefix.endsWith(".")) {
       propertyPrefix += ".";
@@ -45,10 +50,15 @@ public class ConfigurationProvider<T> implements Provider<T> {
     Map<String, Object> properties = new LinkedHashMap<String, Object>();
 
     if (propertiesPath != null) {
+      log.info("Loading classpath properties for {} from {}", configClass.getName(), propertiesPath);
+
       addProperties(ResourceHelper.loadProperties(propertiesPath), properties);
     }
 
+
     if (includeSystemProperties) {
+      log.info("Loading system properties for {}", configClass.getName());
+
       addProperties(System.getProperties(), properties);
     }
 
@@ -57,6 +67,8 @@ public class ConfigurationProvider<T> implements Provider<T> {
     }
 
     try {
+      log.info("Instantiating new {} from properties", configClass.getName());
+
       return EncodingHelper.asValue(properties, configClass);
     } catch (Exception e) {
       throw Throwables.propagate(e);

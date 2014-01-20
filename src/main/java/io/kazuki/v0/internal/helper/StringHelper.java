@@ -4,10 +4,10 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 
 public class StringHelper {
-  public static String toCamelCase(String inValue) {
-    Preconditions.checkNotNull(inValue, "inValue must not be null");
+  public static String toCamelCase(String value) {
+    Preconditions.checkNotNull(value, "value");
 
-    String canonical = inValue.replace('.', '-').toLowerCase();
+    String canonical = value.replace('.', '-').toLowerCase();
 
     return CaseFormat.LOWER_HYPHEN.to(CaseFormat.LOWER_CAMEL, canonical);
   }

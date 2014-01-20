@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import org.skife.jdbi.v2.Handle;
@@ -24,10 +25,15 @@ import org.skife.jdbi.v2.IDBI;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.tweak.HandleCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegistration {
   public static final long DEFAULT_INCREMENT_BLOCK_SIZE = 100000L;
+
+  private final Logger log = LoggerFactory.getLogger(getClass());
+
   protected final Map<String, Counter> counters = new ConcurrentHashMap<String, Counter>();
   protected final Map<String, Integer> typeCodes = new ConcurrentHashMap<String, Integer>();
   protected final Map<Integer, String> typeNames = new ConcurrentHashMap<Integer, String>();
@@ -69,6 +75,8 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public synchronized void initialize() {
+    log.info("Initializing Sequence Service {}", this.toString());
+
     availabilityManager.setAvailable(false);
 
     dataSource.withHandle(new HandleCallback<Void>() {
@@ -89,9 +97,15 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     });
 
     availabilityManager.setAvailable(true);
+
+    if (log.isDebugEnabled()) {
+      log.debug("Initialized Sequence Service {}", this.toString());
+    }
   }
 
   public synchronized void shutdown() {
+    log.info("Shutting down Sequence Service {}", this.toString());
+
     availabilityManager.assertAvailable();
     availabilityManager.setAvailable(false);
 
@@ -106,6 +120,10 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         return null;
       }
     });
+
+    if (log.isDebugEnabled()) {
+      log.debug("Initialized Sequence Service {}", this.toString());
+    }
   }
 
   public synchronized void bumpKey(final String type, long id) throws Exception {
@@ -119,7 +137,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
   public synchronized Key nextKey(final String type) throws KazukiException {
     if (type == null) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     Counter counter = counters.get(type);
@@ -141,6 +159,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     return nextKey;
   }
 
+  @Nullable
   public Key peekKey(final String type) throws KazukiException {
     Counter counter = counters.get(type);
 
@@ -158,7 +177,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   public Integer getTypeId(final String type, final boolean create, final boolean strict)
       throws KazukiException {
     if (type == null) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     if (typeCodes.containsKey(type)) {
@@ -179,7 +198,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     });
 
     if (result == null && strict) {
-      throw new KazukiException("Invalid entity 'type'");
+      throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
     return result;
@@ -379,6 +398,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       this.offset.addAndGet(diff);
     }
 
+    @Nullable
     public Key getNext() throws KazukiException {
       long next = base + offset.incrementAndGet();
 
@@ -389,6 +409,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       return null;
     }
 
+    @Nullable
     public Key peekNext() throws KazukiException {
       long next = base + offset.get() + 1L;
 
@@ -401,19 +422,8 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
     @Override
     public String toString() {
-      StringBuilder builder = new StringBuilder();
-
-      builder.append("Counter[type=");
-      builder.append(type);
-      builder.append(",base=");
-      builder.append(base);
-      builder.append(",offset=");
-      builder.append(offset.get());
-      builder.append(",max=");
-      builder.append(max);
-      builder.append("]");
-
-      return builder.toString();
+      return "Counter[type=" + type + ",base=" + base + ",offset=" + offset.get() + ",max=" + max
+          + "]";
     }
   }
 }
