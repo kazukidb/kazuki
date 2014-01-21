@@ -57,7 +57,7 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
               KeyValueStoreConfiguration.class, propertiesPath, true)).in(Scopes.SINGLETON);
     }
 
-    bind(SqlTypeHelper.class).to(H2TypeHelper.class).asEagerSingleton();
+    bind(SqlTypeHelper.class).to(H2TypeHelper.class).in(Scopes.SINGLETON);
 
     Provider<SequenceService> seqProvider =
         binder().getProvider(Key.<SequenceService>get(SequenceService.class, Names.named(name)));
