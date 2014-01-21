@@ -1,6 +1,10 @@
 package io.kazuki.v0.store.journal;
 
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -12,8 +16,6 @@ import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 
 import java.util.Iterator;
-
-import junit.framework.Assert;
 
 import org.testng.annotations.Test;
 
@@ -50,17 +52,17 @@ public class PartitionedJournalStoreTest {
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
 
-    Assert.assertEquals(manager.createSchema("foo", schema), 2L);
-    Assert.assertNotNull(manager.retrieveSchema("foo"));
+    assertThat(manager.createSchema("foo", schema), is(2L));
+    assertThat(manager.retrieveSchema("foo"), notNullValue());
 
-    Assert.assertNull(journal.getActivePartition());
-    Assert.assertFalse(journal.getAllPartitions().hasNext());
+    assertThat(journal.getActivePartition(), nullValue());
+    assertThat("no partitions yet", !journal.getAllPartitions().hasNext());
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
-      Assert.assertNotNull(journal.getActivePartition());
-      Assert.assertTrue(journal.getActivePartition().getMinId() <= i + 1);
-      Assert.assertTrue(journal.getActivePartition().getMaxId() == i + 1);
+      assertThat(journal.getActivePartition(), notNullValue());
+      assertThat("active partition has insert", journal.getActivePartition().getMinId() <= i + 1);
+      assertThat("active partition has insert", journal.getActivePartition().getMaxId() == i + 1);
     }
 
     long partitionCount = 0L;
@@ -72,16 +74,17 @@ public class PartitionedJournalStoreTest {
       partitionCount += 1;
     }
 
-    Assert.assertEquals(10L, partitionCount);
+    assertThat(partitionCount, is(10L));
+    assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
 
     System.out.println("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       Iterator<Foo> iter = journal.getIteratorRelative("foo", Foo.class, Long.valueOf(i * 10), 10L);
-      Assert.assertTrue(iter.hasNext());
+      assertThat("iter is not empty", iter.hasNext());
       int j = 0;
       while (iter.hasNext()) {
         Foo foo = iter.next();
-        Assert.assertNotNull(foo);
+        assertThat(foo, notNullValue());
         System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
       }
@@ -90,17 +93,17 @@ public class PartitionedJournalStoreTest {
     System.out.println("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       Iterator<Foo> iter = journal.getIteratorAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L);
-      Assert.assertTrue(iter.hasNext());
+      assertThat("iter is not empty", iter.hasNext());
       int j = 0;
       while (iter.hasNext()) {
         Foo foo = iter.next();
-        Assert.assertNotNull(foo);
+        assertThat(foo, notNullValue());
         System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
       }
     }
 
-    Assert.assertTrue(journal.dropPartition(journal.getAllPartitions().next().getPartitionId()));
+    assertThat("dropped", journal.dropPartition(journal.getAllPartitions().next().getPartitionId()));
 
     System.out.println("PARTITIONS:");
     partitionCount = 0L;
@@ -110,16 +113,16 @@ public class PartitionedJournalStoreTest {
       partitionCount += 1;
     }
 
-    Assert.assertEquals(9L, partitionCount);
+    assertThat(partitionCount, is(9L));
 
-    Assert.assertFalse(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L).hasNext());
-    Assert.assertTrue(journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L).hasNext());
-    Assert.assertTrue(journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L).hasNext());
+    assertThat("iter empty", !journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L).hasNext());
+    assertThat("iter not empty", journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L).hasNext());
+    assertThat("iter not empty", journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L).hasNext());
 
-    Assert.assertTrue(journal.getIteratorRelative("foo", Foo.class, 0L, 10L).hasNext());
-    Assert.assertTrue(journal.getIteratorRelative("foo", Foo.class, 10L, 10L).hasNext());
-    Assert.assertTrue(journal.getIteratorRelative("foo", Foo.class, 80L, 10L).hasNext());
-    Assert.assertFalse(journal.getIteratorRelative("foo", Foo.class, 90L, 10L).hasNext());
+    assertThat("iter not empty", journal.getIteratorRelative("foo", Foo.class, 0L, 10L).hasNext());
+    assertThat("iter not empty", journal.getIteratorRelative("foo", Foo.class, 10L, 10L).hasNext());
+    assertThat("iter not empty", journal.getIteratorRelative("foo", Foo.class, 80L, 10L).hasNext());
+    assertThat("iter empty", !journal.getIteratorRelative("foo", Foo.class, 90L, 10L).hasNext());
 
     store.clear(false, false);
   }
