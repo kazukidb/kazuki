@@ -57,6 +57,7 @@ h2_kv_key_ids_of_type(kv_table_name) ::=<<
   select "_key_id"
     from "<kv_table_name>"
    where "_key_type" = :key_type
+     and "_is_deleted" = 'N'
    limit :limit
   offset :offset
 >>
@@ -67,4 +68,8 @@ h2_kv_truncate(kv_table_name) ::=<<
 
 h2_kv_reset(kv_table_name) ::=<< 
   delete from "<kv_table_name>" where "_key_type" > 1
+>>
+
+h2_kv_destroy(kv_table_name) ::=<< 
+  drop table if exists "<kv_table_name>"
 >>

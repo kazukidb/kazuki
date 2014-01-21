@@ -4,7 +4,6 @@ import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 
-import java.util.Collection;
 import java.util.Iterator;
 
 import javax.inject.Inject;
@@ -19,9 +18,7 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public void initialize() {
-    store.initialize();
-  }
+  public void initialize() throws KazukiException {}
 
   @Override
   public <T> void append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
@@ -38,9 +35,6 @@ public class SimpleJournalStore implements JournalStore {
   @Override
   public <T> Iterator<T> getIteratorRelative(String type, Class<T> clazz, Long offset, Long limit)
       throws KazukiException {
-    //
-    // TODO: implement partition offset lookup
-    //
     return getIteratorAbsolute(type, clazz, offset, limit);
   }
 
@@ -55,13 +49,13 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public boolean close(String partitionId) {
-    throw new UnsupportedOperationException("close() not supported");
+  public boolean closeActivePartition() {
+    throw new UnsupportedOperationException("closeActivePartition() not supported");
   }
 
   @Override
-  public boolean drop(String partitionId) {
-    throw new UnsupportedOperationException("drop() not yet supported");
+  public boolean dropPartition(String partitionId) {
+    throw new UnsupportedOperationException("dropPartition() not yet supported");
   }
 
   @Override
@@ -70,7 +64,7 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public Collection<PartitionInfo> getAllPartitions() {
+  public Iterator<PartitionInfoSnapshot> getAllPartitions() {
     throw new UnsupportedOperationException("getAllPartitions() not yet supported");
   }
 }

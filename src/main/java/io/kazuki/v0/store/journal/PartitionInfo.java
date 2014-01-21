@@ -1,5 +1,7 @@
 package io.kazuki.v0.store.journal;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public interface PartitionInfo {
   String getPartitionId();
 
@@ -7,5 +9,8 @@ public interface PartitionInfo {
 
   long getMaxId();
 
+  @JsonIgnore
   long getSize();
+
+  boolean isClosed();
 }

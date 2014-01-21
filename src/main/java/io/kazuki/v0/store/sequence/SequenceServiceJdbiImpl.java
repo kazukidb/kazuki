@@ -75,7 +75,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public synchronized void initialize() {
-    log.info("Initializing Sequence Service {}", this.toString());
+    log.info("Initializing Sequence Service {}", this);
 
     availabilityManager.setAvailable(false);
 
@@ -97,14 +97,11 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     });
 
     availabilityManager.setAvailable(true);
-
-    if (log.isDebugEnabled()) {
-      log.debug("Initialized Sequence Service {}", this.toString());
-    }
+    log.debug("Initialized Sequence Service {}", this);
   }
 
   public synchronized void shutdown() {
-    log.info("Shutting down Sequence Service {}", this.toString());
+    log.info("Shutting down Sequence Service {}", this);
 
     availabilityManager.assertAvailable();
     availabilityManager.setAvailable(false);
@@ -121,9 +118,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       }
     });
 
-    if (log.isDebugEnabled()) {
-      log.debug("Initialized Sequence Service {}", this.toString());
-    }
+    log.debug("Initialized Sequence Service {}", this);
   }
 
   public synchronized void bumpKey(final String type, long id) throws Exception {
@@ -224,6 +219,8 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public synchronized void clear(final boolean preserveTypes, final boolean preserveCounters) {
+    log.info("Clearing SequenceService {}", this);
+
     availabilityManager.doProtected(new ProtectedCommand<Void>() {
       @Override
       public Void execute(Releasable resource) throws Exception {
@@ -241,12 +238,18 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
             @Override
             public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
               if (!preserveCounters) {
+                log.debug("Truncating SequenceService {} table {}", this,
+                    sequenceHelper.getSequenceTableName());
+
                 JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
                     "sequence_table_name", sequenceHelper.getSequenceTableName(),
                     "seq_seq_truncate").execute();
               }
 
               if (!preserveTypes) {
+                log.debug("Truncating SequenceService {} table {}", this,
+                    sequenceHelper.getKeyTypesTableName());
+
                 JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
                     "key_types_table_name", sequenceHelper.getKeyTypesTableName(),
                     "seq_types_truncate").execute();
@@ -264,6 +267,8 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         }
       }
     });
+
+    log.info("Cleared SequenceService {}", this);
   }
 
   public void reload() {

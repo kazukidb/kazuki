@@ -19,9 +19,7 @@ public class Lifecycle {
 
   /** Registers a listener with the lifecycle, thus 'subscribing' to events */
   public void register(LifecycleAware listener) {
-    if (log.isDebugEnabled()) {
-      log.debug("Registering Lifecycle listener {}", listener.toString());
-    }
+    log.debug("Registering Lifecycle listener {}", listener);
 
     listeners.add(listener);
   }
@@ -75,9 +73,7 @@ public class Lifecycle {
     log.info("Firing lifecycle event {} to all listeners", event.name());
 
     for (LifecycleAware listener : listeners) {
-      if (log.isDebugEnabled()) {
-        log.debug("Firing lifecycle event {} to listener {}", event.name(), listener.toString());
-      }
+      log.debug("Firing lifecycle event {} to listener {}", event.name(), listener);
 
       listener.eventFired(event);
     }

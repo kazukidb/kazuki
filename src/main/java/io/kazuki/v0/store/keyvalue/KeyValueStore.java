@@ -35,4 +35,6 @@ public interface KeyValueStore {
   void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException;
 
   Long approximateSize(String type) throws KazukiException;
+
+  void destroy() throws KazukiException;
 }

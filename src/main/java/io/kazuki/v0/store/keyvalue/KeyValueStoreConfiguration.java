@@ -12,22 +12,28 @@ public class KeyValueStoreConfiguration {
   private final String storeName;
   private final String partitionName;
   private final boolean strictTypeCreation;
+  private final Long partitionSize;
 
   public KeyValueStoreConfiguration(@JsonProperty("dbType") String dbType,
       @JsonProperty("groupName") String groupName, @JsonProperty("storeName") String storeName,
       @JsonProperty("partitionName") String partitionName,
+      @JsonProperty("partitionSize") Long partitionSize,
       @JsonProperty("strictTypeCreation") boolean strictTypeCreation) {
     Preconditions.checkNotNull(dbType, "dbType");
     Preconditions.checkArgument(!dbType.contains("_") && !dbType.contains(":"), "invalid dbType");
     Preconditions.checkNotNull(groupName, "groupName");
     Preconditions.checkNotNull(storeName, "storeName");
-    Preconditions.checkNotNull(partitionName, "partitionName");
+    Preconditions.checkArgument(partitionName != null || partitionSize != null,
+        "partitionName or partitionSize must be set");
+    Preconditions
+        .checkArgument(partitionSize == null || partitionSize > 1, "invalid partitionSize");
 
     this.dbType = dbType;
     this.dbPrefix = dbType + ":" + dbType + "_";
     this.groupName = groupName;
     this.storeName = storeName;
-    this.partitionName = partitionName;
+    this.partitionName = partitionName != null ? partitionName : String.format("%016x", 0L);
+    this.partitionSize = partitionSize;
     this.strictTypeCreation = strictTypeCreation;
   }
 
@@ -51,6 +57,10 @@ public class KeyValueStoreConfiguration {
     return partitionName;
   }
 
+  public Long getPartitionSize() {
+    return partitionSize;
+  }
+
   public boolean isStrictTypeCreation() {
     return strictTypeCreation;
   }
@@ -60,6 +70,7 @@ public class KeyValueStoreConfiguration {
     private String groupName;
     private String storeName;
     private String partitionName;
+    private Long partitionSize;
     private boolean strictTypeCreation = true;
 
     public Builder withDbType(String dbType) {
@@ -86,6 +97,12 @@ public class KeyValueStoreConfiguration {
       return this;
     }
 
+    public Builder withPartitionSize(Long partitionSize) {
+      this.partitionSize = partitionSize;
+
+      return this;
+    }
+
     public Builder withStrictTypeCreation(boolean strictTypeCreation) {
       this.strictTypeCreation = strictTypeCreation;
 
@@ -94,7 +111,7 @@ public class KeyValueStoreConfiguration {
 
     public KeyValueStoreConfiguration build() {
       return new KeyValueStoreConfiguration(dbType, groupName, storeName, partitionName,
-          strictTypeCreation);
+          partitionSize, strictTypeCreation);
     }
   }
 }

@@ -23,7 +23,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class SimpleH2JournalStorageTest {
+public class SimpleJournalStoreTest {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
       new EasyJournalStoreModule("foo", "test/io/kazuki/v0/store/sequence"));
   private final ObjectMapper mapper = new ObjectMapper();
@@ -59,7 +59,7 @@ public class SimpleH2JournalStorageTest {
 
     System.out.println("ITER TEST:");
     for (int i = 0; i < 10; i++) {
-      Iterator<Foo> iter = journal.getIteratorAbsolute("foo", Foo.class, Long.valueOf(i + 10), 10L);
+      Iterator<Foo> iter = journal.getIteratorAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L);
       Assert.assertTrue(iter.hasNext());
       int j = 0;
       while (iter.hasNext()) {

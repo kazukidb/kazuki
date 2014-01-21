@@ -3,11 +3,10 @@ package io.kazuki.v0.store.journal;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.schema.TypeValidation;
 
-import java.util.Collection;
 import java.util.Iterator;
 
 public interface JournalStore {
-  void initialize();
+  void initialize() throws KazukiException;
 
   <T> void append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException;
@@ -18,13 +17,13 @@ public interface JournalStore {
   <T> Iterator<T> getIteratorAbsolute(String type, Class<T> clazz, Long offset, Long limit)
       throws KazukiException;
 
-  Collection<PartitionInfo> getAllPartitions() throws KazukiException;
+  Iterator<PartitionInfoSnapshot> getAllPartitions() throws KazukiException;
 
   PartitionInfo getActivePartition() throws KazukiException;
 
-  boolean close(String partitionId) throws KazukiException;
+  boolean closeActivePartition() throws KazukiException;
 
-  boolean drop(String partitionId) throws KazukiException;
+  boolean dropPartition(String partitionId) throws KazukiException;
 
   void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException;
 

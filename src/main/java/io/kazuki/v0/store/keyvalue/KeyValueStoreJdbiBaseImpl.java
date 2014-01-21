@@ -38,6 +38,8 @@ import org.skife.jdbi.v2.tweak.HandleCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
+
 
 /**
  * Abstract implementation of key-value storage based on JDBI.
@@ -65,8 +67,6 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
     this.schemaService = schemaService;
     this.sequences = sequences;
     this.tableName = "_" + groupName + "_" + storeName + "__kv__" + partitionName;
-
-    this.initialize();
   }
 
   @Inject
@@ -81,7 +81,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
   @Override
   public void initialize() {
-    log.info("Intitializing KeyValueStore {}", this.toString());
+    log.info("Intitializing KeyValueStore {}", this);
 
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
@@ -92,9 +92,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       }
     });
 
-    if (log.isDebugEnabled()) {
-      log.debug("Intitialized KeyValueStore {}", this.toString());
-    }
+    log.debug("Intitialized KeyValueStore {}", this);
   }
 
   @Override
@@ -179,9 +177,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       return Collections.emptyMap();
     }
 
-    if (keys.size() > MULTIGET_MAX_KEYS) {
-      throw new IllegalArgumentException("Multiget max is " + MULTIGET_MAX_KEYS + " keys");
-    }
+    Preconditions.checkArgument(keys.size() <= MULTIGET_MAX_KEYS, "Multiget max is %s keys",
+        MULTIGET_MAX_KEYS);
 
     return database.inTransaction(new TransactionCallback<Map<Key, T>>() {
       @Override
@@ -295,29 +292,25 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
   }
 
   public void clear(final boolean preserveTypes, final boolean preserveCounters) {
+    log.debug("Clearing KeyValueStore {} table {}", this, tableName);
+
     nukeLock.lock();
 
     try {
       database.inTransaction(new TransactionCallback<Void>() {
         @Override
         public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          try {
-            if (preserveTypes) {
-              JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
-                  "kv_reset");
-            } else {
-              JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
-                  "kv_truncate").execute();
+          if (preserveTypes) {
+            JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                "kv_reset");
+          } else {
+            JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                "kv_truncate").execute();
 
-              performInitialization(handle, tableName);
-            }
-
-            return null;
-          } catch (Exception e) {
-            e.printStackTrace();
-
-            throw new RuntimeException(e);
+            performInitialization(handle, tableName);
           }
+
+          return null;
         }
       });
 
@@ -325,6 +318,30 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
     } finally {
       nukeLock.unlock();
     }
+
+    log.debug("Cleared KeyValueStore {} table {}", this, tableName);
+  }
+
+  public void destroy() {
+    log.debug("Destroying KeyValueStore {} table {}", this, tableName);
+
+    nukeLock.lock();
+
+    try {
+      database.inTransaction(new TransactionCallback<Void>() {
+        @Override
+        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+              "kv_destroy");
+
+          return null;
+        }
+      });
+    } finally {
+      nukeLock.unlock();
+    }
+
+    log.debug("Destroyed KeyValueStore {} table {}", this, tableName);
   }
 
   public <T> Iterator<T> iterator(final String type, final Class<T> clazz) throws KazukiException {
@@ -454,9 +471,14 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
   }
 
   private void performInitialization(Handle handle, String tableName) {
+    log.debug("Creating table if not exist with name {} for KeyValueStore {}", tableName, this);
+
     JDBIHelper
         .getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_create_table")
         .execute();
+
+    log.debug("Creating index if not exists on table {} for KeyValueStore {}", tableName, this);
+
     JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
         "kv_create_table_index").execute();
   }

@@ -24,7 +24,7 @@ public class LifecycleModule extends AbstractModule {
   protected void configure() {
     bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle());
 
-    if (additionalNames != null && additionalNames.length > 0) {
+    if (additionalNames != null) {
       for (String additionalName : additionalNames) {
         bind(Lifecycle.class).annotatedWith(Names.named(additionalName)).to(
             Key.get(Lifecycle.class, Names.named(name)));

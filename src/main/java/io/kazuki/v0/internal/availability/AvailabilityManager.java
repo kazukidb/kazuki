@@ -13,16 +13,14 @@ public class AvailabilityManager implements Releasable {
   private final AtomicBoolean available = new AtomicBoolean();
 
   public <T> T doProtected(ProtectedCommand<T> command) {
-    log.info("Executing protected command: {}", command.toString());
+    log.info("Executing protected command: {}", command);
 
     boolean allowed = available.compareAndSet(true, false);
     try {
       if (allowed) {
         T value = command.execute(AvailabilityManager.this);
 
-        if (log.isDebugEnabled()) {
-          log.debug("Executed protected command: {}", command.toString());
-        }
+        log.debug("Executed protected command: {}", command);
 
         return value;
       }
@@ -40,9 +38,7 @@ public class AvailabilityManager implements Releasable {
   }
 
   public void setAvailable(boolean availability) {
-    if (log.isTraceEnabled()) {
-      log.trace("Setting availability status to {}", availability);
-    }
+    log.trace("Setting availability status to {}", availability);
 
     available.set(availability);
   }
@@ -52,9 +48,7 @@ public class AvailabilityManager implements Releasable {
   }
 
   public boolean release() {
-    if (log.isTraceEnabled()) {
-      log.trace("Releasing availability manager flag");
-    }
+    log.trace("Releasing availability manager flag");
 
     return available.compareAndSet(false, true);
   }

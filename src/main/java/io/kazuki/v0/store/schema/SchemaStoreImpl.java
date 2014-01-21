@@ -31,9 +31,7 @@ public class SchemaStoreImpl implements SchemaStore {
 
   @Inject
   public synchronized void setKeyValueStorage(KeyValueStore store) {
-    if (log.isDebugEnabled()) {
-      log.debug("Setting schema KeyValueStore for {}", this.toString());
-    }
+    log.debug("Setting schema KeyValueStore for {}", this);
 
     this.store = store;
   }
@@ -127,12 +125,10 @@ public class SchemaStoreImpl implements SchemaStore {
   private Integer getTypeIdPossiblyNull(String type, boolean val) {
     try {
       return sequences.getTypeId(type, val);
-    } catch (Exception e) {
-      if (!(e instanceof IllegalArgumentException)) {
-        throw Throwables.propagate(e);
-      }
-
+    } catch (IllegalArgumentException e) {
       return null;
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
     }
   }
 }
