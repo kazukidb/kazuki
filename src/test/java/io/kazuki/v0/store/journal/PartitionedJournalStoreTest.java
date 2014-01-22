@@ -1,10 +1,14 @@
 package io.kazuki.v0.store.journal;
 
 
+import static io.kazuki.v0.internal.helper.TestHelper.dump;
+import static io.kazuki.v0.internal.helper.TestHelper.isEmptyIter;
+import static io.kazuki.v0.internal.helper.TestHelper.isNotEmptyIter;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -17,37 +21,38 @@ import io.kazuki.v0.store.schema.TypeValidation;
 
 import java.util.Iterator;
 
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
 public class PartitionedJournalStoreTest {
-  private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
-      new EasyPartitionedJournalStoreModule("foo", "test/io/kazuki/v0/store/sequence"));
-  private final ObjectMapper mapper = new ObjectMapper();
+  private Injector inject;
+  private Lifecycle lifecycle;
+  private KeyValueStore store;
+  private SchemaStore manager;
+  private JournalStore journal;
+
+  @BeforeTest
+  public void setUp() throws Exception {
+    inject =
+        Guice.createInjector(new LifecycleModule("foo"), new EasyPartitionedJournalStoreModule(
+            "foo", "test/io/kazuki/v0/store/sequence"));
+
+    lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
+    store = inject.getInstance(com.google.inject.Key.get(KeyValueStore.class, Names.named("foo")));
+    manager = inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));
+    journal = inject.getInstance(com.google.inject.Key.get(JournalStore.class, Names.named("foo")));
+
+    lifecycle.init();
+    store.clear(false, false);
+  }
 
   @Test
   public void testDemo() throws Exception {
-    final Lifecycle lifecycle =
-        inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
-
-    KeyValueStore store =
-        inject.getInstance(com.google.inject.Key.get(KeyValueStore.class, Names.named("foo")));
-
-    SchemaStore manager =
-        inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));
-
-    JournalStore journal =
-        inject.getInstance(com.google.inject.Key.get(JournalStore.class, Names.named("foo")));
-
-    lifecycle.init();
-
-    store.clear(false, false);
-
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
@@ -56,17 +61,18 @@ public class PartitionedJournalStoreTest {
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     assertThat(journal.getActivePartition(), nullValue());
-    assertThat("no partitions yet", !journal.getAllPartitions().hasNext());
+    assertThat(journal.getAllPartitions(), isEmptyIter(PartitionInfoSnapshot.class));
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
       assertThat(journal.getActivePartition(), notNullValue());
-      assertThat("active partition has insert", journal.getActivePartition().getMinId() <= i + 1);
-      assertThat("active partition has insert", journal.getActivePartition().getMaxId() == i + 1);
+      assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
+      assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
     }
 
     long partitionCount = 0L;
     Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions();
+    assertThat(piter, isNotEmptyIter(PartitionInfoSnapshot.class));
 
     System.out.println("PARTITIONS:");
     while (piter.hasNext()) {
@@ -80,7 +86,7 @@ public class PartitionedJournalStoreTest {
     System.out.println("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       Iterator<Foo> iter = journal.getIteratorRelative("foo", Foo.class, Long.valueOf(i * 10), 10L);
-      assertThat("iter is not empty", iter.hasNext());
+      assertThat(iter, isNotEmptyIter(Foo.class));
       int j = 0;
       while (iter.hasNext()) {
         Foo foo = iter.next();
@@ -93,7 +99,7 @@ public class PartitionedJournalStoreTest {
     System.out.println("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       Iterator<Foo> iter = journal.getIteratorAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L);
-      assertThat("iter is not empty", iter.hasNext());
+      assertThat(iter, isNotEmptyIter(Foo.class));
       int j = 0;
       while (iter.hasNext()) {
         Foo foo = iter.next();
@@ -103,7 +109,7 @@ public class PartitionedJournalStoreTest {
       }
     }
 
-    assertThat("dropped", journal.dropPartition(journal.getAllPartitions().next().getPartitionId()));
+    assertThat(journal.dropPartition(journal.getAllPartitions().next().getPartitionId()), is(true));
 
     System.out.println("PARTITIONS:");
     partitionCount = 0L;
@@ -115,19 +121,15 @@ public class PartitionedJournalStoreTest {
 
     assertThat(partitionCount, is(9L));
 
-    assertThat("iter empty", !journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L).hasNext());
-    assertThat("iter not empty", journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L).hasNext());
-    assertThat("iter not empty", journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L).hasNext());
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L), isEmptyIter(Foo.class));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L), isNotEmptyIter(Foo.class));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L), isNotEmptyIter(Foo.class));
 
-    assertThat("iter not empty", journal.getIteratorRelative("foo", Foo.class, 0L, 10L).hasNext());
-    assertThat("iter not empty", journal.getIteratorRelative("foo", Foo.class, 10L, 10L).hasNext());
-    assertThat("iter not empty", journal.getIteratorRelative("foo", Foo.class, 80L, 10L).hasNext());
-    assertThat("iter empty", !journal.getIteratorRelative("foo", Foo.class, 90L, 10L).hasNext());
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 10L), isNotEmptyIter(Foo.class));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 10L, 10L), isNotEmptyIter(Foo.class));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 80L, 10L), isNotEmptyIter(Foo.class));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 90L, 10L), isEmptyIter(Foo.class));
 
     store.clear(false, false);
-  }
-
-  public String dump(Object object) throws Exception {
-    return mapper.writeValueAsString(object);
   }
 }

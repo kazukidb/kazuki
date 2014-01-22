@@ -1,11 +1,19 @@
 package io.kazuki.v0.internal.helper;
 
+import java.util.Iterator;
+
 import org.h2.Driver;
+import org.hamcrest.BaseMatcher;
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
 import org.skife.jdbi.v2.IDBI;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jolbox.bonecp.BoneCPDataSource;
 
 public class TestHelper {
+  private static final ObjectMapper mapper = new ObjectMapper();
+
   public static IDBI getTestDataSource(Class<?> clazz) {
     BoneCPDataSource datasource = new BoneCPDataSource();
 
@@ -16,5 +24,37 @@ public class TestHelper {
     datasource.setPassword(System.getProperty("jdbc.password", "notreallyused"));
 
     return JDBIHelper.getDBI(clazz, datasource);
+  }
+
+  public static <T> Matcher<Iterator<T>> isEmptyIter(Class<T> clazz) {
+    return new BaseMatcher<Iterator<T>>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("is not empty");
+      }
+
+      @Override
+      public boolean matches(Object target) {
+        return (target instanceof Iterator) && !((Iterator<?>) target).hasNext();
+      }
+    };
+  }
+
+  public static <T> Matcher<Iterator<T>> isNotEmptyIter(Class<T> clazz) {
+    return new BaseMatcher<Iterator<T>>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("is empty");
+      }
+
+      @Override
+      public boolean matches(Object target) {
+        return (target instanceof Iterator) && ((Iterator<?>) target).hasNext();
+      }
+    };
+  }
+
+  public static String dump(Object object) throws Exception {
+    return mapper.writeValueAsString(object);
   }
 }
