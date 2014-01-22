@@ -54,6 +54,31 @@ public class TestHelper {
     };
   }
 
+  public static <T> Matcher<Iterator<T>> isIterOfLength(Class<T> clazz, final int targetSize) {
+    return new BaseMatcher<Iterator<T>>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("is iter of length " + targetSize);
+      }
+
+      @Override
+      public boolean matches(Object target) {
+        if (!(target instanceof Iterator)) {
+          return false;
+        }
+
+        Iterator<T> targetIter = (Iterator<T>) target;
+        int count = 0;
+        while (targetIter.hasNext()) {
+          targetIter.next();
+          count += 1;
+        }
+
+        return count == targetSize;
+      }
+    };
+  }
+
   public static String dump(Object object) throws Exception {
     return mapper.writeValueAsString(object);
   }

@@ -3,6 +3,7 @@ package io.kazuki.v0.store.journal;
 
 import static io.kazuki.v0.internal.helper.TestHelper.dump;
 import static io.kazuki.v0.internal.helper.TestHelper.isEmptyIter;
+import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
 import static io.kazuki.v0.internal.helper.TestHelper.isNotEmptyIter;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -70,17 +71,15 @@ public class PartitionedJournalStoreTest {
       assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
     }
 
-    long partitionCount = 0L;
     Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions();
     assertThat(piter, isNotEmptyIter(PartitionInfoSnapshot.class));
 
     System.out.println("PARTITIONS:");
     while (piter.hasNext()) {
       System.out.println(" - part - " + dump(piter.next()));
-      partitionCount += 1;
     }
 
-    assertThat(partitionCount, is(10L));
+    assertThat(journal.getAllPartitions(), isIterOfLength(PartitionInfoSnapshot.class, 10));
     assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
 
     System.out.println("RELATIVE ITER TEST:");
@@ -94,6 +93,7 @@ public class PartitionedJournalStoreTest {
         System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
       }
+      assertThat(j, is(10));
     }
 
     System.out.println("ABSOLUTE ITER TEST:");
@@ -107,19 +107,18 @@ public class PartitionedJournalStoreTest {
         System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
       }
+      assertThat(j, is(10));
     }
 
     assertThat(journal.dropPartition(journal.getAllPartitions().next().getPartitionId()), is(true));
 
     System.out.println("PARTITIONS:");
-    partitionCount = 0L;
     piter = journal.getAllPartitions();
     while (piter.hasNext()) {
       System.out.println(" - part - " + dump(piter.next()));
-      partitionCount += 1;
     }
 
-    assertThat(partitionCount, is(9L));
+    assertThat(journal.getAllPartitions(), isIterOfLength(PartitionInfoSnapshot.class, 9));
 
     assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L), isEmptyIter(Foo.class));
     assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L), isNotEmptyIter(Foo.class));
