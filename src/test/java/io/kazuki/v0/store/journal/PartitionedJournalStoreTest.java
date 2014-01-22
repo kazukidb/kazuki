@@ -79,6 +79,21 @@ public class PartitionedJournalStoreTest {
       System.out.println(" - part - " + dump(piter.next()));
     }
 
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, null),
+        isIterOfLength(Foo.class, 100));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 0L), isEmptyIter(Foo.class));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L),
+        isIterOfLength(Foo.class, 10));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 20L),
+        isIterOfLength(Foo.class, 20));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 11L, 19L),
+        isIterOfLength(Foo.class, 19));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 89L, 12L),
+        isIterOfLength(Foo.class, 11));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 89L, null),
+        isIterOfLength(Foo.class, 11));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 89L, 0L), isEmptyIter(Foo.class));
+
     assertThat(journal.getAllPartitions(), isIterOfLength(PartitionInfoSnapshot.class, 10));
     assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
 
@@ -121,11 +136,29 @@ public class PartitionedJournalStoreTest {
     assertThat(journal.getAllPartitions(), isIterOfLength(PartitionInfoSnapshot.class, 9));
 
     assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L), isEmptyIter(Foo.class));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L), isNotEmptyIter(Foo.class));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L), isNotEmptyIter(Foo.class));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L),
+        isIterOfLength(Foo.class, 10));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 20L),
+        isIterOfLength(Foo.class, 20));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L),
+        isIterOfLength(Foo.class, 10));
+    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 90L, 20L),
+        isIterOfLength(Foo.class, 10));
 
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 10L), isNotEmptyIter(Foo.class));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 10L, 10L), isNotEmptyIter(Foo.class));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, null),
+        isIterOfLength(Foo.class, 90));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 10L),
+        isIterOfLength(Foo.class, 10));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 20L),
+        isIterOfLength(Foo.class, 20));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 11L, 79L),
+        isIterOfLength(Foo.class, 79));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 11L, null),
+        isIterOfLength(Foo.class, 79));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 10L, 10L),
+        isIterOfLength(Foo.class, 10));
+    assertThat(journal.getIteratorRelative("foo", Foo.class, 5L, 10L),
+        isIterOfLength(Foo.class, 10));
     assertThat(journal.getIteratorRelative("foo", Foo.class, 80L, 10L), isNotEmptyIter(Foo.class));
     assertThat(journal.getIteratorRelative("foo", Foo.class, 90L, 10L), isEmptyIter(Foo.class));
 

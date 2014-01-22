@@ -12,7 +12,9 @@ import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.SequenceService;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -138,6 +140,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public <T> Iterator<T> getIteratorAbsolute(String type, Class<T> clazz, Long offset, Long limit)
       throws KazukiException {
     long idOffset = 0L;
@@ -145,34 +148,41 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       idOffset = offset.longValue();
     }
 
+    long found = 0L;
     idOffset += 1;
 
     Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
-    PartitionInfo realPartition = null;
+    List<Iterator<T>> iters = new ArrayList<Iterator<T>>();
 
-    while (iter.hasNext()) {
+    while (iter.hasNext() && (limit == null || limit > found)) {
       PartitionInfo partition = iter.next();
 
       if (idOffset >= partition.getMinId() && idOffset <= partition.getMaxId()) {
-        realPartition = partition;
-        break;
+        Long specificLimit = limit == null ? null : limit;
+
+        if (specificLimit != null) {
+          long contained = 1 + partition.getMaxId() - idOffset;
+          specificLimit = Math.min(contained, specificLimit);
+          limit -= specificLimit;
+        }
+
+        iters.add(new LazyIterator<T>(getIteratorProvider(type, clazz,
+            getPartitionName(Key.valueOf(partition.getPartitionId())),
+            idOffset - partition.getMinId(), specificLimit)));
+
+        idOffset = partition.getMaxId() + 1;
       }
     }
 
-    if (realPartition == null) {
+    if (iters.isEmpty()) {
       return Iterators.emptyIterator();
     }
 
-    //
-    // FIXME - handle partition boundaries
-    //
-    KeyValueStore realKeyValue =
-        getKeyValueStore(getPartitionName(Key.valueOf(realPartition.getPartitionId())), false);
-
-    return realKeyValue.iterator(type, clazz, idOffset - realPartition.getMinId(), limit);
+    return Iterators.concat(iters.toArray(new Iterator[iters.size()]));
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public <T> Iterator<T> getIteratorRelative(String type, Class<T> clazz, Long offset, Long limit)
       throws KazukiException {
     long sizeOffset = 0L;
@@ -181,32 +191,40 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       sizeOffset = offset.longValue();
     }
 
-    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
-    PartitionInfo realPartition = null;
+    long found = 0L;
 
-    while (iter.hasNext()) {
+    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
+    List<Iterator<T>> iters = new ArrayList<Iterator<T>>();
+
+    while (iter.hasNext() && (limit == null || limit > found)) {
       PartitionInfo partition = iter.next();
       long size = 1 + partition.getMaxId() - partition.getMinId();
+      long toIgnore = Math.min(sizeOffset, size);
 
-      if (sizeOffset < size) {
-        realPartition = partition;
-        break;
+      if (toIgnore == size) {
+        sizeOffset -= size;
+        continue;
       }
 
-      sizeOffset -= size;
+      Long specificLimit = limit == null ? null : limit;
+
+      if (specificLimit != null) {
+        long toTake = size - toIgnore;
+        specificLimit = Math.min(toTake, specificLimit);
+        limit -= specificLimit;
+      }
+
+      iters.add(new LazyIterator<T>(getIteratorProvider(type, clazz,
+          getPartitionName(Key.valueOf(partition.getPartitionId())), sizeOffset, specificLimit)));
+
+      sizeOffset = 0L;
     }
 
-    if (realPartition == null) {
+    if (iters.isEmpty()) {
       return Iterators.emptyIterator();
     }
 
-    //
-    // FIXME - handle partition boundaries
-    //
-    KeyValueStore realKeyValue =
-        getKeyValueStore(getPartitionName(Key.valueOf(realPartition.getPartitionId())), false);
-
-    return realKeyValue.iterator(type, clazz, sizeOffset, limit);
+    return Iterators.concat(iters.toArray(new Iterator[iters.size()]));
   }
 
   @Override
@@ -216,7 +234,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
     while (iter.hasNext()) {
       PartitionInfo partition = iter.next();
-      size += partition.getMaxId() - partition.getMinId();
+      size += 1 + partition.getMaxId() - partition.getMinId();
     }
 
     //
@@ -334,6 +352,12 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
         return null;
       }
+
+      @Override
+      public String toString() {
+        return "Provider<Iterator>(t=" + type + ",c=" + clazz.getName() + ",p=" + partitionName
+            + ",o=" + offset + ",l=" + limit + ")";
+      }
     };
   }
 
@@ -370,6 +394,11 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       }
 
       iter.remove();
+    }
+
+    @Override
+    public String toString() {
+      return "LazyIterator(" + provider.toString() + ")";
     }
   }
 }
