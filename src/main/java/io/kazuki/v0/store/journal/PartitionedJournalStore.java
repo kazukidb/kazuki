@@ -148,13 +148,12 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       idOffset = offset.longValue();
     }
 
-    long found = 0L;
     idOffset += 1;
 
     Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
     List<Iterator<T>> iters = new ArrayList<Iterator<T>>();
 
-    while (iter.hasNext() && (limit == null || limit > found)) {
+    while (iter.hasNext() && (limit == null || limit > 0L)) {
       PartitionInfo partition = iter.next();
 
       if (idOffset >= partition.getMinId() && idOffset <= partition.getMaxId()) {
@@ -191,12 +190,10 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       sizeOffset = offset.longValue();
     }
 
-    long found = 0L;
-
     Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
     List<Iterator<T>> iters = new ArrayList<Iterator<T>>();
 
-    while (iter.hasNext() && (limit == null || limit > found)) {
+    while (iter.hasNext() && (limit == null || limit > 0L)) {
       PartitionInfo partition = iter.next();
       long size = 1 + partition.getMaxId() - partition.getMinId();
       long toIgnore = Math.min(sizeOffset, size);
