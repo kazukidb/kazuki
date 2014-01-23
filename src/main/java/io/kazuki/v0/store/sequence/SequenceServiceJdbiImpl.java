@@ -184,11 +184,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     Integer result = dataSource.inTransaction(new TransactionCallback<Integer>() {
       @Override
       public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        try {
-          return sequenceHelper.validateType(handle, typeCodes, typeNames, type, create);
-        } catch (KazukiException e) {
-          return null;
-        }
+        return sequenceHelper.validateType(handle, typeCodes, typeNames, type, create);
       }
     });
 

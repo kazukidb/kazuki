@@ -76,7 +76,7 @@ public class SequenceHelper {
 
     if (result == null || result.isEmpty()) {
       if (!doCreate) {
-        throw new IllegalArgumentException("Invalid entity 'type'");
+        return null;
       }
 
       typeId = getNextId(handle, 0, 1L).intValue();
