@@ -1,5 +1,7 @@
 package io.kazuki.v0.store.journal;
 
+import io.kazuki.v0.internal.v2schema.Attribute;
+import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
@@ -13,6 +15,7 @@ import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.SequenceService;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -79,6 +82,14 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   @Override
   public synchronized void initialize() {
     this.metaStore = getKeyValueStore("META", true);
+
+    try {
+      if (this.schema.retrieveSchema(this.typeName) == null) {
+        this.schema.createSchema(this.typeName, new Schema(Collections.<Attribute>emptyList()));
+      }
+    } catch (KazukiException e) {
+      throw Throwables.propagate(e);
+    }
   }
 
   @Override
