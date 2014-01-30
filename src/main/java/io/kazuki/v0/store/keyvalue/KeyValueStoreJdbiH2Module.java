@@ -47,14 +47,17 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
   public void configure() {
     bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name))).in(Scopes.SINGLETON);
 
-    KeyValueStoreConfiguration theConfig = config.get();
+    KeyValueStoreConfiguration theConfig = this.config.get();
 
     if (theConfig != null) {
       bind(KeyValueStoreConfiguration.class).toInstance(theConfig);
-    } else {
+    } else if (propertiesPath != null) {
       bind(KeyValueStoreConfiguration.class).toProvider(
           new ConfigurationProvider<KeyValueStoreConfiguration>(name,
-              KeyValueStoreConfiguration.class, propertiesPath, true)).in(Scopes.SINGLETON);
+              KeyValueStoreConfiguration.class, propertiesPath, true));
+    } else {
+      bind(KeyValueStoreConfiguration.class).to(
+          Key.get(KeyValueStoreConfiguration.class, Names.named(name)));
     }
 
     bind(SqlTypeHelper.class).to(H2TypeHelper.class).in(Scopes.SINGLETON);

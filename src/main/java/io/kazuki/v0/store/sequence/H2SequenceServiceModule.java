@@ -55,10 +55,13 @@ public class H2SequenceServiceModule extends PrivateModule {
 
     if (theConfig != null) {
       bind(SequenceServiceConfiguration.class).toInstance(theConfig);
-    } else {
+    } else if (propertiesPath != null) {
       bind(SequenceServiceConfiguration.class).toProvider(
           new ConfigurationProvider<SequenceServiceConfiguration>(name,
-              SequenceServiceConfiguration.class, propertiesPath, true)).in(Scopes.SINGLETON);
+              SequenceServiceConfiguration.class, propertiesPath, true));
+    } else {
+      bind(SequenceServiceConfiguration.class).to(
+          Key.get(SequenceServiceConfiguration.class, Names.named(name)));
     }
 
     bind(SequenceHelper.class).in(Scopes.SINGLETON);

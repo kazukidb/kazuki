@@ -46,11 +46,11 @@ public class EasyKeyValueStoreModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    install(new JdbiDataSourceModule(name, propertiesBase + "/jdbi.properties")
-        .withConfiguration(this.jdbiConfig.get()));
-    install(new H2SequenceServiceModule(name, propertiesBase + "/sequence.properties")
-        .withConfiguration(this.sequenceConfig.get()));
-    install(new KeyValueStoreJdbiH2Module(name, propertiesBase + "/keyvalue.properties")
-        .withConfiguration(this.keyValueConfig.get()));
+    install(new JdbiDataSourceModule(name, propertiesBase == null ? null : propertiesBase
+        + "/jdbi.properties").withConfiguration(this.jdbiConfig.get()));
+    install(new H2SequenceServiceModule(name, propertiesBase == null ? null : propertiesBase
+        + "/sequence.properties").withConfiguration(this.sequenceConfig.get()));
+    install(new KeyValueStoreJdbiH2Module(name, propertiesBase == null ? null : propertiesBase
+        + "/keyvalue.properties").withConfiguration(this.keyValueConfig.get()));
   }
 }
