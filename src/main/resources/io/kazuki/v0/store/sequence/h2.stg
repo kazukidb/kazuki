@@ -18,7 +18,7 @@ h2_seq_seq_insert(sequence_table_name) ::=<<
 >>
 
 h2_seq_seq_init(sequence_table_name) ::=<< 
-  merge
+  insert
     into "<sequence_table_name>" ("_key_type", "_next_id")
   values
     (0, 2),
@@ -59,7 +59,7 @@ h2_seq_types_create_table(key_types_table_name) ::=<<
 >>
 
 h2_seq_types_init(key_types_table_name) ::=<< 
-  merge
+  insert
     into "<key_types_table_name>" ("_key_type", "_type_name")
   values
     (0, '$key'),

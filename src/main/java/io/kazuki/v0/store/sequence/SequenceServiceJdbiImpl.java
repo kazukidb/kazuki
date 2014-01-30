@@ -4,6 +4,7 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.availability.AvailabilityManager.ProtectedCommand;
 import io.kazuki.v0.internal.availability.Releasable;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -11,7 +12,6 @@ import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,6 +28,8 @@ import org.skife.jdbi.v2.tweak.HandleCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Throwables;
+
 
 public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegistration {
   public static final long DEFAULT_INCREMENT_BLOCK_SIZE = 100000L;
@@ -38,23 +40,27 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   protected final Map<String, Integer> typeCodes = new ConcurrentHashMap<String, Integer>();
   protected final Map<Integer, String> typeNames = new ConcurrentHashMap<Integer, String>();
   protected final SequenceHelper sequenceHelper;
+  protected final SqlTypeHelper typeHelper;
   protected final AvailabilityManager availabilityManager;
   protected final IDBI dataSource;
   protected final long incrementBlockSize;
 
   @Inject
   public SequenceServiceJdbiImpl(SequenceServiceConfiguration sequenceConfiguration,
-      AvailabilityManager availabilityManager, SequenceHelper sequenceHelper, IDBI dataSource) {
-    this(sequenceHelper, availabilityManager, dataSource, sequenceConfiguration.getGroupName(),
-        sequenceConfiguration.getStoreName(), sequenceConfiguration.getIncrementBlockSize());
+      AvailabilityManager availabilityManager, SequenceHelper sequenceHelper, IDBI dataSource,
+      SqlTypeHelper typeHelper) {
+    this(sequenceHelper, availabilityManager, dataSource, typeHelper, sequenceConfiguration
+        .getGroupName(), sequenceConfiguration.getStoreName(), sequenceConfiguration
+        .getIncrementBlockSize());
   }
 
   public SequenceServiceJdbiImpl(SequenceHelper sequenceHelper,
-      AvailabilityManager availabilityManager, IDBI dataSource, String groupName, String storeName,
-      Long incrementBlockSize) {
+      AvailabilityManager availabilityManager, IDBI dataSource, SqlTypeHelper typeHelper,
+      String groupName, String storeName, Long incrementBlockSize) {
     this.sequenceHelper = sequenceHelper;
     this.availabilityManager = availabilityManager;
     this.dataSource = dataSource;
+    this.typeHelper = typeHelper;
     this.incrementBlockSize =
         incrementBlockSize != null ? incrementBlockSize : DEFAULT_INCREMENT_BLOCK_SIZE;
   }
@@ -79,18 +85,33 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
     availabilityManager.setAvailable(false);
 
-    dataSource.withHandle(new HandleCallback<Void>() {
+    dataSource.inTransaction(new TransactionCallback<Void>() {
       @Override
-      public Void withHandle(Handle handle) throws Exception {
+      public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
         JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "key_types_table_name",
             sequenceHelper.getKeyTypesTableName(), "seq_types_create_table").execute();
-        JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "key_types_table_name",
-            sequenceHelper.getKeyTypesTableName(), "seq_types_init").execute();
 
         JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
             sequenceHelper.getSequenceTableName(), "seq_seq_create_table").execute();
-        JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
-            sequenceHelper.getSequenceTableName(), "seq_seq_init").execute();
+
+        try {
+          JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
+              "key_types_table_name", sequenceHelper.getKeyTypesTableName(), "seq_types_init")
+              .execute();
+        } catch (Throwable t) {
+          if (!typeHelper.isDuplicateKeyException(t)) {
+            throw Throwables.propagate(t);
+          }
+        }
+
+        try {
+          JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
+              sequenceHelper.getSequenceTableName(), "seq_seq_init").execute();
+        } catch (Throwable t) {
+          if (!typeHelper.isDuplicateKeyException(t)) {
+            throw Throwables.propagate(t);
+          }
+        }
 
         return null;
       }
@@ -106,9 +127,9 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     availabilityManager.assertAvailable();
     availabilityManager.setAvailable(false);
 
-    dataSource.withHandle(new HandleCallback<Void>() {
+    dataSource.inTransaction(new TransactionCallback<Void>() {
       @Override
-      public Void withHandle(Handle handle) throws Exception {
+      public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
         for (Counter counter : SequenceServiceJdbiImpl.this.counters.values()) {
           sequenceHelper.setNextId(handle, counter.typeId,
               Long.valueOf(counter.base + counter.offset.get()));
@@ -166,11 +187,6 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public Integer getTypeId(final String type, final boolean create) throws KazukiException {
-    return getTypeId(type, create, true);
-  }
-
-  public Integer getTypeId(final String type, final boolean create, final boolean strict)
-      throws KazukiException {
     if (type == null) {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
@@ -187,10 +203,6 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         return sequenceHelper.validateType(handle, typeCodes, typeNames, type, create);
       }
     });
-
-    if (result == null && strict) {
-      throw new IllegalArgumentException("Invalid entity 'type'");
-    }
 
     return result;
   }
@@ -267,39 +279,28 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     log.info("Cleared SequenceService {}", this);
   }
 
-  public void reload() {
+  @Override
+  public synchronized void resetCounter(final String type) throws KazukiException {
+    final Integer typeId = SequenceServiceJdbiImpl.this.getTypeId(type, false);
+
     dataSource.inTransaction(new TransactionCallback<Void>() {
       @Override
       public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        try {
-          List<Map<String, Object>> currentLimits = getCountersFromDatabase(handle);
+        SequenceServiceJdbiImpl.this.sequenceHelper.setNextId(handle, typeId, 0L);
+        SequenceServiceJdbiImpl.this.counters.remove(type);
 
-          List<Map<String, Object>> currentOffsets = Collections.emptyList();
-          // JDBIHelper.getBoundQuery(handle, sequenceHelper.getDbPrefix(),
-          // sequenceHelper.getSequenceTableName(), "select_max_key_ids").list();
-
-          Map<String, Counter> theCounters = computeCounters(currentLimits, currentOffsets);
-
-          SequenceServiceJdbiImpl.this.counters.putAll(theCounters);
-
-          getCurrentCounters();
-
-          return null;
-        } catch (KazukiException e) {
-          e.printStackTrace();
-          return null;
-        }
+        return null;
       }
     });
   }
 
-  public List<Map<String, Object>> getCountersFromDatabase(Handle handle) {
-    return JDBIHelper.getBoundQuery(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
-        sequenceHelper.getSequenceTableName(), "seq_seq_list").list();
-  }
-
   public Map<String, Counter> getCurrentCounters() {
     return Collections.unmodifiableMap(counters);
+  }
+
+  private List<Map<String, Object>> getCountersFromDatabase(Handle handle) {
+    return JDBIHelper.getBoundQuery(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
+        sequenceHelper.getSequenceTableName(), "seq_seq_list").list();
   }
 
   private Counter createCounter(final String type) {
@@ -318,55 +319,6 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     });
 
     return new Counter(typeId, type, nextBase, nextBase + incrementBlockSize);
-  }
-
-  private Map<String, Counter> computeCounters(List<Map<String, Object>> currentLimits,
-      List<Map<String, Object>> currentOffsets) throws Exception {
-    Map<Long, Long> lims = convert(currentLimits);
-    Map<Long, Long> offs = convert(currentOffsets);
-
-    Map<String, Counter> toReturn = new LinkedHashMap<String, Counter>();
-
-    for (Map.Entry<Long, Long> entry : offs.entrySet()) {
-      int typeId = entry.getKey().intValue();
-      String typeName = this.getTypeName(typeId);
-      Long limit = lims.get(entry.getKey());
-      Long base = limit - DEFAULT_INCREMENT_BLOCK_SIZE;
-      Long offset = offs.get(entry.getKey());
-
-      if ("$schema".equals(typeName)) {
-        base = Long.valueOf(0);
-        offset += 1;
-      }
-
-      Counter theCount = new Counter(typeId, typeName, base, limit);
-      theCount.bumpKey(offset);
-
-      toReturn.put(typeName, theCount);
-    }
-
-    return toReturn;
-  }
-
-  private static Map<Long, Long> convert(List<Map<String, Object>> inputList) {
-    Map<Long, Long> toReturn = new LinkedHashMap<Long, Long>();
-
-    for (Map<String, Object> input : inputList) {
-      Long type = null;
-      Long value = null;
-
-      for (Map.Entry<String, Object> entry : input.entrySet()) {
-        if (entry.getKey().equals("_key_type")) {
-          type = Long.parseLong(entry.getValue().toString());
-        } else {
-          value = Long.parseLong(entry.getValue().toString());
-        }
-      }
-
-      toReturn.put(type, value);
-    }
-
-    return toReturn;
   }
 
   public class Counter {

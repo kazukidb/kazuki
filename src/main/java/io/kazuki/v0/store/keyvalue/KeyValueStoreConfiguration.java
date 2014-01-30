@@ -8,6 +8,7 @@ import com.google.common.base.Preconditions;
 public class KeyValueStoreConfiguration {
   private final String dbType;
   private final String dbPrefix;
+  private final String dataType;
   private final String groupName;
   private final String storeName;
   private final String partitionName;
@@ -15,7 +16,8 @@ public class KeyValueStoreConfiguration {
   private final Long partitionSize;
 
   public KeyValueStoreConfiguration(@JsonProperty("dbType") String dbType,
-      @JsonProperty("groupName") String groupName, @JsonProperty("storeName") String storeName,
+      @JsonProperty("dataType") String dataType, @JsonProperty("groupName") String groupName,
+      @JsonProperty("storeName") String storeName,
       @JsonProperty("partitionName") String partitionName,
       @JsonProperty("partitionSize") Long partitionSize,
       @JsonProperty("strictTypeCreation") boolean strictTypeCreation) {
@@ -29,6 +31,7 @@ public class KeyValueStoreConfiguration {
         .checkArgument(partitionSize == null || partitionSize > 1, "invalid partitionSize");
 
     this.dbType = dbType;
+    this.dataType = dataType;
     this.dbPrefix = dbType + ":" + dbType + "_";
     this.groupName = groupName;
     this.storeName = storeName;
@@ -39,6 +42,10 @@ public class KeyValueStoreConfiguration {
 
   public String getDbType() {
     return dbType;
+  }
+
+  public String getDataType() {
+    return dataType;
   }
 
   public String getDbPrefix() {
@@ -67,6 +74,7 @@ public class KeyValueStoreConfiguration {
 
   public static class Builder implements ConfigurationBuilder<KeyValueStoreConfiguration> {
     private String dbType;
+    private String dataType;
     private String groupName;
     private String storeName;
     private String partitionName;
@@ -75,6 +83,12 @@ public class KeyValueStoreConfiguration {
 
     public Builder withDbType(String dbType) {
       this.dbType = dbType;
+
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      this.dataType = dataType;
 
       return this;
     }
@@ -110,7 +124,7 @@ public class KeyValueStoreConfiguration {
     }
 
     public KeyValueStoreConfiguration build() {
-      return new KeyValueStoreConfiguration(dbType, groupName, storeName, partitionName,
+      return new KeyValueStoreConfiguration(dbType, dataType, groupName, storeName, partitionName,
           partitionSize, strictTypeCreation);
     }
   }

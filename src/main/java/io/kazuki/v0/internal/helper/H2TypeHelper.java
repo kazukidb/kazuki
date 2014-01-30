@@ -55,6 +55,16 @@ public class H2TypeHelper implements SqlTypeHelper {
   }
 
   @Override
+  public boolean isDuplicateKeyException(Throwable t) {
+    return t.getMessage().indexOf("Unique index or primary key violation") >= 0;
+  }
+
+  @Override
+  public boolean isTableAlreadyExistsException(Throwable t) {
+    return t.getMessage().indexOf(" already exists;") >= 0;
+  }
+
+  @Override
   public String quote(String name) {
     return "\"" + name + "\"";
   }

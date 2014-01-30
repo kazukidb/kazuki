@@ -1,6 +1,7 @@
 package io.kazuki.v0.store.sequence;
 
 
+import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -12,14 +13,13 @@ import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
+import com.jolbox.bonecp.BoneCPDataSource;
 
 public class SequenceServiceJdbiImplTest {
   private final Injector inject;
-  private final ObjectMapper mapper = new ObjectMapper();
 
   public SequenceServiceJdbiImplTest() {
     inject =
@@ -36,6 +36,11 @@ public class SequenceServiceJdbiImplTest {
     final SequenceServiceJdbiImpl seq =
         (SequenceServiceJdbiImpl) inject.getInstance(com.google.inject.Key.<SequenceService>get(
             SequenceService.class, Names.named("foo")));
+
+    BoneCPDataSource database =
+        inject.getInstance(com.google.inject.Key.get(BoneCPDataSource.class, Names.named("foo")));
+
+    TestHelper.dropSchema(database);
 
     lifecycle.init();
 
@@ -75,9 +80,5 @@ public class SequenceServiceJdbiImplTest {
     Assert.assertEquals(seq.nextKey("bar").getId(), Long.valueOf(11));
 
     seq.clear(true, true);
-  }
-
-  public String dump(Object object) throws Exception {
-    return mapper.writeValueAsString(object);
   }
 }

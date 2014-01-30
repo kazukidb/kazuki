@@ -1,7 +1,7 @@
 group sql;
 
 h2_kv_create_table(kv_table_name) ::=<<
-  create table if not exists "<kv_table_name>" (
+  create table "<kv_table_name>" (
     "_key_type"     smallint unsigned not null,
     "_key_id"       bigint unsigned not null,
     "_created_dt"   int unsigned not null,
@@ -53,6 +53,13 @@ h2_kv_delete(kv_table_name) ::=<<
      and "_key_id" = :key_id
 >>
 
+h2_kv_delete_hard(kv_table_name) ::=<< 
+  delete
+    from "<kv_table_name>"
+   where "_key_type" = :key_type
+     and "_key_id" = :key_id
+>>
+
 h2_kv_key_ids_of_type(kv_table_name) ::=<< 
   select "_key_id"
     from "<kv_table_name>"
@@ -60,6 +67,12 @@ h2_kv_key_ids_of_type(kv_table_name) ::=<<
      and "_is_deleted" = 'N'
    limit :limit
   offset :offset
+>>
+
+h2_kv_clear_type(kv_table_name) ::=<< 
+  delete
+    from "<kv_table_name>"
+   where "_key_type" = :key_type
 >>
 
 h2_kv_truncate(kv_table_name) ::=<< 
@@ -71,5 +84,5 @@ h2_kv_reset(kv_table_name) ::=<<
 >>
 
 h2_kv_destroy(kv_table_name) ::=<< 
-  drop table if exists "<kv_table_name>"
+  drop table "<kv_table_name>"
 >>

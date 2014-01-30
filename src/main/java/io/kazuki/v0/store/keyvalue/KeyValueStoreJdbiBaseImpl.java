@@ -2,6 +2,7 @@ package io.kazuki.v0.store.keyvalue;
 
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
 import io.kazuki.v0.internal.v2schema.compact.StructureTransform;
@@ -39,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 
 /**
@@ -55,15 +57,19 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
   protected final SequenceService sequences;
 
+  protected final SqlTypeHelper typeHelper;
+
   protected abstract String getPrefix();
 
   protected final Lock nukeLock = new ReentrantLock();
 
   protected final String tableName;
 
-  public KeyValueStoreJdbiBaseImpl(IDBI database, SchemaStore schemaService,
-      SequenceService sequences, String groupName, String storeName, String partitionName) {
+  public KeyValueStoreJdbiBaseImpl(IDBI database, SqlTypeHelper typeHelper,
+      SchemaStore schemaService, SequenceService sequences, String groupName, String storeName,
+      String partitionName) {
     this.database = database;
+    this.typeHelper = typeHelper;
     this.schemaService = schemaService;
     this.sequences = sequences;
     this.tableName = "_" + groupName + "_" + storeName + "__kv__" + partitionName;
@@ -109,39 +115,35 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
-    try {
-      final Key newKey = idOverride == null ? sequences.nextKey(type) : new Key(type, idOverride);
-      final Schema schema = schemaService.retrieveSchema(type);
+    final Key newKey = idOverride == null ? sequences.nextKey(type) : new Key(type, idOverride);
+    final Schema schema = schemaService.retrieveSchema(type);
 
-      return database.inTransaction(new TransactionCallback<Key>() {
-        @Override
-        public Key inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          Object storeValue = EncodingHelper.asJsonMap(inValue);
+    return database.inTransaction(new TransactionCallback<Key>() {
+      @Override
+      public Key inTransaction(Handle handle, TransactionStatus status) throws Exception {
+        Object storeValue = EncodingHelper.asJsonMap(inValue);
 
-          if (schema != null) {
-            FieldTransform fieldTransform = new FieldTransform(schema);
-            StructureTransform structureTransform = new StructureTransform(schema);
-            storeValue =
-                structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
-          }
-
-          byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
-
-          DateTime createdDate = new DateTime();
-          int inserted =
-              doInsert(handle, sequences.getTypeId(type, false), newKey.getId(), storeValueBytes,
-                  createdDate);
-
-          if (inserted < 1) {
-            throw new KazukiException("Entity not created!");
-          }
-
-          return newKey;
+        if (schema != null) {
+          FieldTransform fieldTransform = new FieldTransform(schema);
+          StructureTransform structureTransform = new StructureTransform(schema);
+          storeValue =
+              structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
         }
-      });
-    } catch (Exception e) {
-      throw new KazukiException(e);
-    }
+
+        byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
+
+        DateTime createdDate = new DateTime();
+        int inserted =
+            doInsert(handle, sequences.getTypeId(type, false), newKey.getId(), storeValueBytes,
+                createdDate);
+
+        if (inserted < 1) {
+          throw new KazukiException("Entity not created!");
+        }
+
+        return newKey;
+      }
+    });
   }
 
   @Override
@@ -155,10 +157,9 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
       final Schema schema = schemaService.retrieveSchema(realKey.getType());
 
-      Object storedValue =
-          EncodingHelper.parseSmile(objectBytes, schema != null ? List.class : Map.class);
+      Object storedValue = EncodingHelper.parseSmile(objectBytes, Object.class);
 
-      if (schema != null) {
+      if (schema != null && storedValue instanceof List) {
         FieldTransform fieldTransform = new FieldTransform(schema);
         StructureTransform structureTransform = new StructureTransform(schema);
         storedValue = fieldTransform.unpack(structureTransform.unpack((List<Object>) storedValue));
@@ -206,10 +207,12 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
 
           Map<String, Object> first = results.iterator().next();
 
-          Object storedValue = EncodingHelper.parseSmile((byte[]) first.get("_value"), List.class);
+          Object storedValue =
+              EncodingHelper.parseSmile((byte[]) first.get("_value"), Object.class);
 
           final Schema schema = schemaService.retrieveSchema(realKey.getType());
-          if (schema != null) {
+
+          if (schema != null && storedValue instanceof List) {
             FieldTransform fieldTransform = new FieldTransform(schema);
             StructureTransform structureTransform = new StructureTransform(schema);
             storedValue =
@@ -285,6 +288,29 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
   }
 
   @Override
+  public boolean deleteHard(final Key realKey) throws KazukiException {
+    return database.inTransaction(new TransactionCallback<Boolean>() {
+      @Override
+      public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
+        final int typeId = sequences.getTypeId(realKey.getType(), false);
+        final long keyId = realKey.getId();
+
+        Update delete =
+            JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                "kv_delete_hard");
+
+        delete.bind("updated_dt", getEpochSecondsNow());
+        delete.bind("key_type", typeId);
+        delete.bind("key_id", keyId);
+
+        int deleted = delete.execute();
+
+        return deleted != 0;
+      }
+    });
+  }
+
+  @Override
   public Long approximateSize(String type) throws KazukiException {
     Key nextId = ((SequenceServiceJdbiImpl) sequences).peekKey(type);
 
@@ -322,6 +348,31 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
     log.debug("Cleared KeyValueStore {} table {}", this, tableName);
   }
 
+  public void clear(final String type) throws KazukiException {
+    log.debug("Clearing KeyValueStore {} table {} type {}", this, tableName, type);
+
+    nukeLock.lock();
+
+    final int typeId = sequences.getTypeId(type, false);
+
+    try {
+      database.inTransaction(new TransactionCallback<Void>() {
+        @Override
+        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          JDBIHelper
+              .getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_clear_type")
+              .bind("key_type", typeId).execute();
+
+          return null;
+        }
+      });
+
+      log.debug("Cleared KeyValueStore {} table {} type {}", this, tableName, type);
+    } finally {
+      nukeLock.unlock();
+    }
+  }
+
   public void destroy() {
     log.debug("Destroying KeyValueStore {} table {}", this, tableName);
 
@@ -331,6 +382,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       database.inTransaction(new TransactionCallback<Void>() {
         @Override
         public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+              "kv_truncate").execute();
           JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
               "kv_destroy");
 
@@ -386,12 +439,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       @Override
       public T next() {
         try {
-          Object result =
-              loadFriendlyEntity(Key.valueOf(nextKey), schema != null ? List.class : Map.class);
+          Object result = loadFriendlyEntity(Key.valueOf(nextKey), Object.class);
 
           nextKey = advance();
 
-          if (schema != null) {
+          if (schema != null && result instanceof List) {
             FieldTransform fieldTransform = new FieldTransform(schema);
             StructureTransform structureTransform = new StructureTransform(schema);
             result = fieldTransform.unpack(structureTransform.unpack((List<Object>) result));
@@ -473,9 +525,14 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
   private void performInitialization(Handle handle, String tableName) {
     log.debug("Creating table if not exist with name {} for KeyValueStore {}", tableName, this);
 
-    JDBIHelper
-        .getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_create_table")
-        .execute();
+    try {
+      JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+          "kv_create_table").execute();
+    } catch (Throwable t) {
+      if (!this.typeHelper.isTableAlreadyExistsException(t)) {
+        throw Throwables.propagate(t);
+      }
+    }
 
     log.debug("Creating index if not exists on table {} for KeyValueStore {}", tableName, this);
 

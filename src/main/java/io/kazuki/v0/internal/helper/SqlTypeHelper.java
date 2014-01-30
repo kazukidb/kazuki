@@ -11,6 +11,10 @@ public interface SqlTypeHelper {
 
   String getPKConflictResolve();
 
+  boolean isTableAlreadyExistsException(Throwable t);
+
+  boolean isDuplicateKeyException(Throwable t);
+
   String quote(String name);
 
   String getTableOptions();

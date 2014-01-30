@@ -25,7 +25,7 @@ public interface JournalStore {
 
   boolean dropPartition(String partitionId) throws KazukiException;
 
-  void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException;
+  void clear() throws KazukiException;
 
-  Long approximateSize(String type) throws KazukiException;
+  Long approximateSize() throws KazukiException;
 }

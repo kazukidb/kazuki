@@ -1,6 +1,7 @@
 package io.kazuki.v0.store.keyvalue;
 
 
+import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -25,7 +26,8 @@ import com.google.inject.name.Names;
 
 public class H2KeyValueStorageTest {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
-      new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence"));
+      new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
+          .withJdbiConfig(Configurations.getJdbi().build()));
 
   private final ObjectMapper mapper = new ObjectMapper();
 

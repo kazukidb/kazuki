@@ -1,5 +1,6 @@
 package io.kazuki.v0.internal.helper;
 
+import java.sql.Connection;
 import java.util.Iterator;
 
 import org.h2.Driver;
@@ -9,10 +10,30 @@ import org.hamcrest.Matcher;
 import org.skife.jdbi.v2.IDBI;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Throwables;
 import com.jolbox.bonecp.BoneCPDataSource;
 
 public class TestHelper {
   private static final ObjectMapper mapper = new ObjectMapper();
+
+  public static void dropSchema(BoneCPDataSource database) {
+    Connection conn = null;
+    try {
+      conn = database.getConnection();
+      conn.prepareStatement("DROP ALL OBJECTS").execute();
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    } finally {
+      if (conn != null) {
+        try {
+          conn.close();
+        } catch (Exception e) {
+          throw Throwables.propagate(e);
+        }
+      }
+    }
+
+  }
 
   public static IDBI getTestDataSource(Class<?> clazz) {
     BoneCPDataSource datasource = new BoneCPDataSource();

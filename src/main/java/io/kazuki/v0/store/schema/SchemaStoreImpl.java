@@ -17,7 +17,7 @@ import com.google.common.base.Throwables;
 
 
 public class SchemaStoreImpl implements SchemaStore {
-  private static final String SCHEMA_PREFIX = "$schema";
+  public static final String SCHEMA_PREFIX = "$schema";
 
   private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -119,7 +119,11 @@ public class SchemaStoreImpl implements SchemaStore {
 
     Key theKey = new Key(SCHEMA_PREFIX, typeId.longValue());
 
-    return store.delete(theKey);
+    return store.deleteHard(theKey);
+  }
+
+  public void clear() throws KazukiException {
+    this.store.clear(SCHEMA_PREFIX);
   }
 
   private Integer getTypeIdPossiblyNull(String type, boolean val) {

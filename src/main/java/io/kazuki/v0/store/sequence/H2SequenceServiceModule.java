@@ -1,6 +1,8 @@
 package io.kazuki.v0.store.sequence;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
+import io.kazuki.v0.internal.helper.H2TypeHelper;
+import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -47,6 +49,7 @@ public class H2SequenceServiceModule extends PrivateModule {
 
     bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider)).in(
         Scopes.SINGLETON);
+    bind(SqlTypeHelper.class).to(H2TypeHelper.class).in(Scopes.SINGLETON);
 
     SequenceServiceConfiguration theConfig = config.get();
 

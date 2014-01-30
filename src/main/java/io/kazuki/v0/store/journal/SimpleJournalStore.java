@@ -2,19 +2,26 @@ package io.kazuki.v0.store.journal;
 
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.schema.TypeValidation;
 
 import java.util.Iterator;
 
 import javax.inject.Inject;
 
+import com.google.common.base.Preconditions;
+
 
 public class SimpleJournalStore implements JournalStore {
   private final KeyValueStore store;
+  private final String dataType;
 
   @Inject
-  public SimpleJournalStore(KeyValueStore store) {
+  public SimpleJournalStore(KeyValueStore store, KeyValueStoreConfiguration config) {
+    Preconditions.checkNotNull(config.getDataType(), "dataType");
+
     this.store = store;
+    this.dataType = config.getDataType();
   }
 
   @Override
@@ -39,13 +46,13 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public Long approximateSize(String type) throws KazukiException {
-    return store.approximateSize(type);
+  public Long approximateSize() throws KazukiException {
+    return store.approximateSize(this.dataType);
   }
 
   @Override
-  public void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException {
-    store.clear(preserveTypes, preserveCounters);
+  public void clear() throws KazukiException {
+    store.clear(false, false);
   }
 
   @Override

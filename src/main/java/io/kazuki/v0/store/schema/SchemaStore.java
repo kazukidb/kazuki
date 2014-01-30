@@ -11,4 +11,6 @@ public interface SchemaStore {
   boolean updateSchema(final String type, final Schema value) throws KazukiException;
 
   boolean deleteSchema(final String type) throws KazukiException;
+  
+  void clear() throws KazukiException;
 }
