@@ -1,5 +1,6 @@
 package io.kazuki.v0.store.journal;
 
+import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
@@ -39,6 +40,7 @@ import com.google.inject.Provider;
 
 public class PartitionedJournalStore implements JournalStore, LifecycleRegistration {
   private final Logger log = LoggerFactory.getLogger(getClass());
+  private final AvailabilityManager availability;
   private final IDBI database;
   private final SqlTypeHelper typeHelper;
   private final SequenceService sequence;
@@ -55,11 +57,13 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   private final AtomicReference<KeyValueStore> activePartitionStore;
   private final AtomicReference<PartitionInfoImpl> activePartitionInfo;
 
-  public PartitionedJournalStore(IDBI database, SqlTypeHelper typeHelper, SchemaStore schema,
-      SequenceService sequence, String dbType, String groupName, String storeName,
-      Long partitionSize, String dataType, boolean strictTypeCreation) {
+  public PartitionedJournalStore(AvailabilityManager availability, IDBI database,
+      SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence, String dbType,
+      String groupName, String storeName, Long partitionSize, String dataType,
+      boolean strictTypeCreation) {
     Preconditions.checkNotNull(dataType, "dataType");
 
+    this.availability = availability;
     this.database = database;
     this.typeHelper = typeHelper;
     this.schema = schema;
@@ -76,11 +80,12 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Inject
-  public PartitionedJournalStore(IDBI database, SqlTypeHelper typeHelper, SchemaStore schema,
-      SequenceService sequence, KeyValueStoreConfiguration config) {
-    this(database, typeHelper, schema, sequence, config.getDbType(), config.getGroupName(), config
-        .getStoreName(), config.getPartitionSize(), config.getDataType(), config
-        .isStrictTypeCreation());
+  public PartitionedJournalStore(AvailabilityManager availability, IDBI database,
+      SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
+      KeyValueStoreConfiguration config) {
+    this(availability, database, typeHelper, schema, sequence, config.getDbType(), config
+        .getGroupName(), config.getStoreName(), config.getPartitionSize(), config.getDataType(),
+        config.isStrictTypeCreation());
   }
 
   @Inject
@@ -119,12 +124,15 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       throw Throwables.propagate(e);
     }
 
+    availability.setAvailable(true);
     log.info("Intitialized PartitionedJournalStore {}", this);
   }
 
   @Override
   public synchronized <T> Key append(String type, Class<T> clazz, T inValue,
       TypeValidation typeSafety) throws KazukiException {
+    availability.assertAvailable();
+
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
           + type);
@@ -192,6 +200,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   @SuppressWarnings("unchecked")
   public <T> Iterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
       Long limit) throws KazukiException {
+    availability.assertAvailable();
+
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
           + type);
@@ -243,6 +253,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   @SuppressWarnings("unchecked")
   public <T> Iterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
       Long limit) throws KazukiException {
+    availability.assertAvailable();
+
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
           + type);
@@ -295,6 +307,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public Long approximateSize() throws KazukiException {
+    availability.assertAvailable();
+
     long size = 0L;
 
     for (PartitionInfo partition : this.getAllPartitions()) {
@@ -307,6 +321,9 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   @Override
   public synchronized void clear() throws KazukiException {
     log.info("Clearing PartitionedJournalStore {}", this);
+
+    availability.assertAvailable();
+
     nukeLock.lock();
 
     try {
@@ -337,6 +354,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   public synchronized boolean closeActivePartition() throws KazukiException {
     log.debug("Closing Active Partition for PartitionedJournalStore {}", this);
 
+    availability.assertAvailable();
+
     PartitionInfoImpl partition = activePartitionInfo.get();
 
     if (partition == null || partition.isClosed()) {
@@ -361,6 +380,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   @Override
   public synchronized boolean dropPartition(String partitionId) throws KazukiException {
     log.debug("Dropping Partition {} of PartitionedJournalStore {}", partitionId, this);
+
+    availability.assertAvailable();
 
     Key partitionKey = Key.valueOf(partitionId);
     PartitionInfo partition = metaStore.retrieve(partitionKey, PartitionInfoSnapshot.class);
@@ -388,6 +409,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   @Override
   @Nullable
   public PartitionInfo getActivePartition() throws KazukiException {
+    availability.assertAvailable();
+
     PartitionInfoImpl info = activePartitionInfo.get();
 
     return info == null ? null : info.snapshot();
@@ -395,6 +418,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public Iterable<PartitionInfoSnapshot> getAllPartitions() throws KazukiException {
+    availability.assertAvailable();
+
     return metaStore.iterators().values(this.typeName, PartitionInfoSnapshot.class);
   }
 
@@ -409,7 +434,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     config.withStrictTypeCreation(this.strictTypeCreation);
 
     KeyValueStore keyValueStore =
-        new KeyValueStoreJdbiH2Impl(database, typeHelper, schema, sequence, config.build());
+        new KeyValueStoreJdbiH2Impl(availability, database, typeHelper, schema, sequence,
+            config.build());
 
     if (initialize) {
       keyValueStore.initialize();

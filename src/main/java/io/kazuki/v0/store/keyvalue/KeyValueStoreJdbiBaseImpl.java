@@ -1,5 +1,6 @@
 package io.kazuki.v0.store.keyvalue;
 
+import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
@@ -52,6 +53,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   protected final Logger log = LoggerFactory.getLogger(getClass());
 
+  protected final AvailabilityManager availability;
+
   protected final IDBI database;
 
   protected final SchemaStore schemaService;
@@ -66,9 +69,10 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   protected final String tableName;
 
-  public KeyValueStoreJdbiBaseImpl(IDBI database, SqlTypeHelper typeHelper,
-      SchemaStore schemaService, SequenceService sequences, String groupName, String storeName,
-      String partitionName) {
+  public KeyValueStoreJdbiBaseImpl(AvailabilityManager availability, IDBI database,
+      SqlTypeHelper typeHelper, SchemaStore schemaService, SequenceService sequences,
+      String groupName, String storeName, String partitionName) {
+    this.availability = availability;
     this.database = database;
     this.typeHelper = typeHelper;
     this.schemaService = schemaService;
@@ -99,6 +103,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
       }
     });
 
+    availability.setAvailable(true);
     log.debug("Intitialized KeyValueStore {}", this);
   }
 
@@ -111,6 +116,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   @Override
   public <T> Key create(final String type, Class<T> clazz, final T inValue, final Long idOverride,
       TypeValidation typeSafety) throws KazukiException {
+    availability.assertAvailable();
+
     if (type == null
         || (TypeValidation.STRICT.equals(typeSafety) && ((type.contains("@") || type.contains("$"))))) {
       throw new IllegalArgumentException("Invalid entity 'type'");
@@ -149,6 +156,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   @Override
   public <T> T retrieve(final Key realKey, Class<T> clazz) throws KazukiException {
+    availability.assertAvailable();
+
     try {
       byte[] objectBytes = getObjectBytes(realKey);
 
@@ -175,6 +184,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   @Override
   public <T> Map<Key, T> multiRetrieve(final Collection<Key> keys, final Class<T> clazz)
       throws KazukiException {
+    availability.assertAvailable();
+
     if (keys == null || keys.isEmpty()) {
       return Collections.emptyMap();
     }
@@ -231,6 +242,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   @Override
   public <T> boolean update(final Key realKey, final Class<T> clazz, final T inValue)
       throws KazukiException {
+    availability.assertAvailable();
+
     try {
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
@@ -267,6 +280,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   @Override
   public boolean delete(final Key realKey) throws KazukiException {
+    availability.assertAvailable();
+
     return database.inTransaction(new TransactionCallback<Boolean>() {
       @Override
       public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
@@ -290,6 +305,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   @Override
   public boolean deleteHard(final Key realKey) throws KazukiException {
+    availability.assertAvailable();
+
     return database.inTransaction(new TransactionCallback<Boolean>() {
       @Override
       public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
@@ -313,6 +330,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   @Override
   public Long approximateSize(String type) throws KazukiException {
+    availability.assertAvailable();
+
     Key nextId = ((SequenceServiceJdbiImpl) sequences).peekKey(type);
 
     return (nextId == null) ? 0L : nextId.getId();
@@ -320,6 +339,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   public void clear(final boolean preserveTypes, final boolean preserveCounters) {
     log.debug("Clearing KeyValueStore {} table {}", this, tableName);
+
+    availability.assertAvailable();
 
     nukeLock.lock();
 
@@ -352,6 +373,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   public void clear(final String type) throws KazukiException {
     log.debug("Clearing KeyValueStore {} table {} type {}", this, tableName, type);
 
+    availability.assertAvailable();
+
     nukeLock.lock();
 
     final int typeId = sequences.getTypeId(type, false);
@@ -376,6 +399,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   public void destroy() {
     log.debug("Destroying KeyValueStore {} table {}", this, tableName);
+
+    availability.assertAvailable();
 
     nukeLock.lock();
 
@@ -681,6 +706,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public KeyValuePair<T> next() {
+            availability.assertAvailable();
+
             try {
               curKey = nextKey;
               nextKey = advance();
@@ -711,6 +738,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public void remove() {
+            availability.assertAvailable();
+
             Preconditions.checkNotNull(curKey, "iterator");
             try {
               KeyValueStoreJdbiBaseImpl.this.delete(curKey);
