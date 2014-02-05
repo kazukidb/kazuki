@@ -1,6 +1,7 @@
 package io.kazuki.v0.store.journal;
 
 
+import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
 import static org.hamcrest.MatcherAssert.assertThat;
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.store.Foo;
@@ -69,8 +70,7 @@ public class PartitionedJournalStoreScaleTest {
 
   @Test
   public void testDemo() throws Exception {
-    assertThat(journal.getAllPartitions(),
-        TestHelper.isIterOfLength(PartitionInfoSnapshot.class, 0));
+    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(0));
 
     for (int i = 1; i <= 50000; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -81,23 +81,21 @@ public class PartitionedJournalStoreScaleTest {
       }
 
       if (i % 10000 == 0 && i > 0) {
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
       }
     }
 
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 1L).next().getFooKey(),
-        Matchers.is("k25001"));
-    assertThat(journal.getAllPartitions(),
-        TestHelper.isIterOfLength(PartitionInfoSnapshot.class, 25));
+    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator().next().getValue()
+        .getFooKey(), Matchers.is("k25001"));
+    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(25));
 
     journal.clear();
 
-    assertThat(journal.getAllPartitions(),
-        TestHelper.isIterOfLength(PartitionInfoSnapshot.class, 0));
+    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(0));
 
     for (int i = 1; i <= 50000; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -108,17 +106,16 @@ public class PartitionedJournalStoreScaleTest {
       }
 
       if (i % 10000 == 0 && i > 0) {
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
       }
     }
 
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 1L).next().getFooKey(),
-        Matchers.is("k25001"));
-    assertThat(journal.getAllPartitions(),
-        TestHelper.isIterOfLength(PartitionInfoSnapshot.class, 25));
+    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator().next().getValue()
+        .getFooKey(), Matchers.is("k25001"));
+    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(25));
   }
 }

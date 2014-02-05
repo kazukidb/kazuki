@@ -16,6 +16,7 @@ import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
+import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
@@ -59,6 +60,8 @@ public class PartitionedJournalStoreSmokeTest {
 
   @Test(singleThreaded = true)
   public void testDemo() throws Exception {
+    assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
+
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
@@ -68,7 +71,7 @@ public class PartitionedJournalStoreSmokeTest {
 
     System.out.println(dump(journal.getActivePartition()));
     assertThat(journal.getActivePartition(), nullValue());
-    assertThat(journal.getAllPartitions(), isEmptyIter(PartitionInfoSnapshot.class));
+    assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -77,40 +80,34 @@ public class PartitionedJournalStoreSmokeTest {
       assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
     }
 
-    Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions();
-    assertThat(piter, isNotEmptyIter(PartitionInfoSnapshot.class));
+    Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator();
+    assertThat(piter, isNotEmptyIter());
 
     System.out.println("PARTITIONS:");
     while (piter.hasNext()) {
       System.out.println(" - part - " + dump(piter.next()));
     }
 
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, null),
-        isIterOfLength(Foo.class, 100));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 0L), isEmptyIter(Foo.class));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L),
-        isIterOfLength(Foo.class, 10));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 20L),
-        isIterOfLength(Foo.class, 20));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 11L, 19L),
-        isIterOfLength(Foo.class, 19));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 89L, 12L),
-        isIterOfLength(Foo.class, 11));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 89L, null),
-        isIterOfLength(Foo.class, 11));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 89L, 0L), isEmptyIter(Foo.class));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, null).iterator(), isIterOfLength(100));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 0L).iterator(), isEmptyIter());
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 10L).iterator(), isIterOfLength(10));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 20L).iterator(), isIterOfLength(20));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 11L, 19L).iterator(), isIterOfLength(19));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 89L, 12L).iterator(), isIterOfLength(11));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 89L, null).iterator(), isIterOfLength(11));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 89L, 0L).iterator(), isEmptyIter());
 
-    assertThat(journal.getAllPartitions(), isIterOfLength(PartitionInfoSnapshot.class, 10));
-    System.out.println("HIHIHI: " + journal.getActivePartition().getPartitionId());
+    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(10));
     assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
 
     System.out.println("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
-      Iterator<Foo> iter = journal.getIteratorRelative("foo", Foo.class, Long.valueOf(i * 10), 10L);
-      assertThat(iter, isNotEmptyIter(Foo.class));
+      Iterator<KeyValuePair<Foo>> iter =
+          journal.entriesRelative("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
+      assertThat(iter, isNotEmptyIter());
       int j = 0;
       while (iter.hasNext()) {
-        Foo foo = iter.next();
+        Foo foo = iter.next().getValue();
         assertThat(foo, notNullValue());
         System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
@@ -120,11 +117,12 @@ public class PartitionedJournalStoreSmokeTest {
 
     System.out.println("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
-      Iterator<Foo> iter = journal.getIteratorAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L);
-      assertThat(iter, isNotEmptyIter(Foo.class));
+      Iterator<KeyValuePair<Foo>> iter =
+          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
+      assertThat(iter, isNotEmptyIter());
       int j = 0;
       while (iter.hasNext()) {
-        Foo foo = iter.next();
+        Foo foo = iter.next().getValue();
         assertThat(foo, notNullValue());
         System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
@@ -132,41 +130,32 @@ public class PartitionedJournalStoreSmokeTest {
       assertThat(j, is(10));
     }
 
-    assertThat(journal.dropPartition(journal.getAllPartitions().next().getPartitionId()), is(true));
+    assertThat(
+        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId()),
+        is(true));
 
     System.out.println("PARTITIONS:");
-    piter = journal.getAllPartitions();
+    piter = journal.getAllPartitions().iterator();
     while (piter.hasNext()) {
       System.out.println(" - part - " + dump(piter.next()));
     }
 
-    assertThat(journal.getAllPartitions(), isIterOfLength(PartitionInfoSnapshot.class, 9));
+    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(9));
 
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 0L, 10L), isEmptyIter(Foo.class));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 10L),
-        isIterOfLength(Foo.class, 10));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 10L, 20L),
-        isIterOfLength(Foo.class, 20));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 90L, 10L),
-        isIterOfLength(Foo.class, 10));
-    assertThat(journal.getIteratorAbsolute("foo", Foo.class, 90L, 20L),
-        isIterOfLength(Foo.class, 10));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 10L).iterator(), isEmptyIter());
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 10L, 10L).iterator(), isIterOfLength(10));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 10L, 20L).iterator(), isIterOfLength(20));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 90L, 10L).iterator(), isIterOfLength(10));
+    assertThat(journal.entriesAbsolute("foo", Foo.class, 90L, 20L).iterator(), isIterOfLength(10));
 
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, null),
-        isIterOfLength(Foo.class, 90));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 10L),
-        isIterOfLength(Foo.class, 10));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 0L, 20L),
-        isIterOfLength(Foo.class, 20));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 11L, 79L),
-        isIterOfLength(Foo.class, 79));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 11L, null),
-        isIterOfLength(Foo.class, 79));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 10L, 10L),
-        isIterOfLength(Foo.class, 10));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 5L, 10L),
-        isIterOfLength(Foo.class, 10));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 80L, 10L), isNotEmptyIter(Foo.class));
-    assertThat(journal.getIteratorRelative("foo", Foo.class, 90L, 10L), isEmptyIter(Foo.class));
+    assertThat(journal.entriesRelative("foo", Foo.class, 0L, null).iterator(), isIterOfLength(90));
+    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 10L).iterator(), isIterOfLength(10));
+    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 20L).iterator(), isIterOfLength(20));
+    assertThat(journal.entriesRelative("foo", Foo.class, 11L, 79L).iterator(), isIterOfLength(79));
+    assertThat(journal.entriesRelative("foo", Foo.class, 11L, null).iterator(), isIterOfLength(79));
+    assertThat(journal.entriesRelative("foo", Foo.class, 10L, 10L).iterator(), isIterOfLength(10));
+    assertThat(journal.entriesRelative("foo", Foo.class, 5L, 10L).iterator(), isIterOfLength(10));
+    assertThat(journal.entriesRelative("foo", Foo.class, 80L, 10L).iterator(), isNotEmptyIter());
+    assertThat(journal.entriesRelative("foo", Foo.class, 90L, 10L).iterator(), isEmptyIter());
   }
 }

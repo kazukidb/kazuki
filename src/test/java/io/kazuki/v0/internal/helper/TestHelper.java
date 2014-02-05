@@ -47,8 +47,8 @@ public class TestHelper {
     return JDBIHelper.getDBI(clazz, datasource);
   }
 
-  public static <T> Matcher<Iterator<T>> isEmptyIter(Class<T> clazz) {
-    return new BaseMatcher<Iterator<T>>() {
+  public static Matcher<Iterator<?>> isEmptyIter() {
+    return new BaseMatcher<Iterator<?>>() {
       @Override
       public void describeTo(Description description) {
         description.appendText("is not empty");
@@ -61,8 +61,8 @@ public class TestHelper {
     };
   }
 
-  public static <T> Matcher<Iterator<T>> isNotEmptyIter(Class<T> clazz) {
-    return new BaseMatcher<Iterator<T>>() {
+  public static <T> Matcher<Iterator<?>> isNotEmptyIter() {
+    return new BaseMatcher<Iterator<?>>() {
       @Override
       public void describeTo(Description description) {
         description.appendText("is empty");
@@ -75,8 +75,8 @@ public class TestHelper {
     };
   }
 
-  public static <T> Matcher<Iterator<T>> isIterOfLength(Class<T> clazz, final int targetSize) {
-    return new BaseMatcher<Iterator<T>>() {
+  public static <T> Matcher<Iterator<?>> isIterOfLength(final int targetSize) {
+    return new BaseMatcher<Iterator<?>>() {
       @Override
       public void describeTo(Description description) {
         description.appendText("is iter of length " + targetSize);
@@ -88,7 +88,7 @@ public class TestHelper {
           return false;
         }
 
-        Iterator<T> targetIter = (Iterator<T>) target;
+        Iterator<?> targetIter = (Iterator<?>) target;
         int count = 0;
         while (targetIter.hasNext()) {
           targetIter.next();

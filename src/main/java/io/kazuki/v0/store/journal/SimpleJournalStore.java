@@ -1,11 +1,11 @@
 package io.kazuki.v0.store.journal;
 
 import io.kazuki.v0.store.KazukiException;
+import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
 
 import javax.inject.Inject;
 
@@ -28,21 +28,21 @@ public class SimpleJournalStore implements JournalStore {
   public void initialize() throws KazukiException {}
 
   @Override
-  public <T> void append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
+  public <T> Key append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException {
-    store.create(type, clazz, inValue, typeSafety);
+    return store.create(type, clazz, inValue, typeSafety);
   }
 
   @Override
-  public <T> Iterator<T> getIteratorAbsolute(String type, Class<T> clazz, Long offset, Long limit)
-      throws KazukiException {
-    return store.iterators().iterator(type, clazz, offset, limit);
+  public <T> Iterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
+      Long limit) throws KazukiException {
+    return store.iterators().entries(type, clazz, offset, limit);
   }
 
   @Override
-  public <T> Iterator<T> getIteratorRelative(String type, Class<T> clazz, Long offset, Long limit)
-      throws KazukiException {
-    return getIteratorAbsolute(type, clazz, offset, limit);
+  public <T> Iterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
+      Long limit) throws KazukiException {
+    return entriesAbsolute(type, clazz, offset, limit);
   }
 
   @Override
@@ -71,7 +71,7 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public Iterator<PartitionInfoSnapshot> getAllPartitions() {
+  public Iterable<PartitionInfoSnapshot> getAllPartitions() {
     throw new UnsupportedOperationException("getAllPartitions() not yet supported");
   }
 }

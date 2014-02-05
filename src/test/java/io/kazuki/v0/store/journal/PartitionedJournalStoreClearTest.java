@@ -67,7 +67,7 @@ public class PartitionedJournalStoreClearTest {
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     assertThat(journal.getActivePartition(), nullValue());
-    assertThat(journal.getAllPartitions(), isEmptyIter(PartitionInfoSnapshot.class));
+    assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -79,8 +79,8 @@ public class PartitionedJournalStoreClearTest {
     assertThat(journal.getActivePartition().getPartitionId(),
         equalTo("PartitionInfo-bar-barstore:10"));
 
-    Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions();
-    assertThat(piter, isNotEmptyIter(PartitionInfoSnapshot.class));
+    Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator();
+    assertThat(piter, isNotEmptyIter());
 
     System.out.println("PARTITIONS PRE:");
     while (piter.hasNext()) {
@@ -102,8 +102,8 @@ public class PartitionedJournalStoreClearTest {
     assertThat(journal.getActivePartition().getPartitionId(),
         equalTo("PartitionInfo-bar-barstore:10"));
 
-    Iterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions();
-    assertThat(piter2, isNotEmptyIter(PartitionInfoSnapshot.class));
+    Iterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions().iterator();
+    assertThat(piter2, isNotEmptyIter());
 
     System.out.println("PARTITIONS POST:");
     while (piter2.hasNext()) {

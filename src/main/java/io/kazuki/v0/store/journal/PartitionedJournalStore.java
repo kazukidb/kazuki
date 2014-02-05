@@ -5,6 +5,7 @@ import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Impl;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.inject.Provider;
 
@@ -101,11 +103,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
         this.schema.createSchema(this.typeName, new Schema(Collections.<Attribute>emptyList()));
       }
 
-      Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
-
-      while (iter.hasNext()) {
-        PartitionInfoSnapshot partition = iter.next();
-
+      for (PartitionInfoSnapshot partition : this.getAllPartitions()) {
         if (!partition.isClosed()) {
           log.debug("Found active partition: {}", partition.getPartitionId());
 
@@ -125,7 +123,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Override
-  public synchronized <T> void append(String type, Class<T> clazz, T inValue,
+  public synchronized <T> Key append(String type, Class<T> clazz, T inValue,
       TypeValidation typeSafety) throws KazukiException {
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
@@ -186,12 +184,14 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     theActivePartitionInfo.setMaxId(theKey.getId());
     this.metaStore.update(Key.valueOf(theActivePartitionInfo.getPartitionId()),
         PartitionInfo.class, theActivePartitionInfo);
+
+    return theKey;
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public <T> Iterator<T> getIteratorAbsolute(String type, Class<T> clazz, Long offset, Long limit)
-      throws KazukiException {
+  public <T> Iterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
+      Long limit) throws KazukiException {
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
           + type);
@@ -204,8 +204,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
     idOffset += 1;
 
-    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
-    List<Iterator<T>> iters = new ArrayList<Iterator<T>>();
+    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions().iterator();
+    List<Iterable<KeyValuePair<T>>> iters = new ArrayList<Iterable<KeyValuePair<T>>>();
 
     while (iter.hasNext() && (limit == null || limit > 0L)) {
       PartitionInfo partition = iter.next();
@@ -219,7 +219,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
           limit -= specificLimit;
         }
 
-        iters.add(new LazyIterator<T>(getIteratorProvider(type, clazz,
+        iters.add(new LazyIterable<KeyValuePair<T>>(getIterableProvider(type, clazz,
             getPartitionName(Key.valueOf(partition.getPartitionId())),
             idOffset - partition.getMinId(), specificLimit)));
 
@@ -228,16 +228,21 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     }
 
     if (iters.isEmpty()) {
-      return Iterators.emptyIterator();
+      return new Iterable<KeyValuePair<T>>() {
+        @Override
+        public Iterator<KeyValuePair<T>> iterator() {
+          return Iterators.emptyIterator();
+        }
+      };
     }
 
-    return Iterators.concat(iters.toArray(new Iterator[iters.size()]));
+    return Iterables.concat(iters.toArray(new Iterable[iters.size()]));
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public <T> Iterator<T> getIteratorRelative(String type, Class<T> clazz, Long offset, Long limit)
-      throws KazukiException {
+  public <T> Iterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
+      Long limit) throws KazukiException {
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
           + type);
@@ -249,8 +254,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       sizeOffset = offset.longValue();
     }
 
-    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
-    List<Iterator<T>> iters = new ArrayList<Iterator<T>>();
+    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions().iterator();
+    List<Iterable<KeyValuePair<T>>> iters = new ArrayList<Iterable<KeyValuePair<T>>>();
 
     while (iter.hasNext() && (limit == null || limit > 0L)) {
       PartitionInfo partition = iter.next();
@@ -270,26 +275,29 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
         limit -= specificLimit;
       }
 
-      iters.add(new LazyIterator<T>(getIteratorProvider(type, clazz,
+      iters.add(new LazyIterable<KeyValuePair<T>>(getIterableProvider(type, clazz,
           getPartitionName(Key.valueOf(partition.getPartitionId())), sizeOffset, specificLimit)));
 
       sizeOffset = 0L;
     }
 
     if (iters.isEmpty()) {
-      return Iterators.emptyIterator();
+      return new Iterable<KeyValuePair<T>>() {
+        @Override
+        public Iterator<KeyValuePair<T>> iterator() {
+          return Iterators.emptyIterator();
+        }
+      };
     }
 
-    return Iterators.concat(iters.toArray(new Iterator[iters.size()]));
+    return Iterables.concat(iters.toArray(new Iterable[iters.size()]));
   }
 
   @Override
   public Long approximateSize() throws KazukiException {
-    Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
     long size = 0L;
 
-    while (iter.hasNext()) {
-      PartitionInfo partition = iter.next();
+    for (PartitionInfo partition : this.getAllPartitions()) {
       size += 1 + partition.getMaxId() - partition.getMinId();
     }
 
@@ -304,11 +312,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     try {
       this.closeActivePartition();
 
-      Iterator<PartitionInfoSnapshot> iter = this.getAllPartitions();
-
-      while (iter.hasNext()) {
-        PartitionInfo partition = iter.next();
-
+      for (PartitionInfo partition : this.getAllPartitions()) {
         if (!this.dropPartition(partition.getPartitionId())) {
           throw new KazukiException("unable to delete partition");
         }
@@ -331,7 +335,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public synchronized boolean closeActivePartition() throws KazukiException {
-    log.info("Closing Active Partition for PartitionedJournalStore {}", this);
+    log.debug("Closing Active Partition for PartitionedJournalStore {}", this);
 
     PartitionInfoImpl partition = activePartitionInfo.get();
 
@@ -348,7 +352,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
         metaStore.update(Key.valueOf(partition.getPartitionId()), PartitionInfo.class, partition);
 
     if (result) {
-      log.info("Closed Active Partition for PartitionedJournalStore {}", this);
+      log.debug("Closed Active Partition for PartitionedJournalStore {}", this);
     }
 
     return result;
@@ -356,7 +360,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public synchronized boolean dropPartition(String partitionId) throws KazukiException {
-    log.info("Dropping Partition {} of PartitionedJournalStore {}", partitionId, this);
+    log.debug("Dropping Partition {} of PartitionedJournalStore {}", partitionId, this);
 
     Key partitionKey = Key.valueOf(partitionId);
     PartitionInfo partition = metaStore.retrieve(partitionKey, PartitionInfoSnapshot.class);
@@ -375,7 +379,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     boolean result = metaStore.delete(partitionKey);
 
     if (result) {
-      log.info("Dropped Partition {} of PartitionedJournalStore {}", partitionId, this);
+      log.debug("Dropped Partition {} of PartitionedJournalStore {}", partitionId, this);
     }
 
     return result;
@@ -390,8 +394,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Override
-  public Iterator<PartitionInfoSnapshot> getAllPartitions() throws KazukiException {
-    return metaStore.iterators().iterator(this.typeName, PartitionInfoSnapshot.class);
+  public Iterable<PartitionInfoSnapshot> getAllPartitions() throws KazukiException {
+    return metaStore.iterators().values(this.typeName, PartitionInfoSnapshot.class);
   }
 
   private KeyValueStore getKeyValueStore(String partitionName, boolean initialize) {
@@ -418,13 +422,13 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     return String.format("%016x", partitionKey.getId());
   }
 
-  private <T> Provider<Iterator<T>> getIteratorProvider(final String type, final Class<T> clazz,
-      final String partitionName, final Long offset, final Long limit) {
-    return new Provider<Iterator<T>>() {
+  private <T> Provider<Iterable<KeyValuePair<T>>> getIterableProvider(final String type,
+      final Class<T> clazz, final String partitionName, final Long offset, final Long limit) {
+    return new Provider<Iterable<KeyValuePair<T>>>() {
       @Override
-      public Iterator<T> get() {
+      public Iterable<KeyValuePair<T>> get() {
         try {
-          return getKeyValueStore(partitionName, false).iterators().iterator(type, clazz, offset,
+          return getKeyValueStore(partitionName, false).iterators().entries(type, clazz, offset,
               limit);
         } catch (Exception e) {
           throw Throwables.propagate(e);
@@ -433,45 +437,22 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
       @Override
       public String toString() {
-        return "Provider<Iterator>(t=" + type + ",c=" + clazz.getName() + ",p=" + partitionName
+        return "Provider<Iterable>(t=" + type + ",c=" + clazz.getName() + ",p=" + partitionName
             + ",o=" + offset + ",l=" + limit + ")";
       }
     };
   }
 
-  public static class LazyIterator<T> implements Iterator<T> {
-    private final Provider<Iterator<T>> provider;
-    private Iterator<T> iter = null;
+  public static class LazyIterable<T> implements Iterable<T> {
+    private final Provider<Iterable<T>> provider;
 
-    public LazyIterator(Provider<Iterator<T>> provider) {
+    public LazyIterable(Provider<Iterable<T>> provider) {
       this.provider = provider;
     }
 
     @Override
-    public boolean hasNext() {
-      if (iter == null) {
-        iter = provider.get();
-      }
-
-      return iter.hasNext();
-    }
-
-    @Override
-    public T next() {
-      if (iter == null) {
-        iter = provider.get();
-      }
-
-      return iter.next();
-    }
-
-    @Override
-    public void remove() {
-      if (iter == null) {
-        iter = provider.get();
-      }
-
-      iter.remove();
+    public Iterator<T> iterator() {
+      return provider.get().iterator();
     }
 
     @Override
