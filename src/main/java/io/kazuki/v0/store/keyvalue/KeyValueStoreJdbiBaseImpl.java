@@ -562,10 +562,14 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   private Iterator<String> createKeyIterator(final String type, final Long offset, final Long limit) {
-    return database.withHandle(new HandleCallback<Iterator<String>>() {
+    Iterator<String> iter = database.withHandle(new HandleCallback<Iterator<String>>() {
       @Override
       public Iterator<String> withHandle(Handle handle) throws Exception {
-        final int typeId = sequences.getTypeId(type, false);
+        final Integer typeId = sequences.getTypeId(type, false);
+
+        if (typeId == null) {
+          return null;
+        }
 
         Query<Map<String, Object>> select =
             JDBIHelper.getBoundQuery(handle, getPrefix(), "kv_table_name", tableName,
@@ -586,6 +590,12 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         return inefficentButExpedient.iterator();
       }
     });
+
+    if (iter == null) {
+      throw new IllegalArgumentException("Invalid entity 'type'");
+    }
+
+    return iter;
   }
 
   private void performInitialization(Handle handle, String tableName) {

@@ -74,8 +74,8 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
     bind(SequenceService.class).toProvider(seqProvider).in(Scopes.SINGLETON);
 
     bind(KeyValueStore.class).to(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);
-    bind(Key.get(KeyValueStore.class, Names.named(name))).toProvider(
-        binder().getProvider(Key.get(KeyValueStore.class))).in(Scopes.SINGLETON);
+    bind(KeyValueStore.class).annotatedWith(Names.named(name))
+        .toProvider(binder().getProvider(Key.get(KeyValueStore.class))).in(Scopes.SINGLETON);
 
     bind(SchemaStore.class).to(SchemaStoreImpl.class).in(Scopes.SINGLETON);
     bind(SchemaStore.class).annotatedWith(Names.named(name)).to(Key.get(SchemaStore.class));
