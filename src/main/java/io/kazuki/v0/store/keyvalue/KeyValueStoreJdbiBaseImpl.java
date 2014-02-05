@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import org.joda.time.DateTime;
@@ -46,7 +47,7 @@ import com.google.common.base.Throwables;
 /**
  * Abstract implementation of key-value storage based on JDBI.
  */
-public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
+public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyValueStoreIteration {
   public static int MULTIGET_MAX_KEYS = 3000;
 
   protected final Logger log = LoggerFactory.getLogger(getClass());
@@ -397,71 +398,111 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
     log.debug("Destroyed KeyValueStore {} table {}", this, tableName);
   }
 
-  public <T> Iterator<T> iterator(final String type, final Class<T> clazz) throws KazukiException {
-    return iterator(type, clazz, 0L, null);
+  @Override
+  public KeyValueStoreIteration iterators() {
+    return this;
   }
 
   @Override
-  public <T> Iterator<T> iterator(final String type, final Class<T> clazz, final Long offset,
-      final Long limit) throws KazukiException {
-    return new Iterator<T>() {
-      private final Iterator<String> inner = createKeyIterator(type, offset, limit);
-      private final Schema schema = schemaService.retrieveSchema(type);
-      private String nextKey = advance();
+  public <T> KeyValueIterator<T> iterator(String type, Class<T> clazz) {
+    return this.values(type, clazz).iterator();
+  }
 
-      public String advance() {
-        String key = null;
+  @Override
+  public <T> KeyValueIterator<T> iterator(String type, Class<T> clazz, @Nullable Long offset,
+      @Nullable Long limit) {
+    return this.values(type, clazz, offset, limit).iterator();
+  }
 
-        while (key == null && inner.hasNext()) {
-          String newKey = inner.next();
+  @Override
+  public <T> KeyValueIterable<KeyValuePair<T>> entries(String type, Class<T> clazz) {
+    return this.entries(type, clazz, null, null);
+  }
 
-          final Key realKey;
-          try {
-            realKey = Key.valueOf(newKey);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
+  @Override
+  public <T> KeyValueIterable<KeyValuePair<T>> entries(final String type, final Class<T> clazz,
+      @Nullable final Long offset, @Nullable final Long limit) {
+    return new KeyValueIterableJdbiImpl<T>(type, clazz, offset, limit, true);
+  }
 
-          if (type.equals(realKey.getType())) {
-            key = newKey;
-            break;
-          }
-        }
+  @Override
+  public <T> KeyValueIterable<Key> keys(String type, Class<T> clazz) {
+    return this.keys(type, clazz, null, null);
+  }
 
-        return key;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return nextKey != null;
-      }
-
-      @Override
-      public T next() {
-        try {
-          Object result = loadFriendlyEntity(Key.valueOf(nextKey), Object.class);
-
-          nextKey = advance();
-
-          if (schema != null && result instanceof List) {
-            FieldTransform fieldTransform = new FieldTransform(schema);
-            StructureTransform structureTransform = new StructureTransform(schema);
-            result = fieldTransform.unpack(structureTransform.unpack((List<Object>) result));
-          }
-
-          return EncodingHelper.asValue((Map<String, Object>) result, clazz);
-        } catch (Exception e) {
-          if (!(e instanceof RuntimeException)) {
-            throw new RuntimeException(e);
-          } else {
-            throw (RuntimeException) e;
-          }
-        }
-      }
+  @Override
+  public <T> KeyValueIterable<Key> keys(final String type, final Class<T> clazz,
+      @Nullable final Long offset, @Nullable final Long limit) {
+    return new KeyValueIterable<Key>() {
+      private final KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
+          clazz, offset, limit, false);
 
       @Override
-      public void remove() {
-        throw new UnsupportedOperationException();
+      public KeyValueIterator<Key> iterator() {
+        final KeyValueIterator<KeyValuePair<T>> innerIter = inner.iterator();
+
+        return new KeyValueIterator<Key>() {
+          @Override
+          public boolean hasNext() {
+            return innerIter.hasNext();
+          }
+
+          @Override
+          public Key next() {
+            return innerIter.next().getKey();
+          }
+
+          @Override
+          public void remove() {
+            innerIter.remove();
+          }
+
+          @Override
+          public void close() {
+            innerIter.close();
+          }
+        };
+      }
+    };
+  }
+
+  @Override
+  public <T> KeyValueIterable<T> values(String type, Class<T> clazz) {
+    return this.values(type, clazz, null, null);
+  }
+
+  @Override
+  public <T> KeyValueIterable<T> values(final String type, final Class<T> clazz,
+      @Nullable final Long offset, @Nullable final Long limit) {
+    return new KeyValueIterable<T>() {
+      private final KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
+          clazz, offset, limit, true);
+
+      @Override
+      public KeyValueIterator<T> iterator() {
+        final KeyValueIterator<KeyValuePair<T>> innerIter = inner.iterator();
+
+        return new KeyValueIterator<T>() {
+          @Override
+          public boolean hasNext() {
+            return innerIter.hasNext();
+          }
+
+          @Override
+          public T next() {
+            return innerIter.next().getValue();
+          }
+
+          @Override
+          public void remove() {
+            innerIter.remove();
+          }
+
+          @Override
+          public void close() {
+            innerIter.close();
+          }
+        };
       }
     };
   }
@@ -583,6 +624,107 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore {
       return (T) EncodingHelper.parseSmile(objectBytes, clazz);
     } catch (Exception e) {
       throw new KazukiException(e);
+    }
+  }
+
+  class KeyValueIterableJdbiImpl<T> implements KeyValueIterable<KeyValuePair<T>> {
+    private final String type;
+    private final Class<T> clazz;
+    private final Long offset;
+    private final Long limit;
+    private final boolean includeValues;
+
+    public KeyValueIterableJdbiImpl(String type, Class<T> clazz, Long offset, Long limit,
+        boolean includeValues) {
+      this.type = type;
+      this.clazz = clazz;
+      this.offset = offset;
+      this.limit = limit;
+      this.includeValues = includeValues;
+    }
+
+    @Override
+    public KeyValueIterator<KeyValuePair<T>> iterator() {
+      try {
+        return new KeyValueIterator<KeyValuePair<T>>() {
+          private final Iterator<String> inner = createKeyIterator(type, offset, limit);
+          private final Schema schema = schemaService.retrieveSchema(type);
+          private Key nextKey = advance();
+          private Key curKey = null;
+
+          public Key advance() {
+            Key key = null;
+
+            while (key == null && inner.hasNext()) {
+              String newKey = inner.next();
+
+              final Key realKey;
+              try {
+                realKey = Key.valueOf(newKey);
+              } catch (Exception e) {
+                throw Throwables.propagate(e);
+              }
+
+              if (type.equals(realKey.getType())) {
+                key = realKey;
+                break;
+              }
+            }
+
+            return key;
+          }
+
+          @Override
+          public boolean hasNext() {
+            return nextKey != null;
+          }
+
+          @Override
+          public KeyValuePair<T> next() {
+            try {
+              curKey = nextKey;
+              nextKey = advance();
+
+              T value = null;
+
+              if (includeValues) {
+                Object result = loadFriendlyEntity(curKey, Object.class);
+
+                if (schema != null && result instanceof List) {
+                  FieldTransform fieldTransform = new FieldTransform(schema);
+                  StructureTransform structureTransform = new StructureTransform(schema);
+                  result = fieldTransform.unpack(structureTransform.unpack((List<Object>) result));
+                }
+
+                value = EncodingHelper.asValue((Map<String, Object>) result, clazz);
+              }
+
+              return new KeyValuePair<T>(curKey, value);
+            } catch (Exception e) {
+              if (!(e instanceof RuntimeException)) {
+                throw new RuntimeException(e);
+              } else {
+                throw (RuntimeException) e;
+              }
+            }
+          }
+
+          @Override
+          public void remove() {
+            Preconditions.checkNotNull(curKey, "iterator");
+            try {
+              KeyValueStoreJdbiBaseImpl.this.delete(curKey);
+            } catch (KazukiException e) {
+              throw Throwables.propagate(e);
+            }
+          }
+
+          @Override
+          public void close() {}
+        };
+      } catch (KazukiException e) {
+        throw Throwables.propagate(e);
+      }
     }
   }
 }

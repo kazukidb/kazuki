@@ -46,14 +46,14 @@ public class H2KeyValueStorageTest {
 
     store.clear(false, false);
 
-    Assert.assertFalse(store.iterator("$schema", Schema.class).hasNext());
+    Assert.assertFalse(store.iterators().iterator("$schema", Schema.class).hasNext());
 
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
 
     manager.createSchema("foo", schema);
-    Iterator<Schema> sIter = store.iterator("$schema", Schema.class);
+    Iterator<Schema> sIter = store.iterators().iterator("$schema", Schema.class);
     Assert.assertTrue(sIter.hasNext());
     sIter.next();
     Assert.assertFalse(sIter.hasNext());
@@ -66,7 +66,7 @@ public class H2KeyValueStorageTest {
     System.out.println("created key = " + foo2Key);
     Assert.assertNotNull(store.retrieve(foo2Key, Foo.class));
 
-    Iterator<Foo> iter = store.iterator("foo", Foo.class);
+    Iterator<Foo> iter = store.iterators().iterator("foo", Foo.class);
     Assert.assertTrue(iter.hasNext());
     while (iter.hasNext()) {
       Foo theNext = iter.next();

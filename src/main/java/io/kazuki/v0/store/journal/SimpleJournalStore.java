@@ -36,7 +36,7 @@ public class SimpleJournalStore implements JournalStore {
   @Override
   public <T> Iterator<T> getIteratorAbsolute(String type, Class<T> clazz, Long offset, Long limit)
       throws KazukiException {
-    return store.iterator(type, clazz, offset, limit);
+    return store.iterators().iterator(type, clazz, offset, limit);
   }
 
   @Override

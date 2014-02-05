@@ -142,7 +142,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     PartitionInfoImpl theActivePartitionInfo = activePartitionInfo.get();
 
     if (theActivePartitionInfo == null) {
-      Iterator<PartitionInfoImpl> iter = metaStore.iterator(this.typeName, PartitionInfoImpl.class);
+      Iterator<PartitionInfoImpl> iter =
+          metaStore.iterators().iterator(this.typeName, PartitionInfoImpl.class);
 
       while (iter.hasNext()) {
         PartitionInfoImpl part = iter.next();
@@ -390,7 +391,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public Iterator<PartitionInfoSnapshot> getAllPartitions() throws KazukiException {
-    return metaStore.iterator(this.typeName, PartitionInfoSnapshot.class);
+    return metaStore.iterators().iterator(this.typeName, PartitionInfoSnapshot.class);
   }
 
   private KeyValueStore getKeyValueStore(String partitionName, boolean initialize) {
@@ -423,7 +424,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       @Override
       public Iterator<T> get() {
         try {
-          return getKeyValueStore(partitionName, false).iterator(type, clazz, offset, limit);
+          return getKeyValueStore(partitionName, false).iterators().iterator(type, clazz, offset,
+              limit);
         } catch (Exception e) {
           throw Throwables.propagate(e);
         }

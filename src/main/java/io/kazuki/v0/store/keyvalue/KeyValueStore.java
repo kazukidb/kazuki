@@ -5,7 +5,6 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.schema.TypeValidation;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Map;
 
 import javax.annotation.Nullable;
@@ -29,16 +28,13 @@ public interface KeyValueStore {
 
   boolean deleteHard(Key key) throws KazukiException;
 
-  <T> Iterator<T> iterator(String type, Class<T> clazz) throws KazukiException;
-
-  <T> Iterator<T> iterator(String type, Class<T> clazz, @Nullable Long offset, @Nullable Long limit)
-      throws KazukiException;
-
   void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException;
 
   void clear(String type) throws KazukiException;
 
   Long approximateSize(String type) throws KazukiException;
+
+  KeyValueStoreIteration iterators();
 
   void destroy() throws KazukiException;
 }
