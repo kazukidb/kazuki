@@ -536,7 +536,12 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     return database.inTransaction(new TransactionCallback<byte[]>() {
       @Override
       public byte[] inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        final int typeId = sequences.getTypeId(key.getType(), false);
+        final Integer typeId = sequences.getTypeId(key.getType(), false);
+
+        if (typeId == null) {
+          throw new IllegalArgumentException("Invalid entity 'type'");
+        }
+
         final long keyId = key.getId();
 
         Query<Map<String, Object>> select =
@@ -684,11 +689,12 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         return new KeyValueIterator<KeyValuePair<T>>() {
           private final Iterator<String> inner = createKeyIterator(type, offset, limit);
           private final Schema schema = schemaService.retrieveSchema(type);
-          private Key nextKey = advance();
-          private Key curKey = null;
+          private KeyValuePair<T> nextKv = advance();
+          private KeyValuePair<T> currentKv = null;
 
-          public Key advance() {
+          public KeyValuePair<T> advance() {
             Key key = null;
+            T value = null;
 
             while (key == null && inner.hasNext()) {
               String newKey = inner.next();
@@ -706,53 +712,51 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
               }
             }
 
-            return key;
-          }
-
-          @Override
-          public boolean hasNext() {
-            return nextKey != null;
-          }
-
-          @Override
-          public KeyValuePair<T> next() {
-            availability.assertAvailable();
+            if (key == null) {
+              return null;
+            }
 
             try {
-              curKey = nextKey;
-              nextKey = advance();
-
-              T value = null;
-
               if (includeValues) {
-                Object result = loadFriendlyEntity(curKey, Object.class);
-
+                Object result = loadFriendlyEntity(key, Object.class);
+  
                 if (schema != null && result instanceof List) {
                   FieldTransform fieldTransform = new FieldTransform(schema);
                   StructureTransform structureTransform = new StructureTransform(schema);
                   result = fieldTransform.unpack(structureTransform.unpack((List<Object>) result));
                 }
-
+  
                 value = EncodingHelper.asValue((Map<String, Object>) result, clazz);
               }
-
-              return new KeyValuePair<T>(curKey, value);
             } catch (Exception e) {
-              if (!(e instanceof RuntimeException)) {
-                throw new RuntimeException(e);
-              } else {
-                throw (RuntimeException) e;
-              }
+              throw Throwables.propagate(e);
             }
+
+            return new KeyValuePair<T>(key, value);
+          }
+
+          @Override
+          public boolean hasNext() {
+            return nextKv != null;
+          }
+
+          @Override
+          public KeyValuePair<T> next() {
+            availability.assertAvailable();
+            
+            currentKv = nextKv;
+            nextKv = advance();
+            
+            return currentKv;
           }
 
           @Override
           public void remove() {
             availability.assertAvailable();
 
-            Preconditions.checkNotNull(curKey, "iterator");
+            Preconditions.checkNotNull(currentKv, "iterator");
             try {
-              KeyValueStoreJdbiBaseImpl.this.delete(curKey);
+              KeyValueStoreJdbiBaseImpl.this.delete(currentKv.getKey());
             } catch (KazukiException e) {
               throw Throwables.propagate(e);
             }
