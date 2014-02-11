@@ -160,8 +160,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       }
     }
 
-    if (theActivePartitionInfo != null
-        && theActivePartitionInfo.getSize() + 1 >= this.partitionSize) {
+    if (theActivePartitionInfo != null && theActivePartitionInfo.getSize() >= this.partitionSize) {
       this.closeActivePartition();
     }
 

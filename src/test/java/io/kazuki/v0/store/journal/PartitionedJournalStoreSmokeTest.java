@@ -85,7 +85,9 @@ public class PartitionedJournalStoreSmokeTest {
 
     System.out.println("PARTITIONS:");
     while (piter.hasNext()) {
-      System.out.println(" - part - " + dump(piter.next()));
+      PartitionInfoSnapshot snap = piter.next();
+      System.out.println(" - part - " + dump(snap) + " " + snap.getSize());
+      assertThat(snap.getSize(), is(10L));
     }
 
     assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, null).iterator(), isIterOfLength(100));

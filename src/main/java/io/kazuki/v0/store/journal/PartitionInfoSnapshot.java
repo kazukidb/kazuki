@@ -34,7 +34,7 @@ public class PartitionInfoSnapshot implements PartitionInfo {
 
   @Override
   public long getSize() {
-    return this.maxId - this.minId;
+    return 1L + (this.maxId - this.minId);
   }
 
   @Override
