@@ -1,9 +1,8 @@
 package io.kazuki.v0.store.keyvalue;
 
-import java.io.Closeable;
 import java.util.Iterator;
 
-public interface KeyValueIterator<T> extends Iterator<T>, Closeable {
+public interface KeyValueIterator<T> extends Iterator<T>, AutoCloseable {
   @Override
   boolean hasNext();
 
