@@ -757,6 +757,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
             Preconditions.checkNotNull(currentKv, "iterator");
             try {
               KeyValueStoreJdbiBaseImpl.this.delete(currentKv.getKey());
+              currentKv = null;
             } catch (KazukiException e) {
               throw Throwables.propagate(e);
             }
