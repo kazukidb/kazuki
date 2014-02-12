@@ -1,15 +1,13 @@
 package io.kazuki.v0.store.journal;
 
 
-import static io.kazuki.v0.internal.helper.TestHelper.dump;
-import static io.kazuki.v0.internal.helper.TestHelper.isEmptyIter;
-import static io.kazuki.v0.internal.helper.TestHelper.isNotEmptyIter;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
+import java.util.Iterator;
+
+import com.google.common.collect.ImmutableList;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.name.Names;
+import com.jolbox.bonecp.BoneCPDataSource;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.internal.helper.TestSupport;
@@ -21,27 +19,30 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
-
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.common.collect.ImmutableList;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
+import static io.kazuki.v0.internal.helper.TestHelper.dump;
+import static io.kazuki.v0.internal.helper.TestHelper.isEmptyIter;
+import static io.kazuki.v0.internal.helper.TestHelper.isNotEmptyIter;
+import static org.hamcrest.MatcherAssert.*;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 
-public class PartitionedJournalStoreClearTest extends TestSupport
+public class PartitionedJournalStoreClearTest
+    extends TestSupport
 {
   private Injector inject;
+
   private BoneCPDataSource database;
+
   private Lifecycle lifecycle;
+
   private SchemaStore manager;
+
   private JournalStore journal;
 
-  @BeforeTest(alwaysRun = true)
+  @BeforeClass(alwaysRun = true)
   public void setUp() throws Exception {
     inject =
         Guice.createInjector(new LifecycleModule("bar"), new EasyPartitionedJournalStoreModule(

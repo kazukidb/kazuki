@@ -1,12 +1,16 @@
 package io.kazuki.v0.internal.helper;
 
+import java.lang.reflect.Method;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.testng.ITestContext;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 
 public abstract class TestSupport
 {
@@ -15,23 +19,25 @@ public abstract class TestSupport
   protected Logger log = LoggerFactory.getLogger("TEST");
 
   @BeforeClass
-  public void setUpLogging() {
+  public void beforeClass() {
     MDC.put(TEST_CLASS_NAME, getClass().getName());
-  }
-
-  @AfterClass
-  public void tearDownLogging() {
-    MDC.remove(TEST_CLASS_NAME);
-  }
-
-  @BeforeClass
-  public void announceClass() {
     System.out.println("Running test " + getClass().getName());
   }
 
   @AfterClass
-  public void denounceClass() {
+  public void afterClass() {
+    MDC.remove(TEST_CLASS_NAME);
     System.out.println();
+  }
+
+  @BeforeMethod
+  public void prepareMethod(final Method method) {
+    log.info(" === Starting {}", method.getName());
+  }
+
+  @AfterMethod
+  public void afterMethod(final Method method) {
+    log.info(" === Finished {}", method.getName());
   }
 
   @AfterMethod

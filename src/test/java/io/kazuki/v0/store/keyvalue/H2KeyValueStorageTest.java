@@ -1,6 +1,13 @@
 package io.kazuki.v0.store.keyvalue;
 
 
+import java.util.Iterator;
+import java.util.Map;
+
+import com.google.common.collect.ImmutableList;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.name.Names;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
@@ -12,25 +19,23 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
-import java.util.Map;
-
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.google.common.collect.ImmutableList;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.name.Names;
 
 import static io.kazuki.v0.internal.helper.TestHelper.dump;
 
-public class H2KeyValueStorageTest extends TestSupport
+public class H2KeyValueStorageTest
+    extends TestSupport
 {
-  private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
-      new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
-          .withJdbiConfig(Configurations.getJdbi().build()));
+  private Injector inject;
+
+  @BeforeClass(alwaysRun = true)
+  public void setUp() throws Exception {
+    inject = Guice.createInjector(new LifecycleModule("foo"),
+        new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
+            .withJdbiConfig(Configurations.getJdbi().build()));
+  }
 
   @Test
   public void testDemo() throws Exception {

@@ -1,27 +1,32 @@
 package io.kazuki.v0.store.sequence;
 
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.name.Names;
+import com.jolbox.bonecp.BoneCPDataSource;
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
-
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
-
-public class SequenceServiceJdbiImplTest extends TestSupport
+public class SequenceServiceJdbiImplTest
+    extends TestSupport
 {
-  private final Injector inject =
-      Guice.createInjector(new LifecycleModule("foo"), new JdbiDataSourceModule("foo",
-          "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
-          "test/io/kazuki/v0/store/sequence/sequence.properties"));
+  private Injector inject;
+
+  @BeforeClass(alwaysRun = true)
+  public void setUp() throws Exception {
+    inject =
+        Guice.createInjector(new LifecycleModule("foo"), new JdbiDataSourceModule("foo",
+            "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
+            "test/io/kazuki/v0/store/sequence/sequence.properties"));
+  }
 
   @Test
   public void testDemo() throws Exception {

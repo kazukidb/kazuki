@@ -1,8 +1,12 @@
 package io.kazuki.v0.store.journal;
 
 
-import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
-import static org.hamcrest.MatcherAssert.assertThat;
+import java.io.File;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.name.Names;
+import com.jolbox.bonecp.BoneCPDataSource;
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
@@ -12,29 +16,29 @@ import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.io.File;
-
 import org.hamcrest.Matchers;
 import org.joda.time.DateTime;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
+import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
+import static org.hamcrest.MatcherAssert.*;
 
-public class PartitionedJournalStoreScaleTest extends TestSupport
+public class PartitionedJournalStoreScaleTest
+    extends TestSupport
 {
   private static final String dbName = "target/testdb.db";
+
   private Injector inject;
+
   private BoneCPDataSource database;
+
   private Lifecycle lifecycle;
+
   private JournalStore journal;
 
-  @BeforeTest(alwaysRun = true)
+  @BeforeClass(alwaysRun = true)
   public void setUp() throws Exception {
     KeyValueStoreConfiguration kvConfig =
         new KeyValueStoreConfiguration.Builder().withDbType("h2").withDataType("foo")
@@ -63,7 +67,7 @@ public class PartitionedJournalStoreScaleTest extends TestSupport
     journal.clear();
   }
 
-  @AfterTest(alwaysRun = true)
+  @AfterClass(alwaysRun = true)
   public void shutDown() throws Exception {
     new File(dbName + ".h2.db").delete();
     new File(dbName + ".trace.db").delete();
