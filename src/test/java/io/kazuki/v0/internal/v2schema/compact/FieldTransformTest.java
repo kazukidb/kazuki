@@ -14,10 +14,10 @@
  */
 package io.kazuki.v0.internal.v2schema.compact;
 
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.internal.v2schema.Transform;
 import io.kazuki.v0.internal.v2schema.Attribute.Type;
-import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,7 +33,8 @@ import org.testng.annotations.Test;
 import com.google.common.collect.ImmutableMap;
 
 @Test
-public class FieldTransformTest {
+public class FieldTransformTest extends TestSupport
+{
   Schema EMPTY_SCHEMA = (new Schema.Builder()).build();
   Schema BOOLEAN_SCHEMA = (new Schema.Builder()).addAttribute("baz", Type.BOOLEAN, true).build();
   Schema DATE_SCHEMA = (new Schema.Builder()).addAttribute("quux", Type.UTC_DATE_SECS, true)

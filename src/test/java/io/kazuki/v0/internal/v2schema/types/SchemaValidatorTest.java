@@ -17,10 +17,10 @@
  */
 package io.kazuki.v0.internal.v2schema.types;
 
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.internal.v2schema.Attribute.Type;
-import io.kazuki.v0.internal.v2schema.types.TransformException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,7 +28,8 @@ import java.util.List;
 import org.testng.annotations.Test;
 
 @Test
-public class SchemaValidatorTest {
+public class SchemaValidatorTest extends TestSupport
+{
     public void testAttributeUpgrades() {
         SchemaValidator.validateAttributeUpgrade(a("foo", Type.ENUM, "dude"),
                 a("foo", Type.ENUM, "dude"));

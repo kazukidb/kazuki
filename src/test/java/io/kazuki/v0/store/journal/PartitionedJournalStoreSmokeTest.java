@@ -1,17 +1,16 @@
 package io.kazuki.v0.store.journal;
 
 
-import static io.kazuki.v0.internal.helper.TestHelper.dump;
-import static io.kazuki.v0.internal.helper.TestHelper.isEmptyIter;
-import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
-import static io.kazuki.v0.internal.helper.TestHelper.isNotEmptyIter;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
+import java.util.Iterator;
+
+import com.google.common.collect.ImmutableList;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.name.Names;
+import com.jolbox.bonecp.BoneCPDataSource;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestHelper;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -21,26 +20,31 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
-
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.common.collect.ImmutableList;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
+import static io.kazuki.v0.internal.helper.TestHelper.dump;
+import static io.kazuki.v0.internal.helper.TestHelper.isEmptyIter;
+import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
+import static io.kazuki.v0.internal.helper.TestHelper.isNotEmptyIter;
+import static org.hamcrest.MatcherAssert.*;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 
-public class PartitionedJournalStoreSmokeTest {
+public class PartitionedJournalStoreSmokeTest
+    extends TestSupport
+{
   private Injector inject;
+
   private BoneCPDataSource database;
+
   private Lifecycle lifecycle;
+
   private SchemaStore manager;
+
   private JournalStore journal;
 
-  @BeforeTest(alwaysRun = true)
+  @BeforeClass(alwaysRun = true)
   public void setUp() throws Exception {
     inject =
         Guice.createInjector(new LifecycleModule("foo"), new EasyPartitionedJournalStoreModule(
@@ -69,7 +73,7 @@ public class PartitionedJournalStoreSmokeTest {
     assertThat(manager.createSchema("foo", schema), is(3L));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
-    System.out.println(dump(journal.getActivePartition()));
+    log.info(dump(journal.getActivePartition()));
     assertThat(journal.getActivePartition(), nullValue());
     assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
 
@@ -83,10 +87,10 @@ public class PartitionedJournalStoreSmokeTest {
     Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator();
     assertThat(piter, isNotEmptyIter());
 
-    System.out.println("PARTITIONS:");
+    log.info("PARTITIONS:");
     while (piter.hasNext()) {
       PartitionInfoSnapshot snap = piter.next();
-      System.out.println(" - part - " + dump(snap) + " " + snap.getSize());
+      log.info(" - part - " + dump(snap) + " " + snap.getSize());
       assertThat(snap.getSize(), is(10L));
     }
 
@@ -102,7 +106,7 @@ public class PartitionedJournalStoreSmokeTest {
     assertThat(journal.getAllPartitions().iterator(), isIterOfLength(10));
     assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
 
-    System.out.println("RELATIVE ITER TEST:");
+    log.info("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       Iterator<KeyValuePair<Foo>> iter =
           journal.entriesRelative("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
@@ -111,13 +115,13 @@ public class PartitionedJournalStoreSmokeTest {
       while (iter.hasNext()) {
         Foo foo = iter.next().getValue();
         assertThat(foo, notNullValue());
-        System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+        log.info("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
       }
       assertThat(j, is(10));
     }
 
-    System.out.println("ABSOLUTE ITER TEST:");
+    log.info("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       Iterator<KeyValuePair<Foo>> iter =
           journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
@@ -126,7 +130,7 @@ public class PartitionedJournalStoreSmokeTest {
       while (iter.hasNext()) {
         Foo foo = iter.next().getValue();
         assertThat(foo, notNullValue());
-        System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+        log.info("i=" + i + ",j=" + j + ",foo=" + dump(foo));
         j += 1;
       }
       assertThat(j, is(10));
@@ -136,10 +140,10 @@ public class PartitionedJournalStoreSmokeTest {
         journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId()),
         is(true));
 
-    System.out.println("PARTITIONS:");
+    log.info("PARTITIONS:");
     piter = journal.getAllPartitions().iterator();
     while (piter.hasNext()) {
-      System.out.println(" - part - " + dump(piter.next()));
+      log.info(" - part - " + dump(piter.next()));
     }
 
     assertThat(journal.getAllPartitions().iterator(), isIterOfLength(9));

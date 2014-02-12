@@ -14,17 +14,17 @@
  */
 package io.kazuki.v0.internal.v2schema.util;
 
-import io.kazuki.v0.internal.v2schema.util.BitSetUtil;
-
 import java.util.BitSet;
 import java.util.List;
 
+import io.kazuki.v0.internal.helper.TestSupport;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 @Test
-public class BitSetUtilTest {
+public class BitSetUtilTest extends TestSupport
+{
   public void testSmall() {
     String testString = "";
     long testLong = 0;
