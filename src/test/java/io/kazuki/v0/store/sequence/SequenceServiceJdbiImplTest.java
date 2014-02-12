@@ -6,9 +6,6 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
-import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl.Counter;
-
-import java.util.Map;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
