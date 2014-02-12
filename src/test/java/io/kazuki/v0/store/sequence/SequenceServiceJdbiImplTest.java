@@ -44,8 +44,7 @@ public class SequenceServiceJdbiImplTest {
 
     lifecycle.init();
 
-    Map<String, Counter> counters = seq.getCurrentCounters();
-    Assert.assertEquals(counters.toString(), "{}");
+    Assert.assertEquals(seq.getCurrentCounters().toString(), "{}");
 
     Integer fooId = seq.getTypeId("foo", true);
     Assert.assertEquals(fooId, Integer.valueOf(2));
@@ -55,7 +54,7 @@ public class SequenceServiceJdbiImplTest {
     Assert.assertEquals(barId, Integer.valueOf(3));
     Assert.assertEquals(seq.getTypeName(barId), "bar");
 
-    Assert.assertEquals(counters.toString(), "{}");
+    Assert.assertEquals(seq.getCurrentCounters().toString(), "{}");
 
     for (int i = 0; i < 10; i++) {
       Key key = seq.nextKey("foo");
@@ -63,15 +62,21 @@ public class SequenceServiceJdbiImplTest {
       Assert.assertEquals(key.getId(), Long.valueOf(i + 1));
     }
 
-    Map<String, Counter> counters2 = seq.getCurrentCounters();
-    Assert
-        .assertEquals(counters2.toString(), "{foo=Counter[type=foo,base=0,offset=10,max=100000]}");
+    Assert.assertEquals(
+        seq.getCurrentCounters().toString(),
+        "{foo=Counter[type=foo,base=0,offset=10,max=100000]}"
+    );
 
     for (int i = 0; i < 10; i++) {
       Key key = seq.nextKey("bar");
       Assert.assertEquals(key.getType(), "bar");
       Assert.assertEquals(key.getId(), Long.valueOf(i + 1));
     }
+
+    Assert.assertEquals(
+        seq.getCurrentCounters().toString(),
+        "{foo=Counter[type=foo,base=0,offset=10,max=100000], bar=Counter[type=bar,base=0,offset=10,max=100000]}"
+    );
 
     lifecycle.shutdown();
     lifecycle.init();
