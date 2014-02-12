@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestHelper;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -32,7 +33,8 @@ import com.google.inject.Injector;
 import com.google.inject.name.Names;
 import com.jolbox.bonecp.BoneCPDataSource;
 
-public class PartitionedJournalStoreClearTest {
+public class PartitionedJournalStoreClearTest extends TestSupport
+{
   private Injector inject;
   private BoneCPDataSource database;
   private Lifecycle lifecycle;
@@ -82,9 +84,9 @@ public class PartitionedJournalStoreClearTest {
     Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator();
     assertThat(piter, isNotEmptyIter());
 
-    System.out.println("PARTITIONS PRE:");
+    log.info("PARTITIONS PRE:");
     while (piter.hasNext()) {
-      System.out.println(" - part - " + dump(piter.next()));
+      log.info(" - part - " + dump(piter.next()));
     }
 
     journal.clear();
@@ -105,9 +107,9 @@ public class PartitionedJournalStoreClearTest {
     Iterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions().iterator();
     assertThat(piter2, isNotEmptyIter());
 
-    System.out.println("PARTITIONS POST:");
+    log.info("PARTITIONS POST:");
     while (piter2.hasNext()) {
-      System.out.println(" - part - " + dump(piter2.next()));
+      log.info(" - part - " + dump(piter2.next()));
     }
   }
 }

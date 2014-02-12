@@ -2,6 +2,7 @@ package io.kazuki.v0.store.sequence;
 
 
 import io.kazuki.v0.internal.helper.TestHelper;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -15,15 +16,12 @@ import com.google.inject.Injector;
 import com.google.inject.name.Names;
 import com.jolbox.bonecp.BoneCPDataSource;
 
-public class SequenceServiceJdbiImplTest {
-  private final Injector inject;
-
-  public SequenceServiceJdbiImplTest() {
-    inject =
-        Guice.createInjector(new LifecycleModule("foo"), new JdbiDataSourceModule("foo",
-            "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
-            "test/io/kazuki/v0/store/sequence/sequence.properties"));
-  }
+public class SequenceServiceJdbiImplTest extends TestSupport
+{
+  private final Injector inject =
+      Guice.createInjector(new LifecycleModule("foo"), new JdbiDataSourceModule("foo",
+          "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
+          "test/io/kazuki/v0/store/sequence/sequence.properties"));
 
   @Test
   public void testDemo() throws Exception {
