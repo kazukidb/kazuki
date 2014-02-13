@@ -177,7 +177,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       }
 
       theActivePartitionInfo =
-          new PartitionInfoImpl(partitionKey.getIdentifier(), theKey.getId(), theKey.getId(), false);
+          new PartitionInfoImpl(partitionKey.getInternalIdentifier(), theKey.getId(), theKey.getId(), false);
 
       this.metaStore.create(this.typeName, PartitionInfo.class, theActivePartitionInfo,
           partitionKey.getId(), typeSafety);

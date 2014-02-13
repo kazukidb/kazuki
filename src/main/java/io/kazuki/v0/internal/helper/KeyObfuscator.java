@@ -21,11 +21,13 @@ public class KeyObfuscator {
   private static final byte[] saltBytes = System.getProperty("key.encrypt.salt", "asalt")
       .getBytes();
   private static final byte[] ivBytes;
+  private static final Cipher cipher;
 
   static {
     try {
       ivBytes =
           Hex.decodeHex(System.getProperty("key.encrypt.iv", "0123456789ABCDEF").toCharArray());
+      cipher = Cipher.getInstance("DES/CBC/NoPadding");
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -36,7 +38,7 @@ public class KeyObfuscator {
   private static ConcurrentHashMap<String, SecretKey> keyCache =
       new ConcurrentHashMap<String, SecretKey>();
 
-  public static String encrypt(String type, Long id) {
+  public static synchronized String encrypt(String type, Long id) {
     StringBuilder encryptedIdentifier = new StringBuilder();
     encryptedIdentifier.append("@");
     encryptedIdentifier.append(type);
@@ -44,7 +46,8 @@ public class KeyObfuscator {
 
     try {
       byte[] plain = ByteBuffer.allocate(8).putLong(id).array();
-      byte[] encrypted = getCipher(type, Cipher.ENCRYPT_MODE).doFinal(plain);
+      cipher.init(Cipher.ENCRYPT_MODE, getKey(type), paramSpec);
+      byte[] encrypted = cipher.doFinal(plain);
 
       encryptedIdentifier.append(Hex.encodeHex(encrypted));
 
@@ -54,7 +57,7 @@ public class KeyObfuscator {
     }
   }
 
-  public static Key decrypt(String encryptedText) {
+  public static synchronized Key decrypt(String encryptedText) {
     if (encryptedText == null || encryptedText.length() == 0 || !encryptedText.contains(":")) {
       throw new IllegalArgumentException("Invalid key");
     }
@@ -73,7 +76,8 @@ public class KeyObfuscator {
 
     try {
       byte[] encrypted = Hex.decodeHex(parts[1].toCharArray());
-      byte[] decrypted = getCipher(type, Cipher.DECRYPT_MODE).doFinal(encrypted);
+      cipher.init(Cipher.DECRYPT_MODE, getKey(type), paramSpec);
+      byte[] decrypted = cipher.doFinal(encrypted);
 
       Long id = ByteBuffer.allocate(8).put(decrypted).getLong(0);
 
@@ -83,24 +87,13 @@ public class KeyObfuscator {
     }
   }
 
-  private static Cipher getCipher(String type, int mode) {
-    try {
-      Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding");
-      cipher.init(mode, getKey(type), paramSpec);
-
-      return cipher;
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
-    }
-  }
-
   private static SecretKey getKey(String type) throws Exception {
     if (!keyCache.containsKey(type)) {
       SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
       String password = keyString + ":" + type;
-      KeySpec spec = new PBEKeySpec(password.toCharArray(), saltBytes, 1024, 192);
+      KeySpec spec = new PBEKeySpec(password.toCharArray(), saltBytes, 1024, 64);
       SecretKey tmp = factory.generateSecret(spec);
-      SecretKey key = new SecretKeySpec(tmp.getEncoded(), "DESede");
+      SecretKey key = new SecretKeySpec(tmp.getEncoded(), "DES");
 
       keyCache.put(type, key);
     }

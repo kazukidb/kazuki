@@ -6,14 +6,13 @@ import io.kazuki.v0.internal.helper.KeyObfuscator;
  * Putting the "Key" in Key-Value storage.
  */
 public class Key {
-  private final String identifier;
-  private final String encryptedIdentifier;
+  private final String internalIdentifier;
+  private volatile String encryptedIdentifier;
   private final String type;
   private final Long id;
 
   public Key(String type, Long id) {
-    this.identifier = type + ":" + Long.toString(id);
-    this.encryptedIdentifier = KeyObfuscator.encrypt(type, id);
+    this.internalIdentifier = type + ":" + Long.toString(id);
     this.type = type;
     this.id = id;
   }
@@ -45,26 +44,30 @@ public class Key {
     return type;
   }
 
-  public String getEncryptedIdentifier() {
+  public String getIdentifier() {
+    if (this.encryptedIdentifier == null) {
+      this.encryptedIdentifier = KeyObfuscator.encrypt(this.type, this.id);
+    }
+
     return encryptedIdentifier;
   }
 
-  public String getIdentifier() {
-    return identifier;
+  public String getInternalIdentifier() {
+    return internalIdentifier;
   }
 
   @Override
   public boolean equals(Object obj) {
-    return obj instanceof Key && identifier.equals(((Key) obj).identifier);
+    return obj instanceof Key && internalIdentifier.equals(((Key) obj).internalIdentifier);
   }
 
   @Override
   public int hashCode() {
-    return identifier.hashCode();
+    return internalIdentifier.hashCode();
   }
 
   @Override
   public String toString() {
-    return identifier;
+    return getIdentifier();
   }
 }
