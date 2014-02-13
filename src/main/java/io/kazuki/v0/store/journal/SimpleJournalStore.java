@@ -2,6 +2,7 @@ package io.kazuki.v0.store.journal;
 
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
@@ -34,13 +35,13 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public <T> Iterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
+  public <T> KeyValueIterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
       Long limit) throws KazukiException {
     return store.iterators().entries(type, clazz, offset, limit);
   }
 
   @Override
-  public <T> Iterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
+  public <T> KeyValueIterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
       Long limit) throws KazukiException {
     return entriesAbsolute(type, clazz, offset, limit);
   }
@@ -71,7 +72,7 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public Iterable<PartitionInfoSnapshot> getAllPartitions() {
+  public KeyValueIterable<PartitionInfoSnapshot> getAllPartitions() {
     throw new UnsupportedOperationException("getAllPartitions() not yet supported");
   }
 }

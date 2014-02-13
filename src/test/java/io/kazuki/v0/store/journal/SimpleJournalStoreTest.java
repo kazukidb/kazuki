@@ -8,14 +8,12 @@ import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyJournalStoreModule;
+import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
-
 import junit.framework.Assert;
 
 import org.testng.annotations.Test;
@@ -62,15 +60,16 @@ public class SimpleJournalStoreTest {
 
     System.out.println("ITER TEST:");
     for (int i = 0; i < 10; i++) {
-      Iterator<KeyValuePair<Foo>> iter =
-          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
-      Assert.assertTrue(iter.hasNext());
-      int j = 0;
-      while (iter.hasNext()) {
-        Foo foo = iter.next().getValue();
-        Assert.assertNotNull(foo);
-        System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
-        j += 1;
+      try (KeyValueIterator<KeyValuePair<Foo>> iter =
+          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
+        Assert.assertTrue(iter.hasNext());
+        int j = 0;
+        while (iter.hasNext()) {
+          Foo foo = iter.next().getValue();
+          Assert.assertNotNull(foo);
+          System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          j += 1;
+        }
       }
     }
   }

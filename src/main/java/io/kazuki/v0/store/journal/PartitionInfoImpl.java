@@ -37,7 +37,7 @@ public class PartitionInfoImpl implements PartitionInfo {
 
   @Override
   public long getSize() {
-    return this.maxId.get() - this.minId;
+    return 1L + (this.maxId.get() - this.minId);
   }
 
   @Override

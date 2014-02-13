@@ -12,7 +12,6 @@ import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 
-import java.util.Iterator;
 import java.util.Map;
 
 import org.junit.Assert;
@@ -53,10 +52,11 @@ public class H2KeyValueStorageTest {
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
 
     manager.createSchema("foo", schema);
-    Iterator<Schema> sIter = store.iterators().iterator("$schema", Schema.class);
-    Assert.assertTrue(sIter.hasNext());
-    sIter.next();
-    Assert.assertFalse(sIter.hasNext());
+    try (KeyValueIterator<Schema> sIter = store.iterators().iterator("$schema", Schema.class)) {
+      Assert.assertTrue(sIter.hasNext());
+      sIter.next();
+      Assert.assertFalse(sIter.hasNext());
+    }
 
     Key foo1Key = store.create("foo", Foo.class, new Foo("k", "v"), TypeValidation.STRICT);
     System.out.println("created key = " + foo1Key);
@@ -66,12 +66,13 @@ public class H2KeyValueStorageTest {
     System.out.println("created key = " + foo2Key);
     Assert.assertNotNull(store.retrieve(foo2Key, Foo.class));
 
-    Iterator<Foo> iter = store.iterators().iterator("foo", Foo.class);
-    Assert.assertTrue(iter.hasNext());
-    while (iter.hasNext()) {
-      Foo theNext = iter.next();
-      Assert.assertNotNull(theNext);
-      System.out.println("dump all : " + dump(theNext));
+    try (KeyValueIterator<Foo> iter = store.iterators().iterator("foo", Foo.class)) {
+      Assert.assertTrue(iter.hasNext());
+      while (iter.hasNext()) {
+        Foo theNext = iter.next();
+        Assert.assertNotNull(theNext);
+        System.out.println("dump all : " + dump(theNext));
+      }
     }
 
     Foo foo1Found = store.retrieve(foo1Key, Foo.class);
