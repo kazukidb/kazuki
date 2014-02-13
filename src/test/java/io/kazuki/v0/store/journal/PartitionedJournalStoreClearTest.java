@@ -16,12 +16,11 @@ import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
+import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
 
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -67,7 +66,10 @@ public class PartitionedJournalStoreClearTest {
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     assertThat(journal.getActivePartition(), nullValue());
-    assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
+
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isEmptyIter());
+    }
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -79,12 +81,13 @@ public class PartitionedJournalStoreClearTest {
     assertThat(journal.getActivePartition().getPartitionId(),
         equalTo("PartitionInfo-bar-barstore:10"));
 
-    Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator();
-    assertThat(piter, isNotEmptyIter());
+    try (KeyValueIterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator()) {
+      assertThat(piter, isNotEmptyIter());
+      System.out.println("PARTITIONS PRE:");
 
-    System.out.println("PARTITIONS PRE:");
-    while (piter.hasNext()) {
-      System.out.println(" - part - " + dump(piter.next()));
+      while (piter.hasNext()) {
+        System.out.println(" - part - " + dump(piter.next()));
+      }
     }
 
     journal.clear();
@@ -102,12 +105,13 @@ public class PartitionedJournalStoreClearTest {
     assertThat(journal.getActivePartition().getPartitionId(),
         equalTo("PartitionInfo-bar-barstore:10"));
 
-    Iterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions().iterator();
-    assertThat(piter2, isNotEmptyIter());
+    try (KeyValueIterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions().iterator()) {
+      assertThat(piter2, isNotEmptyIter());
 
-    System.out.println("PARTITIONS POST:");
-    while (piter2.hasNext()) {
-      System.out.println(" - part - " + dump(piter2.next()));
+      System.out.println("PARTITIONS POST:");
+      while (piter2.hasNext()) {
+        System.out.println(" - part - " + dump(piter2.next()));
+      }
     }
   }
 }

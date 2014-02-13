@@ -2,14 +2,13 @@ package io.kazuki.v0.store.keyvalue;
 
 import io.kazuki.v0.store.Key;
 
-import java.util.Iterator;
-
 import javax.annotation.Nullable;
 
 public interface KeyValueStoreIteration {
-  <T> Iterator<T> iterator(String type, Class<T> clazz);
+  <T> KeyValueIterator<T> iterator(String type, Class<T> clazz);
 
-  <T> Iterator<T> iterator(String type, Class<T> clazz, @Nullable Long offset, @Nullable Long limit);
+  <T> KeyValueIterator<T> iterator(String type, Class<T> clazz, @Nullable Long offset,
+      @Nullable Long limit);
 
   <T> KeyValueIterable<Key> keys(String type, Class<T> clazz);
 

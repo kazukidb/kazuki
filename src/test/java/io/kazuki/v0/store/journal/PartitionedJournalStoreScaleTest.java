@@ -7,6 +7,8 @@ import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
+import io.kazuki.v0.store.keyvalue.KeyValueIterator;
+import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
@@ -70,7 +72,9 @@ public class PartitionedJournalStoreScaleTest {
 
   @Test
   public void testDemo() throws Exception {
-    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(0));
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isIterOfLength(0));
+    }
 
     for (int i = 1; i <= 50000; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -81,21 +85,29 @@ public class PartitionedJournalStoreScaleTest {
       }
 
       if (i % 10000 == 0 && i > 0) {
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        for (int j = 0; j < 5; j++) {
+          try (KeyValueIterator<PartitionInfoSnapshot> theIter =
+              journal.getAllPartitions().iterator()) {
+            journal.dropPartition(theIter.next().getPartitionId());
+          }
+        }
       }
     }
 
-    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator().next().getValue()
-        .getFooKey(), Matchers.is("k25001"));
-    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(25));
+    try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+        journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator()) {
+      assertThat(theIter.next().getValue().getFooKey(), Matchers.is("k25001"));
+    }
+
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isIterOfLength(25));
+    }
 
     journal.clear();
 
-    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(0));
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isIterOfLength(0));
+    }
 
     for (int i = 1; i <= 50000; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -106,16 +118,22 @@ public class PartitionedJournalStoreScaleTest {
       }
 
       if (i % 10000 == 0 && i > 0) {
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId());
+        for (int j = 0; j < 5; j++) {
+          try (KeyValueIterator<PartitionInfoSnapshot> theIter =
+              journal.getAllPartitions().iterator()) {
+            journal.dropPartition(theIter.next().getPartitionId());
+          }
+        }
       }
     }
 
-    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator().next().getValue()
-        .getFooKey(), Matchers.is("k25001"));
-    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(25));
+    try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+        journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator()) {
+      assertThat(theIter.next().getValue().getFooKey(), Matchers.is("k25001"));
+    }
+
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isIterOfLength(25));
+    }
   }
 }

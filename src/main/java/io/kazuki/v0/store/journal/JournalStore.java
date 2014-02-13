@@ -2,6 +2,7 @@ package io.kazuki.v0.store.journal;
 
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.schema.TypeValidation;
 
@@ -11,13 +12,13 @@ public interface JournalStore {
   <T> Key append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException;
 
-  <T> Iterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset, Long limit)
-      throws KazukiException;
+  <T> KeyValueIterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
+      Long limit) throws KazukiException;
 
-  <T> Iterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset, Long limit)
-      throws KazukiException;
+  <T> KeyValueIterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
+      Long limit) throws KazukiException;
 
-  Iterable<PartitionInfoSnapshot> getAllPartitions() throws KazukiException;
+  KeyValueIterable<PartitionInfoSnapshot> getAllPartitions() throws KazukiException;
 
   PartitionInfo getActivePartition() throws KazukiException;
 

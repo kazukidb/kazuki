@@ -16,13 +16,13 @@ import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
+import io.kazuki.v0.store.keyvalue.KeyValueIterable;
+import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-
-import java.util.Iterator;
 
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -71,7 +71,10 @@ public class PartitionedJournalStoreSmokeTest {
 
     System.out.println(dump(journal.getActivePartition()));
     assertThat(journal.getActivePartition(), nullValue());
-    assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
+
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isEmptyIter());
+    }
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
@@ -80,84 +83,101 @@ public class PartitionedJournalStoreSmokeTest {
       assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
     }
 
-    Iterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator();
-    assertThat(piter, isNotEmptyIter());
+    try (KeyValueIterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator()) {
+      assertThat(piter, isNotEmptyIter());
 
-    System.out.println("PARTITIONS:");
-    while (piter.hasNext()) {
-      PartitionInfoSnapshot snap = piter.next();
-      System.out.println(" - part - " + dump(snap) + " " + snap.getSize());
-      assertThat(snap.getSize(), is(10L));
+      System.out.println("PARTITIONS:");
+      while (piter.hasNext()) {
+        PartitionInfoSnapshot snap = piter.next();
+        System.out.println(" - part - " + dump(snap) + " " + snap.getSize());
+        assertThat(snap.getSize(), is(10L));
+      }
     }
 
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, null).iterator(), isIterOfLength(100));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 0L).iterator(), isEmptyIter());
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 10L).iterator(), isIterOfLength(10));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 20L).iterator(), isIterOfLength(20));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 11L, 19L).iterator(), isIterOfLength(19));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 89L, 12L).iterator(), isIterOfLength(11));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 89L, null).iterator(), isIterOfLength(11));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 89L, 0L).iterator(), isEmptyIter());
+    Long[][] configs =
+        { {0L, null, 100L}, {0L, 0L, 0L}, {0L, 10L, 10L}, {0L, 20L, 20L}, {11L, 19L, 19L},
+            {89L, 12L, 11L}, {89L, null, 11L}, {89L, 0L, 0L}};
 
-    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(10));
+    for (Long[] config : configs) {
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesAbsolute("foo", Foo.class, config[0], config[1]).iterator()) {
+        assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+    }
+
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isIterOfLength(10));
+    }
+
     assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
 
     System.out.println("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
-      Iterator<KeyValuePair<Foo>> iter =
-          journal.entriesRelative("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
-      assertThat(iter, isNotEmptyIter());
-      int j = 0;
-      while (iter.hasNext()) {
-        Foo foo = iter.next().getValue();
-        assertThat(foo, notNullValue());
-        System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
-        j += 1;
+      try (KeyValueIterator<KeyValuePair<Foo>> iter =
+          journal.entriesRelative("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
+        assertThat(iter, isNotEmptyIter());
+        int j = 0;
+        while (iter.hasNext()) {
+          Foo foo = iter.next().getValue();
+          assertThat(foo, notNullValue());
+          System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          j += 1;
+        }
+        assertThat(j, is(10));
       }
-      assertThat(j, is(10));
     }
 
     System.out.println("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
-      Iterator<KeyValuePair<Foo>> iter =
-          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator();
-      assertThat(iter, isNotEmptyIter());
-      int j = 0;
-      while (iter.hasNext()) {
-        Foo foo = iter.next().getValue();
-        assertThat(foo, notNullValue());
-        System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
-        j += 1;
+      try (KeyValueIterator<KeyValuePair<Foo>> iter =
+          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
+        assertThat(iter, isNotEmptyIter());
+        int j = 0;
+        while (iter.hasNext()) {
+          Foo foo = iter.next().getValue();
+          assertThat(foo, notNullValue());
+          System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          j += 1;
+        }
+        assertThat(j, is(10));
       }
-      assertThat(j, is(10));
     }
 
-    assertThat(
-        journal.dropPartition(journal.getAllPartitions().iterator().next().getPartitionId()),
-        is(true));
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(journal.dropPartition(theIter.next().getPartitionId()), is(true));
+    }
 
     System.out.println("PARTITIONS:");
-    piter = journal.getAllPartitions().iterator();
-    while (piter.hasNext()) {
-      System.out.println(" - part - " + dump(piter.next()));
+
+    try (KeyValueIterable<PartitionInfoSnapshot> piter2 = journal.getAllPartitions()) {
+      for (PartitionInfoSnapshot snap : piter2) {
+        System.out.println(" - part - " + dump(snap));
+      }
     }
 
-    assertThat(journal.getAllPartitions().iterator(), isIterOfLength(9));
+    try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
+      assertThat(theIter, isIterOfLength(9));
+    }
 
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 0L, 10L).iterator(), isEmptyIter());
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 10L, 10L).iterator(), isIterOfLength(10));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 10L, 20L).iterator(), isIterOfLength(20));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 90L, 10L).iterator(), isIterOfLength(10));
-    assertThat(journal.entriesAbsolute("foo", Foo.class, 90L, 20L).iterator(), isIterOfLength(10));
+    Long[][] absConfigs =
+        { {0L, 10L, 0L}, {10L, 10L, 10L}, {10L, 20L, 20L}, {90L, 10L, 10L}, {90L, 20L, 10L}};
 
-    assertThat(journal.entriesRelative("foo", Foo.class, 0L, null).iterator(), isIterOfLength(90));
-    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 10L).iterator(), isIterOfLength(10));
-    assertThat(journal.entriesRelative("foo", Foo.class, 0L, 20L).iterator(), isIterOfLength(20));
-    assertThat(journal.entriesRelative("foo", Foo.class, 11L, 79L).iterator(), isIterOfLength(79));
-    assertThat(journal.entriesRelative("foo", Foo.class, 11L, null).iterator(), isIterOfLength(79));
-    assertThat(journal.entriesRelative("foo", Foo.class, 10L, 10L).iterator(), isIterOfLength(10));
-    assertThat(journal.entriesRelative("foo", Foo.class, 5L, 10L).iterator(), isIterOfLength(10));
-    assertThat(journal.entriesRelative("foo", Foo.class, 80L, 10L).iterator(), isNotEmptyIter());
-    assertThat(journal.entriesRelative("foo", Foo.class, 90L, 10L).iterator(), isEmptyIter());
+    for (Long[] config : absConfigs) {
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesAbsolute("foo", Foo.class, config[0], config[1]).iterator()) {
+        assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+    }
+
+    Long[][] relConfigs =
+        { {0L, null, 90L}, {0L, 10L, 10L}, {0L, 20L, 20L}, {11L, 79L, 79L}, {11L, null, 79L},
+            {10L, 10L, 10L}, {5L, 10L, 10L}, {80L, 10L, 10L}, {90L, 10L, 0L},};
+
+    for (Long[] config : relConfigs) {
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesRelative("foo", Foo.class, config[0], config[1]).iterator()) {
+        assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+    }
   }
 }

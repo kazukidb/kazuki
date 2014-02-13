@@ -69,6 +69,15 @@ h2_kv_key_ids_of_type(kv_table_name) ::=<<
   offset :offset
 >>
 
+h2_kv_key_values_of_type(kv_table_name) ::=<< 
+  select "_key_id", "_value"
+    from "<kv_table_name>"
+   where "_key_type" = :key_type
+     and "_is_deleted" = 'N'
+   limit :limit
+  offset :offset
+>>
+
 h2_kv_clear_type(kv_table_name) ::=<< 
   delete
     from "<kv_table_name>"
