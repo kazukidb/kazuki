@@ -3,6 +3,7 @@ package io.kazuki.v0.store.keyvalue;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.schema.TypeValidation;
+import io.kazuki.v0.store.sequence.ResolvedKey;
 
 import java.util.Collection;
 import java.util.Map;
@@ -15,7 +16,7 @@ public interface KeyValueStore {
   <T> Key create(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException;
 
-  <T> Key create(String type, Class<T> clazz, T inValue, @Nullable Long idOverride,
+  <T> Key create(String type, Class<T> clazz, T inValue, @Nullable ResolvedKey keyOverride,
       TypeValidation typeSafety) throws KazukiException;
 
   <T> T retrieve(Key key, Class<T> clazz) throws KazukiException;

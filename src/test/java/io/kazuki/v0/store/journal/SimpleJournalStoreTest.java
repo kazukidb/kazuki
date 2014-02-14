@@ -14,6 +14,7 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
+import io.kazuki.v0.store.sequence.KeyImpl;
 import junit.framework.Assert;
 
 import org.testng.annotations.Test;
@@ -51,7 +52,7 @@ public class SimpleJournalStoreTest {
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
 
-    Assert.assertEquals(manager.createSchema("foo", schema), 2L);
+    Assert.assertEquals(manager.createSchema("foo", schema), KeyImpl.valueOf("$schema:2"));
     Assert.assertNotNull(manager.retrieveSchema("foo"));
 
     for (int i = 0; i < 100; i++) {

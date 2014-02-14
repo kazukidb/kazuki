@@ -10,6 +10,10 @@ public interface SequenceService {
 
   Key nextKey(String type) throws KazukiException;
 
+  ResolvedKey resolveKey(Key key) throws KazukiException;
+
+  Key unresolveKey(ResolvedKey key) throws KazukiException;
+
   void clear(boolean clearTypes, boolean clearCounters);
 
   void resetCounter(String type) throws KazukiException;

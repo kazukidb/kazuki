@@ -23,6 +23,7 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
+import io.kazuki.v0.store.sequence.KeyImpl;
 
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -66,7 +67,7 @@ public class PartitionedJournalStoreSmokeTest {
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
 
-    assertThat(manager.createSchema("foo", schema), is(3L));
+    assertThat(manager.createSchema("foo", schema), is(KeyImpl.valueOf("$schema:3")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     System.out.println(dump(journal.getActivePartition()));

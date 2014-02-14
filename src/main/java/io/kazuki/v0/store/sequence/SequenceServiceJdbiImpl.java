@@ -12,7 +12,6 @@ import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -175,6 +174,22 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     return nextKey;
   }
 
+  @Override
+  public ResolvedKey resolveKey(Key key) throws KazukiException {
+    Integer typeId = this.getTypeId(key.getTypeName(), false);
+
+    if (typeId == null) {
+      throw new IllegalArgumentException("Invalid entity 'type'");
+    }
+
+    return new ResolvedKey(typeId, 0L, Long.parseLong(key.getInternalIdentifier().split(":")[1]));
+  }
+
+  @Override
+  public Key unresolveKey(ResolvedKey key) throws KazukiException {
+    return KeyImpl.createInternal(this.getTypeName(key.getTypeTag()), key.getIdentifierLo());
+  }
+
   @Nullable
   public Key peekKey(final String type) throws KazukiException {
     Counter counter = counters.get(type);
@@ -298,11 +313,6 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     return Collections.unmodifiableMap(counters);
   }
 
-  private List<Map<String, Object>> getCountersFromDatabase(Handle handle) {
-    return JDBIHelper.getBoundQuery(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
-        sequenceHelper.getSequenceTableName(), "seq_seq_list").list();
-  }
-
   private Counter createCounter(final String type) {
     final int typeId = this.dataSource.withHandle(new HandleCallback<Integer>() {
       @Override
@@ -356,7 +366,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       long next = base + offset.incrementAndGet();
 
       if (next < max) {
-        return new Key(type, next);
+        return KeyImpl.createInternal(type, next);
       }
 
       return null;
@@ -367,7 +377,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       long next = base + offset.get() + 1L;
 
       if (next < max) {
-        return new Key(type, next);
+        return KeyImpl.createInternal(type, next);
       }
 
       return null;

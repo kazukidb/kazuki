@@ -13,6 +13,8 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
+import io.kazuki.v0.store.sequence.KeyImpl;
+import io.kazuki.v0.store.sequence.ResolvedKey;
 import io.kazuki.v0.store.sequence.SequenceService;
 import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl;
 
@@ -112,8 +114,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> Key create(final String type, Class<T> clazz, final T inValue, final Long idOverride,
-      TypeValidation typeSafety) throws KazukiException {
+  public <T> Key create(final String type, Class<T> clazz, final T inValue,
+      final ResolvedKey idOverride, TypeValidation typeSafety) throws KazukiException {
     availability.assertAvailable();
 
     if (type == null
@@ -121,7 +123,17 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
-    final Key newKey = idOverride == null ? sequences.nextKey(type) : new Key(type, idOverride);
+    final Key newKey;
+    final ResolvedKey resolvedKey;
+
+    if (idOverride != null) {
+      newKey = sequences.unresolveKey(idOverride);
+      resolvedKey = idOverride;
+    } else {
+      newKey = sequences.nextKey(type);
+      resolvedKey = sequences.resolveKey(newKey);
+    }
+
     final Schema schema = schemaService.retrieveSchema(type);
 
     return database.inTransaction(new TransactionCallback<Key>() {
@@ -139,9 +151,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
 
         DateTime createdDate = new DateTime();
-        int inserted =
-            doInsert(handle, sequences.getTypeId(type, false), newKey.getId(), storeValueBytes,
-                createdDate);
+        int inserted = doInsert(handle, resolvedKey, storeValueBytes, createdDate);
 
         if (inserted < 1) {
           throw new KazukiException("Entity not created!");
@@ -157,13 +167,14 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     availability.assertAvailable();
 
     try {
-      byte[] objectBytes = getObjectBytes(realKey);
+      ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      byte[] objectBytes = getObjectBytes(resolvedKey);
 
       if (objectBytes == null) {
         return null;
       }
 
-      final Schema schema = schemaService.retrieveSchema(realKey.getType());
+      final Schema schema = schemaService.retrieveSchema(realKey.getTypeName());
 
       Object storedValue = EncodingHelper.parseSmile(objectBytes, Object.class);
 
@@ -197,15 +208,15 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         Map<Key, T> dbFound = new LinkedHashMap<Key, T>();
 
         for (Key realKey : keys) {
-          final int typeId = sequences.getTypeId(realKey.getType(), false);
-          final long keyId = realKey.getId();
+          final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
           Query<Map<String, Object>> select =
               JDBIHelper.getBoundQuery(handle, getPrefix(), "kv_table_name", tableName,
                   "kv_retrieve");
 
-          select.bind("key_type", typeId);
-          select.bind("key_id", keyId);
+          select.bind("key_type", resolvedKey.getTypeTag());
+          select.bind("key_id_hi", resolvedKey.getIdentifierHi());
+          select.bind("key_id_lo", resolvedKey.getIdentifierLo());
 
           List<Map<String, Object>> results = select.list();
 
@@ -220,7 +231,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
           Object storedValue =
               EncodingHelper.parseSmile((byte[]) first.get("_value"), Object.class);
 
-          final Schema schema = schemaService.retrieveSchema(realKey.getType());
+          final Schema schema = schemaService.retrieveSchema(realKey.getTypeName());
 
           if (schema != null && storedValue instanceof List) {
             FieldTransform fieldTransform = new FieldTransform(schema);
@@ -246,12 +257,10 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
         public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          final int typeId = sequences.getTypeId(realKey.getType(), false);
-          final long keyId = realKey.getId();
-
+          ResolvedKey resolvedKey = sequences.resolveKey(realKey);
           Object storeValue = EncodingHelper.asJsonMap(inValue);
 
-          final Schema schema = schemaService.retrieveSchema(realKey.getType());
+          final Schema schema = schemaService.retrieveSchema(realKey.getTypeName());
 
           if (schema != null) {
             FieldTransform fieldTransform = new FieldTransform(schema);
@@ -260,7 +269,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
                 structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
           }
 
-          int updated = doUpdate(handle, typeId, keyId, EncodingHelper.convertToSmile(storeValue));
+          int updated = doUpdate(handle, resolvedKey, EncodingHelper.convertToSmile(storeValue));
 
           return updated == 1;
         }
@@ -277,16 +286,16 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     return database.inTransaction(new TransactionCallback<Boolean>() {
       @Override
       public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        final int typeId = sequences.getTypeId(realKey.getType(), false);
-        final long keyId = realKey.getId();
+        ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
         Update delete =
             JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
                 "kv_delete");
 
         delete.bind("updated_dt", getEpochSecondsNow());
-        delete.bind("key_type", typeId);
-        delete.bind("key_id", keyId);
+        delete.bind("key_type", resolvedKey.getTypeTag());
+        delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
+        delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
 
         int deleted = delete.execute();
 
@@ -302,16 +311,16 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     return database.inTransaction(new TransactionCallback<Boolean>() {
       @Override
       public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        final int typeId = sequences.getTypeId(realKey.getType(), false);
-        final long keyId = realKey.getId();
+        ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
         Update delete =
             JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
                 "kv_delete_hard");
 
         delete.bind("updated_dt", getEpochSecondsNow());
-        delete.bind("key_type", typeId);
-        delete.bind("key_id", keyId);
+        delete.bind("key_type", resolvedKey.getTypeTag());
+        delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
+        delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
 
         int deleted = delete.execute();
 
@@ -325,8 +334,9 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     availability.assertAvailable();
 
     Key nextId = ((SequenceServiceJdbiImpl) sequences).peekKey(type);
+    ResolvedKey resolvedKey = sequences.resolveKey(nextId);
 
-    return (nextId == null) ? 0L : nextId.getId();
+    return (nextId == null) ? 0L : resolvedKey.getIdentifierLo();
   }
 
   public void clear(final boolean preserveTypes, final boolean preserveCounters) {
@@ -534,24 +544,17 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     };
   }
 
-  private byte[] getObjectBytes(final Key key) throws KazukiException {
+  private byte[] getObjectBytes(final ResolvedKey key) throws KazukiException {
     return database.inTransaction(new TransactionCallback<byte[]>() {
       @Override
       public byte[] inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        final Integer typeId = sequences.getTypeId(key.getType(), false);
-
-        if (typeId == null) {
-          throw new IllegalArgumentException("Invalid entity 'type'");
-        }
-
-        final long keyId = key.getId();
-
         Query<Map<String, Object>> select =
             JDBIHelper
                 .getBoundQuery(handle, getPrefix(), "kv_table_name", tableName, "kv_retrieve");
 
-        select.bind("key_type", typeId);
-        select.bind("key_id", keyId);
+        select.bind("key_type", key.getTypeTag());
+        select.bind("key_id_hi", key.getIdentifierHi());
+        select.bind("key_id_lo", key.getIdentifierLo());
 
         List<Map<String, Object>> results = select.list();
 
@@ -659,12 +662,13 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         "kv_create_table_index").execute();
   }
 
-  private int doInsert(Handle handle, final int typeId, final long nextId, byte[] valueBytes,
+  private int doInsert(Handle handle, final ResolvedKey resolvedKey, byte[] valueBytes,
       DateTime date) {
     Update update =
         JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_create");
-    update.bind("key_type", typeId);
-    update.bind("key_id", nextId);
+    update.bind("key_type", resolvedKey.getTypeTag());
+    update.bind("key_id_hi", resolvedKey.getIdentifierHi());
+    update.bind("key_id_lo", resolvedKey.getIdentifierLo());
     update.bind("created_dt", date.withZone(DateTimeZone.UTC).getMillis() / 1000);
     update.bind("version", 0L);
     update.bind("value", valueBytes);
@@ -673,11 +677,12 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     return inserted;
   }
 
-  private int doUpdate(Handle handle, final int typeId, final long keyId, byte[] valueBytes) {
+  private int doUpdate(Handle handle, final ResolvedKey resolvedKey, byte[] valueBytes) {
     Update update =
         JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_update");
-    update.bind("key_type", typeId);
-    update.bind("key_id", keyId);
+    update.bind("key_type", resolvedKey.getTypeTag());
+    update.bind("key_id_hi", resolvedKey.getIdentifierHi());
+    update.bind("key_id_lo", resolvedKey.getIdentifierLo());
     update.bind("updated_dt", getEpochSecondsNow());
     update.bind("old_version", 0L);
     update.bind("new_version", 0L);
@@ -732,7 +737,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
               record = inner.next();
 
               try {
-                key = new Key(type, ((Number) record.get("_key_id")).longValue());
+                key = KeyImpl.createInternal(type, ((Number) record.get("_key_id_lo")).longValue());
               } catch (Exception e) {
                 throw Throwables.propagate(e);
               }

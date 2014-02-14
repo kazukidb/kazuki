@@ -3,7 +3,8 @@ group sql;
 h2_kv_create_table(kv_table_name) ::=<<
   create table "<kv_table_name>" (
     "_key_type"     smallint unsigned not null,
-    "_key_id"       bigint unsigned not null,
+    "_key_id_hi"    bigint unsigned not null,
+    "_key_id_lo"    bigint unsigned not null,
     "_created_dt"   int unsigned not null,
     "_updated_dt"   int unsigned not null,
     "_version"      bigint unsigned not null,
@@ -11,7 +12,7 @@ h2_kv_create_table(kv_table_name) ::=<<
     "_format"       char(1) not null default 'S',
     "_compression"  char(1) not null default 'F',
     "_value"        varbinary not null,
-    PRIMARY KEY("_key_type", "_key_id")
+    PRIMARY KEY("_key_type", "_key_id_hi", "_key_id_lo")
   )
 >>
 
@@ -20,27 +21,30 @@ h2_kv_create_table_index(kv_table_name) ::=<<
 >>
 
 h2_kv_create(kv_table_name) ::=<< 
-  insert into "<kv_table_name>" ("_key_type", "_key_id", "_created_dt", "_updated_dt", "_version", "_is_deleted", "_format", "_compression", "_value")
-  values (:key_type, :key_id, :created_dt, :created_dt, :version, 'N', 'S', 'F', :value)
+  insert into "<kv_table_name>" ("_key_type", "_key_id_hi", "_key_id_lo", "_created_dt", "_updated_dt", "_version", "_is_deleted", "_format", "_compression", "_value")
+  values (:key_type, :key_id_hi, :key_id_lo, :created_dt, :created_dt, :version, 'N', 'S', 'F', :value)
 >>
 
 h2_kv_retrieve(kv_table_name) ::=<< 
-  select "_key_type", "_key_id", "_created_dt", "_updated_dt", "_format", "_compression", "_version", "_is_deleted", "_value"
+  select "_key_type", "_key_id_hi", "_key_id_lo", "_created_dt", "_updated_dt", "_format", "_compression", "_version", "_is_deleted", "_value"
     from "<kv_table_name>"
    where "_key_type" = :key_type
-     and "_key_id" = :key_id
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
      and "_is_deleted" = 'N'
 >>
 
 h2_kv_update(kv_table_name) ::=<< 
   update "<kv_table_name>"
     set "_key_type"    = :key_type,
-        "_key_id"      = :key_id,
+        "_key_id_hi"   = :key_id_hi,
+        "_key_id_lo"   = :key_id_lo,
         "_updated_dt"  = :updated_dt,
         "_version"     = :new_version,
         "_value"       = :value
    where "_key_type"   = :key_type
-     and "_key_id"     = :key_id
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
      and "_is_deleted" = 'N'
      and "_version"    = :old_version
 >>
@@ -50,18 +54,20 @@ h2_kv_delete(kv_table_name) ::=<<
     set "_updated_dt" = :updated_dt,
         "_is_deleted" = 'Y'
    where "_key_type" = :key_type
-     and "_key_id" = :key_id
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
 >>
 
 h2_kv_delete_hard(kv_table_name) ::=<< 
   delete
     from "<kv_table_name>"
    where "_key_type" = :key_type
-     and "_key_id" = :key_id
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
 >>
 
 h2_kv_key_ids_of_type(kv_table_name) ::=<< 
-  select "_key_id"
+  select "_key_id_lo"
     from "<kv_table_name>"
    where "_key_type" = :key_type
      and "_is_deleted" = 'N'
@@ -70,7 +76,7 @@ h2_kv_key_ids_of_type(kv_table_name) ::=<<
 >>
 
 h2_kv_key_values_of_type(kv_table_name) ::=<< 
-  select "_key_id", "_value"
+  select "_key_id_lo", "_value"
     from "<kv_table_name>"
    where "_key_type" = :key_type
      and "_is_deleted" = 'N'

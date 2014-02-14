@@ -6,6 +6,8 @@ import io.kazuki.v0.internal.v2schema.types.TransformException;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
+import io.kazuki.v0.store.sequence.KeyImpl;
+import io.kazuki.v0.store.sequence.ResolvedKey;
 import io.kazuki.v0.store.sequence.SequenceService;
 
 import javax.inject.Inject;
@@ -36,7 +38,7 @@ public class SchemaStoreImpl implements SchemaStore {
     this.store = store;
   }
 
-  public long createSchema(String type, Schema value) throws KazukiException {
+  public Key createSchema(String type, Schema value) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -47,9 +49,11 @@ public class SchemaStoreImpl implements SchemaStore {
       throw new KazukiException("unable to allocate new type id for Schema type: " + type);
     }
 
-    Schema existing = this.store.retrieve(Key.valueOf(SCHEMA_PREFIX + ":" + typeId), Schema.class);
+    Key realKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
+
+    Schema existing = this.store.retrieve(realKey, Schema.class);
     if (existing != null) {
-      return typeId.longValue();
+      return realKey;
     }
 
     try {
@@ -58,9 +62,10 @@ public class SchemaStoreImpl implements SchemaStore {
       throw new KazukiException("invalid schema definition for type: " + type, e);
     }
 
-    store.create(SCHEMA_PREFIX, Schema.class, value, typeId.longValue(), TypeValidation.LAX);
+    ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+    store.create(SCHEMA_PREFIX, Schema.class, value, resolvedKey, TypeValidation.LAX);
 
-    return typeId.longValue();
+    return realKey;
   }
 
   public Schema retrieveSchema(String type) throws KazukiException {
@@ -74,7 +79,7 @@ public class SchemaStoreImpl implements SchemaStore {
       return null;
     }
 
-    return store.retrieve(new Key(SCHEMA_PREFIX, typeId.longValue()), Schema.class);
+    return store.retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue()), Schema.class);
   }
 
   public boolean updateSchema(final String type, final Schema value) throws KazukiException {
@@ -88,7 +93,7 @@ public class SchemaStoreImpl implements SchemaStore {
       return false;
     }
 
-    Key theKey = new Key(SCHEMA_PREFIX, typeId.longValue());
+    Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
 
     final Schema original = store.retrieve(theKey, Schema.class);
 
@@ -117,7 +122,7 @@ public class SchemaStoreImpl implements SchemaStore {
       return false;
     }
 
-    Key theKey = new Key(SCHEMA_PREFIX, typeId.longValue());
+    Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
 
     return store.deleteHard(theKey);
   }

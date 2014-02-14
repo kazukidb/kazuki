@@ -1,6 +1,7 @@
 package io.kazuki.v0.internal.helper;
 
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.sequence.KeyImpl;
 
 import java.nio.ByteBuffer;
 import java.security.spec.AlgorithmParameterSpec;
@@ -63,7 +64,7 @@ public class KeyObfuscator {
     }
 
     if (!encryptedText.startsWith("@")) {
-      return Key.valueOf(encryptedText);
+      return KeyImpl.valueOf(encryptedText);
     }
 
     String[] parts = encryptedText.substring(1).split(":");
@@ -81,7 +82,7 @@ public class KeyObfuscator {
 
       Long id = ByteBuffer.allocate(8).put(decrypted).getLong(0);
 
-      return new Key(type, id);
+      return KeyImpl.createInternal(type, id);
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
