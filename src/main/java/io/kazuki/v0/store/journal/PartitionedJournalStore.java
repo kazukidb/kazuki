@@ -173,7 +173,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     }
 
     if (theActivePartitionInfo == null || theActivePartitionInfo.isClosed()) {
-      Key partitionKey = sequence.nextKey(this.typeName);
+      KeyImpl partitionKey = (KeyImpl) sequence.nextKey(this.typeName);
 
       if (partitionKey == null) {
         throw new IllegalStateException("unable to allocate new partition key of type: "

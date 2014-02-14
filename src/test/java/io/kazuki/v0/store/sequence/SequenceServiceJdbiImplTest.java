@@ -60,7 +60,7 @@ public class SequenceServiceJdbiImplTest {
     for (int i = 0; i < 10; i++) {
       Key key = seq.nextKey("foo");
       ResolvedKey resolvedKey = seq.resolveKey(key);
-      Assert.assertEquals(key.getTypeName(), "foo");
+      Assert.assertEquals(key.getTypePart(), "foo");
       Assert.assertEquals(resolvedKey.getIdentifierHi(), 0L);
       Assert.assertEquals(resolvedKey.getIdentifierLo(), (long) i + 1L);
     }
@@ -72,7 +72,7 @@ public class SequenceServiceJdbiImplTest {
     for (int i = 0; i < 10; i++) {
       Key key = seq.nextKey("bar");
       ResolvedKey resolvedKey = seq.resolveKey(key);
-      Assert.assertEquals(key.getTypeName(), "bar");
+      Assert.assertEquals(key.getTypePart(), "bar");
       Assert.assertEquals(resolvedKey.getIdentifierHi(), 0L);
       Assert.assertEquals(resolvedKey.getIdentifierLo(), (long) i + 1L);
     }

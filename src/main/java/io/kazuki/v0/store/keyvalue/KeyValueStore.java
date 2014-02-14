@@ -13,6 +13,8 @@ import javax.annotation.Nullable;
 public interface KeyValueStore {
   void initialize();
 
+  Key toKey(String keyString);
+
   <T> Key create(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException;
 

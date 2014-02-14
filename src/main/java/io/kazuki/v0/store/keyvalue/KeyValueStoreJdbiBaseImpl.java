@@ -108,6 +108,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
+  public Key toKey(String keyString) {
+    return KeyImpl.valueOf(keyString);
+  }
+
+  @Override
   public <T> Key create(final String type, Class<T> clazz, final T inValue,
       TypeValidation typeSafety) throws KazukiException {
     return create(type, clazz, inValue, null, typeSafety);
@@ -174,7 +179,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         return null;
       }
 
-      final Schema schema = schemaService.retrieveSchema(realKey.getTypeName());
+      final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
       Object storedValue = EncodingHelper.parseSmile(objectBytes, Object.class);
 
@@ -231,7 +236,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
           Object storedValue =
               EncodingHelper.parseSmile((byte[]) first.get("_value"), Object.class);
 
-          final Schema schema = schemaService.retrieveSchema(realKey.getTypeName());
+          final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
           if (schema != null && storedValue instanceof List) {
             FieldTransform fieldTransform = new FieldTransform(schema);
@@ -260,7 +265,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
           ResolvedKey resolvedKey = sequences.resolveKey(realKey);
           Object storeValue = EncodingHelper.asJsonMap(inValue);
 
-          final Schema schema = schemaService.retrieveSchema(realKey.getTypeName());
+          final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
           if (schema != null) {
             FieldTransform fieldTransform = new FieldTransform(schema);

@@ -176,13 +176,15 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
   @Override
   public ResolvedKey resolveKey(Key key) throws KazukiException {
-    Integer typeId = this.getTypeId(key.getTypeName(), false);
+    Integer typeId = this.getTypeId(key.getTypePart(), false);
 
     if (typeId == null) {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
-    return new ResolvedKey(typeId, 0L, Long.parseLong(key.getInternalIdentifier().split(":")[1]));
+    KeyImpl keyImpl = (KeyImpl) key;
+
+    return new ResolvedKey(typeId, 0L, keyImpl.getInternalId());
   }
 
   @Override

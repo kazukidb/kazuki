@@ -10,13 +10,14 @@ import io.kazuki.v0.store.Key;
 public class KeyImpl implements Key {
   private final String internalIdentifier;
   private volatile String encryptedIdentifier;
+  private volatile String encryptedId;
   private final String type;
-  private final Long id;
+  private final Long internalId;
 
-  protected KeyImpl(String type, Long id) {
-    this.internalIdentifier = type + ":" + Long.toString(id);
+  protected KeyImpl(String type, Long internalId) {
+    this.internalIdentifier = type + ":" + Long.toString(internalId);
     this.type = type;
-    this.id = id;
+    this.internalId = internalId;
   }
 
   public static KeyImpl createInternal(String type, Long id) {
@@ -42,20 +43,23 @@ public class KeyImpl implements Key {
     return new KeyImpl(parts[0], id);
   }
 
-  public String getTypeName() {
+  @Override
+  public String getTypePart() {
     return type;
   }
 
-  public String getIdentifier() {
-    if (this.encryptedIdentifier == null) {
-      this.encryptedIdentifier = KeyObfuscator.encrypt(this.type, this.id);
-    }
+  @Override
+  public String getIdPart() {
+    computeEncryptedIds();
 
-    return encryptedIdentifier;
+    return this.encryptedId;
   }
 
-  public String getInternalIdentifier() {
-    return internalIdentifier;
+  @Override
+  public String getIdentifier() {
+    computeEncryptedIds();
+
+    return encryptedIdentifier;
   }
 
   @Override
@@ -71,5 +75,20 @@ public class KeyImpl implements Key {
   @Override
   public String toString() {
     return getIdentifier();
+  }
+
+  public String getInternalIdentifier() {
+    return internalIdentifier;
+  }
+
+  public Long getInternalId() {
+    return internalId;
+  }
+
+  private void computeEncryptedIds() {
+    if (this.encryptedIdentifier == null) {
+      this.encryptedIdentifier = KeyObfuscator.encrypt(this.type, this.internalId);
+      this.encryptedId = this.encryptedIdentifier.split(":")[1];
+    }
   }
 }
