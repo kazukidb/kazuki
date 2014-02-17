@@ -1,6 +1,5 @@
 package io.kazuki.v0.store.sequence;
 
-import com.google.common.hash.HashCode;
 
 /**
  * Resolves the internal representation of a Key. This class should only be used within Kazuki
@@ -17,8 +16,8 @@ public class ResolvedKey {
     this.identifierHi = identifierHi;
     this.identifierLo = identifierLo;
     this.hashCode =
-        HashCode.fromInt(typeTag).asInt() ^ HashCode.fromLong(identifierHi).asInt()
-            ^ HashCode.fromLong(identifierLo).asInt();
+        Integer.valueOf(this.typeTag).hashCode() ^ Long.valueOf(identifierHi).hashCode()
+            ^ Long.valueOf(identifierLo).hashCode();
   }
 
   public int getTypeTag() {
