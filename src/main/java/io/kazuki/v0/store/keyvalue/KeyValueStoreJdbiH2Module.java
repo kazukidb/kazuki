@@ -13,6 +13,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
 
+import io.kazuki.v0.internal.availability.AvailabilityManager;
+
 import org.skife.jdbi.v2.IDBI;
 
 import com.google.inject.Key;
@@ -61,6 +63,7 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
     }
 
     bind(SqlTypeHelper.class).to(H2TypeHelper.class).in(Scopes.SINGLETON);
+    bind(AvailabilityManager.class).in(Scopes.SINGLETON);
 
     Provider<SequenceService> seqProvider =
         binder().getProvider(Key.<SequenceService>get(SequenceService.class, Names.named(name)));
