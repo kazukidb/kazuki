@@ -67,6 +67,9 @@ public class H2SequenceServiceModule extends PrivateModule {
     bind(SequenceHelper.class).in(Scopes.SINGLETON);
     bind(AvailabilityManager.class).in(Scopes.SINGLETON);
 
+    // AvailabilityManager needs to be exposed in this private module
+    expose(AvailabilityManager.class);
+
     bind(SequenceService.class).annotatedWith(Names.named(name)).to(SequenceServiceJdbiImpl.class)
         .in(Scopes.SINGLETON);
 
