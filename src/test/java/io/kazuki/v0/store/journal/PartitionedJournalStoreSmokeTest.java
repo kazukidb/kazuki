@@ -180,5 +180,36 @@ public class PartitionedJournalStoreSmokeTest {
         assertThat(theIter, isIterOfLength(config[2].intValue()));
       }
     }
+
+    lifecycle.stop();
+    lifecycle.shutdown();
+    lifecycle.init();
+    lifecycle.start();
+
+    for (Long[] config : absConfigs) {
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesAbsolute("foo", Foo.class, config[0], config[1]).iterator()) {
+        assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+    }
+
+    for (Long[] config : relConfigs) {
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesRelative("foo", Foo.class, config[0], config[1]).iterator()) {
+        assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+    }
+
+    journal.append("foo", Foo.class, new Foo("ab", "ac"), TypeValidation.STRICT);
+
+    try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+        journal.entriesAbsolute("foo", Foo.class, 10L, null).iterator()) {
+      assertThat(theIter, isIterOfLength(91));
+    }
+
+    try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+        journal.entriesRelative("foo", Foo.class, 0L, null).iterator()) {
+      assertThat(theIter, isIterOfLength(91));
+    }
   }
 }

@@ -102,6 +102,19 @@ public class H2KeyValueStorageTest {
     System.out.println("retrieved value = " + dump(foo1Found));
     Assert.assertNull(foo1Found);
 
+    lifecycle.stop();
+    lifecycle.shutdown();
+    lifecycle.init();
+    lifecycle.start();
+    
+    foo1Found = store.retrieve(foo1Key, Foo.class);
+    System.out.println("retrieved value = " + dump(foo1Found));
+    Assert.assertNull(foo1Found);
+
+    foo1Found = store.retrieve(foo2Key, Foo.class);
+    System.out.println("retrieved value = " + dump(foo2Found));
+    Assert.assertNotNull(foo2Found);
+
     store.clear(false, false);
   }
 
