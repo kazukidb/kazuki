@@ -10,13 +10,14 @@ import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl.Counter;
 
 import java.util.Map;
 
+import javax.sql.DataSource;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
 
 public class SequenceServiceJdbiImplTest {
   private final Injector inject;
@@ -37,8 +38,8 @@ public class SequenceServiceJdbiImplTest {
         (SequenceServiceJdbiImpl) inject.getInstance(com.google.inject.Key.<SequenceService>get(
             SequenceService.class, Names.named("foo")));
 
-    BoneCPDataSource database =
-        inject.getInstance(com.google.inject.Key.get(BoneCPDataSource.class, Names.named("foo")));
+    DataSource database =
+        inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
 
     TestHelper.dropSchema(database);
 

@@ -3,6 +3,8 @@ package io.kazuki.v0.internal.helper;
 import java.sql.Connection;
 import java.util.Iterator;
 
+import javax.sql.DataSource;
+
 import org.h2.Driver;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
@@ -16,7 +18,7 @@ import com.jolbox.bonecp.BoneCPDataSource;
 public class TestHelper {
   private static final ObjectMapper mapper = new ObjectMapper();
 
-  public static void dropSchema(BoneCPDataSource database) {
+  public static void dropSchema(DataSource database) {
     Connection conn = null;
     try {
       conn = database.getConnection();

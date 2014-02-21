@@ -15,6 +15,9 @@ import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.KeyImpl;
+
+import javax.sql.DataSource;
+
 import junit.framework.Assert;
 
 import org.testng.annotations.Test;
@@ -23,7 +26,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
 
 public class SimpleJournalStoreTest {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
@@ -35,8 +37,8 @@ public class SimpleJournalStoreTest {
     final Lifecycle lifecycle =
         inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
 
-    BoneCPDataSource database =
-        inject.getInstance(com.google.inject.Key.get(BoneCPDataSource.class, Names.named("foo")));
+    DataSource database =
+        inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
 
     SchemaStore manager =
         inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));

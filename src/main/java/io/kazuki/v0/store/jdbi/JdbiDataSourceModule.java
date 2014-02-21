@@ -1,11 +1,16 @@
 package io.kazuki.v0.store.jdbi;
 
+import io.kazuki.v0.internal.helper.MaskProxy;
 import io.kazuki.v0.store.config.ConfigurationProvider;
+import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
+import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.sql.DataSource;
 
 import com.google.common.base.Throwables;
 import com.google.inject.Key;
@@ -50,29 +55,57 @@ public class JdbiDataSourceModule extends PrivateModule {
           Key.get(JdbiDataSourceConfiguration.class, Names.named(name)));
     }
 
-    bind(BoneCPDataSource.class).annotatedWith(Names.named(name))
+    bind(DataSource.class).annotatedWith(Names.named(name))
         .toProvider(BoneCPDataSourceProvider.class).in(Scopes.SINGLETON);
-    expose(BoneCPDataSource.class).annotatedWith(Names.named(name));
+    expose(DataSource.class).annotatedWith(Names.named(name));
 
     if (additionalNames != null) {
       for (String otherName : additionalNames) {
-        bind(BoneCPDataSource.class).annotatedWith(Names.named(otherName)).to(
-            Key.get(BoneCPDataSource.class, Names.named(name)));
-        expose(BoneCPDataSource.class).annotatedWith(Names.named(otherName));
+        bind(DataSource.class).annotatedWith(Names.named(otherName)).to(
+            Key.get(DataSource.class, Names.named(name)));
+        expose(DataSource.class).annotatedWith(Names.named(otherName));
       }
     }
   }
 
-  private static class BoneCPDataSourceProvider implements Provider<BoneCPDataSource> {
+  private static class BoneCPDataSourceProvider
+      implements
+        Provider<DataSource>,
+        LifecycleRegistration {
     private final JdbiDataSourceConfiguration config;
+    private final MaskProxy<DataSource, BoneCPDataSource> instance;
 
     @Inject
     public BoneCPDataSourceProvider(JdbiDataSourceConfiguration config) {
       this.config = config;
+      this.instance =
+          new MaskProxy<DataSource, BoneCPDataSource>(DataSource.class, createDataSource());
     }
 
     @Override
-    public BoneCPDataSource get() {
+    @Inject
+    public void register(Lifecycle lifecycle) {
+      lifecycle.register(new LifecycleSupportBase() {
+        @Override
+        public void shutdown() {
+          BoneCPDataSource newInstance = createDataSource();
+          BoneCPDataSource oldInstance = instance.getAndSet(newInstance);
+
+          try {
+            oldInstance.close();
+          } catch (Exception e) {
+            throw Throwables.propagate(e);
+          }
+        }
+      });
+    }
+
+    @Override
+    public DataSource get() {
+      return instance.asProxyInstance();
+    }
+
+    private BoneCPDataSource createDataSource() {
       try {
         Class.forName(config.getJdbcDriver());
       } catch (Exception e) {

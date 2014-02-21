@@ -1,5 +1,6 @@
 package io.kazuki.v0.store.keyvalue;
 
+import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.H2TypeHelper;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
@@ -12,8 +13,7 @@ import io.kazuki.v0.store.sequence.SequenceService;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
-
-import io.kazuki.v0.internal.availability.AvailabilityManager;
+import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.IDBI;
 
@@ -22,7 +22,6 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
 import com.google.inject.Scopes;
 import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
 
 public class KeyValueStoreJdbiH2Module extends PrivateModule {
   protected final String name;
@@ -67,10 +66,10 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
 
     Provider<SequenceService> seqProvider =
         binder().getProvider(Key.<SequenceService>get(SequenceService.class, Names.named(name)));
-    Provider<BoneCPDataSource> dsProvider =
-        binder().getProvider(Key.get(BoneCPDataSource.class, Names.named(name)));
+    Provider<DataSource> dsProvider =
+        binder().getProvider(Key.get(DataSource.class, Names.named(name)));
 
-    bind(BoneCPDataSource.class).toProvider(dsProvider);
+    bind(DataSource.class).toProvider(dsProvider);
     bind(IDBI.class).toProvider(new IdbiProvider(KeyValueStore.class, dsProvider)).in(
         Scopes.SINGLETON);
 

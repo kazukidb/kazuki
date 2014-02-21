@@ -25,6 +25,8 @@ import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.KeyImpl;
 
+import javax.sql.DataSource;
+
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -32,11 +34,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
 
 public class PartitionedJournalStoreSmokeTest {
   private Injector inject;
-  private BoneCPDataSource database;
+  private DataSource database;
   private Lifecycle lifecycle;
   private SchemaStore manager;
   private JournalStore journal;
@@ -49,8 +50,7 @@ public class PartitionedJournalStoreSmokeTest {
             .build()));
 
     lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
-    database =
-        inject.getInstance(com.google.inject.Key.get(BoneCPDataSource.class, Names.named("foo")));
+    database = inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
     manager = inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));
     journal = inject.getInstance(com.google.inject.Key.get(JournalStore.class, Names.named("foo")));
 

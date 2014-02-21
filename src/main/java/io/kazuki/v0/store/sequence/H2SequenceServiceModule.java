@@ -10,6 +10,7 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
+import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.IDBI;
 
@@ -19,7 +20,6 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
 import com.google.inject.Scopes;
 import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
 
 public class H2SequenceServiceModule extends PrivateModule {
   private final String name;
@@ -44,8 +44,8 @@ public class H2SequenceServiceModule extends PrivateModule {
   protected void configure() {
     bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name))).in(Scopes.SINGLETON);
 
-    Provider<BoneCPDataSource> provider =
-        binder().getProvider(Key.get(BoneCPDataSource.class, Names.named(name)));
+    Provider<DataSource> provider =
+        binder().getProvider(Key.get(DataSource.class, Names.named(name)));
 
     bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider)).in(
         Scopes.SINGLETON);

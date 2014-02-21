@@ -16,6 +16,8 @@ import io.kazuki.v0.store.schema.TypeValidation;
 
 import java.io.File;
 
+import javax.sql.DataSource;
+
 import org.hamcrest.Matchers;
 import org.joda.time.DateTime;
 import org.testng.annotations.AfterTest;
@@ -25,12 +27,11 @@ import org.testng.annotations.Test;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
-import com.jolbox.bonecp.BoneCPDataSource;
 
 public class PartitionedJournalStoreScaleTest {
   private static final String dbName = "target/testdb.db";
   private Injector inject;
-  private BoneCPDataSource database;
+  private DataSource database;
   private Lifecycle lifecycle;
   private JournalStore journal;
 
@@ -51,8 +52,7 @@ public class PartitionedJournalStoreScaleTest {
             .withJdbiConfig(dbConfig));
 
     lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
-    database =
-        inject.getInstance(com.google.inject.Key.get(BoneCPDataSource.class, Names.named("foo")));
+    database = inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
     journal = inject.getInstance(com.google.inject.Key.get(JournalStore.class, Names.named("foo")));
 
     TestHelper.dropSchema(database);

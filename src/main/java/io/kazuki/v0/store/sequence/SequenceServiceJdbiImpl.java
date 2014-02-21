@@ -138,7 +138,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       }
     });
 
-    log.debug("Initialized Sequence Service {}", this);
+    log.debug("Shut down Sequence Service {}", this);
   }
 
   public synchronized void bumpKey(final String type, long id) throws Exception {
