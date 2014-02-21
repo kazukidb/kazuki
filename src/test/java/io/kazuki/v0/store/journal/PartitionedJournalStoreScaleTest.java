@@ -3,7 +3,6 @@ package io.kazuki.v0.store.journal;
 
 import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
 import static org.hamcrest.MatcherAssert.assertThat;
-import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
@@ -15,8 +14,6 @@ import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.TypeValidation;
 
 import java.io.File;
-
-import javax.sql.DataSource;
 
 import org.hamcrest.Matchers;
 import org.joda.time.DateTime;
@@ -31,7 +28,6 @@ import com.google.inject.name.Names;
 public class PartitionedJournalStoreScaleTest {
   private static final String dbName = "target/testdb.db";
   private Injector inject;
-  private DataSource database;
   private Lifecycle lifecycle;
   private JournalStore journal;
 
@@ -43,8 +39,8 @@ public class PartitionedJournalStoreScaleTest {
             .withPartitionSize(1000L).withStrictTypeCreation(true).build();
 
     JdbiDataSourceConfiguration dbConfig =
-        new JdbiDataSourceConfiguration("org.h2.Driver", "jdbc:h2:" + dbName
-            + ";DB_CLOSE_ON_EXIT=TRUE", "sa", "not_really_used", 25, 25);
+        new JdbiDataSourceConfiguration("org.h2.Driver", "jdbc:h2:" + dbName, "sa",
+            "not_really_used", 25, 25);
 
     inject =
         Guice.createInjector(new LifecycleModule("foo"), new EasyPartitionedJournalStoreModule(
@@ -52,11 +48,16 @@ public class PartitionedJournalStoreScaleTest {
             .withJdbiConfig(dbConfig));
 
     lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
-    database = inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
     journal = inject.getInstance(com.google.inject.Key.get(JournalStore.class, Names.named("foo")));
 
-    TestHelper.dropSchema(database);
+    new File(dbName + ".h2.db").delete();
+    new File(dbName + ".trace.db").delete();
+    new File(dbName + ".lock.db").delete();
 
+    lifecycle.init();
+    lifecycle.start();
+    lifecycle.stop();
+    lifecycle.shutdown();
     lifecycle.init();
     lifecycle.start();
 
@@ -64,7 +65,9 @@ public class PartitionedJournalStoreScaleTest {
   }
 
   @AfterTest(alwaysRun = true)
-  public void shutDown() throws Exception {
+  public void tearDown() throws Exception {
+    lifecycle.stop();
+    lifecycle.shutdown();
     new File(dbName + ".h2.db").delete();
     new File(dbName + ".trace.db").delete();
     new File(dbName + ".lock.db").delete();

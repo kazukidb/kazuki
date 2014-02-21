@@ -23,6 +23,7 @@ public class TestHelper {
     try {
       conn = database.getConnection();
       conn.prepareStatement("DROP ALL OBJECTS").execute();
+      conn.commit();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     } finally {

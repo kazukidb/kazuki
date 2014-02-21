@@ -2,6 +2,7 @@ package io.kazuki.v0.store.keyvalue;
 
 
 import io.kazuki.v0.internal.helper.Configurations;
+import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -44,6 +45,11 @@ public class H2KeyValueStorageTest {
     lifecycle.init();
 
     store.clear(false, false);
+
+    lifecycle.stop();
+    lifecycle.shutdown();
+    lifecycle.init();
+    lifecycle.start();
 
     Assert.assertFalse(store.iterators().iterator("$schema", Schema.class).hasNext());
 
@@ -106,7 +112,7 @@ public class H2KeyValueStorageTest {
     lifecycle.shutdown();
     lifecycle.init();
     lifecycle.start();
-    
+
     foo1Found = store.retrieve(foo1Key, Foo.class);
     System.out.println("retrieved value = " + dump(foo1Found));
     Assert.assertNull(foo1Found);

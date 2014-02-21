@@ -1,6 +1,8 @@
 package io.kazuki.v0.store.lifecycle;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,8 +16,16 @@ import org.slf4j.LoggerFactory;
 public class Lifecycle {
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  private final ConcurrentLinkedQueue<LifecycleAware> listeners =
-      new ConcurrentLinkedQueue<LifecycleAware>();
+  private static final EnumSet<LifecycleEvent> reverseOrder = EnumSet.of(LifecycleEvent.UNANNOUNCE,
+      LifecycleEvent.STOP, LifecycleEvent.SHUTDOWN);
+
+  private final ConcurrentLinkedDeque<LifecycleAware> listeners = new ConcurrentLinkedDeque<>();
+
+  private final String name;
+
+  public Lifecycle(String name) {
+    this.name = name;
+  }
 
   /** Registers a listener with the lifecycle, thus 'subscribing' to events */
   public void register(LifecycleAware listener) {
@@ -66,13 +76,22 @@ public class Lifecycle {
     fireEvent(LifecycleEvent.STOP);
   }
 
+  public String getName() {
+    return name;
+  }
+
   /**
    * Sends the event synchronously to each listener in order.
    */
   private void fireEvent(LifecycleEvent event) {
     log.info("Firing lifecycle event {} to all listeners", event.name());
 
-    for (LifecycleAware listener : listeners) {
+    Iterator<LifecycleAware> iter =
+        reverseOrder.contains(event) ? listeners.descendingIterator() : listeners.iterator();
+
+    while (iter.hasNext()) {
+      LifecycleAware listener = iter.next();
+
       log.debug("Firing lifecycle event {} to listener {}", event.name(), listener);
 
       listener.eventFired(event);

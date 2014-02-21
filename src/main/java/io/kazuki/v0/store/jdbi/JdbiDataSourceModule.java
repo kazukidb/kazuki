@@ -55,6 +55,8 @@ public class JdbiDataSourceModule extends PrivateModule {
           Key.get(JdbiDataSourceConfiguration.class, Names.named(name)));
     }
 
+    bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name)));
+
     bind(DataSource.class).annotatedWith(Names.named(name))
         .toProvider(BoneCPDataSourceProvider.class).in(Scopes.SINGLETON);
     expose(DataSource.class).annotatedWith(Names.named(name));
@@ -78,8 +80,7 @@ public class JdbiDataSourceModule extends PrivateModule {
     @Inject
     public BoneCPDataSourceProvider(JdbiDataSourceConfiguration config) {
       this.config = config;
-      this.instance =
-          new MaskProxy<DataSource, BoneCPDataSource>(DataSource.class, createDataSource());
+      this.instance = new MaskProxy<DataSource, BoneCPDataSource>(DataSource.class, null);
     }
 
     @Override
@@ -87,9 +88,13 @@ public class JdbiDataSourceModule extends PrivateModule {
     public void register(Lifecycle lifecycle) {
       lifecycle.register(new LifecycleSupportBase() {
         @Override
+        public void init() {
+          instance.getAndSet(createDataSource());
+        }
+
+        @Override
         public void shutdown() {
-          BoneCPDataSource newInstance = createDataSource();
-          BoneCPDataSource oldInstance = instance.getAndSet(newInstance);
+          BoneCPDataSource oldInstance = instance.getAndSet(null);
 
           try {
             oldInstance.close();

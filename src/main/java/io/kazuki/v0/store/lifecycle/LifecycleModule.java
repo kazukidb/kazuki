@@ -22,7 +22,7 @@ public class LifecycleModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle());
+    bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle(this.name));
 
     if (additionalNames != null) {
       for (String additionalName : additionalNames) {

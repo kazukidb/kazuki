@@ -11,11 +11,11 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
-import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
+import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
@@ -23,8 +23,10 @@ import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.KeyImpl;
 
-import javax.sql.DataSource;
+import java.io.File;
 
+import org.hamcrest.Matchers;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -34,31 +36,52 @@ import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
 public class PartitionedJournalStoreClearTest {
+  private JdbiDataSourceConfiguration config;
+  private String dbName;
   private Injector inject;
-  private DataSource database;
   private Lifecycle lifecycle;
   private SchemaStore manager;
   private JournalStore journal;
 
   @BeforeTest(alwaysRun = true)
   public void setUp() throws Exception {
+    config = Configurations.getJdbi().build();
+    dbName = config.getJdbcUrl().substring("jdbc:h2:".length());
+
     inject =
         Guice.createInjector(new LifecycleModule("bar"), new EasyPartitionedJournalStoreModule(
-            "bar", "test/io/kazuki/v0/store/sequence").withJdbiConfig(Configurations.getJdbi()
-            .build()));
+            "bar", "test/io/kazuki/v0/store/sequence").withJdbiConfig(config));
 
     lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("bar")));
-    database = inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("bar")));
     manager = inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("bar")));
     journal = inject.getInstance(com.google.inject.Key.get(JournalStore.class, Names.named("bar")));
 
-    TestHelper.dropSchema(database);
+    new File(dbName + ".h2.db").delete();
+    new File(dbName + ".trace.db").delete();
+    new File(dbName + ".lock.db").delete();
 
     lifecycle.init();
+    lifecycle.start();
+    lifecycle.stop();
+    lifecycle.shutdown();
+    lifecycle.init();
+    lifecycle.start();
+  }
+
+  @AfterTest(alwaysRun = true)
+  public void tearDown() throws Exception {
+    lifecycle.stop();
+    lifecycle.shutdown();
+
+    new File(dbName + ".h2.db").delete();
+    new File(dbName + ".trace.db").delete();
+    new File(dbName + ".lock.db").delete();
   }
 
   @Test
   public void testClear() throws Exception {
+    assertThat(manager.retrieveSchema("foo"), Matchers.nullValue());
+
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));

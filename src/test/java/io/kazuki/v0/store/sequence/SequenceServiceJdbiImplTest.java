@@ -41,9 +41,14 @@ public class SequenceServiceJdbiImplTest {
     DataSource database =
         inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
 
+    lifecycle.init();
+
     TestHelper.dropSchema(database);
 
+    lifecycle.stop();
+    lifecycle.shutdown();
     lifecycle.init();
+    lifecycle.start();
 
     Map<String, Counter> counters = seq.getCurrentCounters();
     Assert.assertEquals(counters.toString(), "{}");
