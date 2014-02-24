@@ -727,13 +727,15 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
       try {
         theIter = new KeyValueIterator<KeyValuePair<T>>() {
-          private final KeyValueIterator<Map<String, Object>> inner = createKeyValueIterator(type,
-              offset, limit, includeValues);
+          private volatile KeyValueIterator<Map<String, Object>> inner = createKeyValueIterator(
+              type, offset, limit, includeValues);
           private final Schema schema = schemaService.retrieveSchema(type);
           private KeyValuePair<T> nextKv = advance();
           private KeyValuePair<T> currentKv = null;
 
           public KeyValuePair<T> advance() {
+            Preconditions.checkNotNull(inner, "iterator");
+
             Map<String, Object> record = null;
             Key key = null;
             T value = null;
@@ -776,6 +778,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public boolean hasNext() {
+            Preconditions.checkNotNull(inner, "iterator");
+
             return nextKv != null;
           }
 
@@ -793,7 +797,9 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
           public void remove() {
             availability.assertAvailable();
 
-            Preconditions.checkNotNull(currentKv, "iterator");
+            Preconditions.checkNotNull(inner, "iterator");
+            Preconditions.checkNotNull(currentKv, "next");
+
             try {
               KeyValueStoreJdbiBaseImpl.this.delete(currentKv.getKey());
               currentKv = null;
@@ -804,12 +810,17 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public void close() {
-            inner.close();
+            if (inner != null) {
+              inner.close();
+              inner = null;
+            }
           }
 
           @Override
           protected void finalize() throws Throwable {
-            inner.close();
+            if (inner != null) {
+              inner.close();
+            }
           }
         };
       } catch (KazukiException e) {
