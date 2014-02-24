@@ -10,7 +10,7 @@
   <artifactId>kazuki-db</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <packaging>jar</packaging>
-  <version>0.0.23</version>
+  <version>0.0.24-SNAPSHOT</version>
   <licenses>
     <license>
       <name>The Apache Software License, Version 2.0</name>
@@ -21,7 +21,7 @@
     <connection>scm:git:git://github.com/kazukidb/kazuki.git</connection>
     <developerConnection>scm:git:git@github.com:kazukidb/kazuki.git</developerConnection>
     <url>https://github.com/kazukidb/kazuki</url>
-    <tag>kazuki-db-0.0.23</tag>
+    <tag>HEAD</tag>
   </scm>
   <repositories>
     <repository>
