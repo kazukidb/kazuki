@@ -20,6 +20,7 @@ import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,13 +114,13 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> Key create(final String type, Class<T> clazz, final T inValue,
+  public synchronized <T> Key create(final String type, Class<T> clazz, final T inValue,
       TypeValidation typeSafety) throws KazukiException {
     return create(type, clazz, inValue, null, typeSafety);
   }
 
   @Override
-  public <T> Key create(final String type, Class<T> clazz, final T inValue,
+  public synchronized <T> Key create(final String type, Class<T> clazz, final T inValue,
       final ResolvedKey idOverride, TypeValidation typeSafety) throws KazukiException {
     availability.assertAvailable();
 
@@ -168,8 +169,10 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> T retrieve(final Key realKey, Class<T> clazz) throws KazukiException {
+  public synchronized <T> T retrieve(final Key realKey, Class<T> clazz) throws KazukiException {
     availability.assertAvailable();
+
+    final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
     try {
       ResolvedKey resolvedKey = sequences.resolveKey(realKey);
@@ -178,8 +181,6 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
       if (objectBytes == null) {
         return null;
       }
-
-      final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
       Object storedValue = EncodingHelper.parseSmile(objectBytes, Object.class);
 
@@ -196,7 +197,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> Map<Key, T> multiRetrieve(final Collection<Key> keys, final Class<T> clazz)
+  public synchronized <T> Map<Key, T> multiRetrieve(final Collection<Key> keys, final Class<T> clazz)
       throws KazukiException {
     availability.assertAvailable();
 
@@ -206,6 +207,18 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
     Preconditions.checkArgument(keys.size() <= MULTIGET_MAX_KEYS, "Multiget max is %s keys",
         MULTIGET_MAX_KEYS);
+
+    final Map<String, Schema> schemaMap = new HashMap<>(keys.size());
+
+    for (Key realKey : keys) {
+      String type = realKey.getTypePart();
+
+      if (schemaMap.containsKey(type)) {
+        continue;
+      }
+
+      schemaMap.put(type, schemaService.retrieveSchema(realKey.getTypePart()));
+    }
 
     return database.inTransaction(new TransactionCallback<Map<Key, T>>() {
       @Override
@@ -236,7 +249,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
           Object storedValue =
               EncodingHelper.parseSmile((byte[]) first.get("_value"), Object.class);
 
-          final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
+          final Schema schema = schemaMap.get(realKey.getTypePart());
 
           if (schema != null && storedValue instanceof List) {
             FieldTransform fieldTransform = new FieldTransform(schema);
@@ -254,9 +267,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> boolean update(final Key realKey, final Class<T> clazz, final T inValue)
+  public synchronized <T> boolean update(final Key realKey, final Class<T> clazz, final T inValue)
       throws KazukiException {
     availability.assertAvailable();
+
+    final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
     try {
       return database.inTransaction(new TransactionCallback<Boolean>() {
@@ -264,8 +279,6 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
           ResolvedKey resolvedKey = sequences.resolveKey(realKey);
           Object storeValue = EncodingHelper.asJsonMap(inValue);
-
-          final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
 
           if (schema != null) {
             FieldTransform fieldTransform = new FieldTransform(schema);
@@ -285,7 +298,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public boolean delete(final Key realKey) throws KazukiException {
+  public synchronized boolean delete(final Key realKey) throws KazukiException {
     availability.assertAvailable();
 
     return database.inTransaction(new TransactionCallback<Boolean>() {
@@ -310,7 +323,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public boolean deleteHard(final Key realKey) throws KazukiException {
+  public synchronized boolean deleteHard(final Key realKey) throws KazukiException {
     availability.assertAvailable();
 
     return database.inTransaction(new TransactionCallback<Boolean>() {

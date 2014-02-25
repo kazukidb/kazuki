@@ -75,7 +75,7 @@ public class SchemaStoreImpl implements SchemaStore {
 
     Integer typeId = getTypeIdPossiblyNull(type, false);
 
-    if (typeId == null) {
+    if (typeId == null || type.equals(SCHEMA_PREFIX)) {
       return null;
     }
 
