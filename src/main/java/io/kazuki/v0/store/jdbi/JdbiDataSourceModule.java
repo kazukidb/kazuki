@@ -112,9 +112,13 @@ public class JdbiDataSourceModule extends PrivateModule {
 
     private BoneCPDataSource createDataSource() {
       try {
-        Class.forName(config.getJdbcDriver());
-      } catch (Exception e) {
-        throw Throwables.propagate(e);
+        Class.forName(config.getJdbcDriver(), true, Thread.currentThread().getContextClassLoader());
+      } catch (Exception unused) {
+        try {
+          Class.forName(config.getJdbcDriver(), true, getClass().getClassLoader());
+        } catch (Exception e) {
+          throw Throwables.propagate(e);
+        }
       }
 
       BoneCPDataSource datasource = new BoneCPDataSource();
