@@ -169,31 +169,38 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public synchronized <T> T retrieve(final Key realKey, Class<T> clazz) throws KazukiException {
+  public synchronized <T> T retrieve(final Key realKey, final Class<T> clazz)
+      throws KazukiException {
     availability.assertAvailable();
 
     final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
+    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
-    try {
-      ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-      byte[] objectBytes = getObjectBytes(resolvedKey);
+    return database.inTransaction(new TransactionCallback<T>() {
+      @Override
+      public T inTransaction(Handle handle, TransactionStatus status) throws Exception {
+        try {
+          byte[] objectBytes = getObjectBytes(handle, resolvedKey);
 
-      if (objectBytes == null) {
-        return null;
+          if (objectBytes == null) {
+            return null;
+          }
+
+          Object storedValue = EncodingHelper.parseSmile(objectBytes, Object.class);
+
+          if (schema != null && storedValue instanceof List) {
+            FieldTransform fieldTransform = new FieldTransform(schema);
+            StructureTransform structureTransform = new StructureTransform(schema);
+            storedValue =
+                fieldTransform.unpack(structureTransform.unpack((List<Object>) storedValue));
+          }
+
+          return EncodingHelper.asValue((Map<String, Object>) storedValue, clazz);
+        } catch (Exception e) {
+          throw new KazukiException(e);
+        }
       }
-
-      Object storedValue = EncodingHelper.parseSmile(objectBytes, Object.class);
-
-      if (schema != null && storedValue instanceof List) {
-        FieldTransform fieldTransform = new FieldTransform(schema);
-        StructureTransform structureTransform = new StructureTransform(schema);
-        storedValue = fieldTransform.unpack(structureTransform.unpack((List<Object>) storedValue));
-      }
-
-      return EncodingHelper.asValue((Map<String, Object>) storedValue, clazz);
-    } catch (Exception e) {
-      throw new KazukiException(e);
-    }
+    });
   }
 
   @Override
@@ -272,12 +279,12 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     availability.assertAvailable();
 
     final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
+    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
     try {
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
         public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          ResolvedKey resolvedKey = sequences.resolveKey(realKey);
           Object storeValue = EncodingHelper.asJsonMap(inValue);
 
           if (schema != null) {
@@ -301,11 +308,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   public synchronized boolean delete(final Key realKey) throws KazukiException {
     availability.assertAvailable();
 
+    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+
     return database.inTransaction(new TransactionCallback<Boolean>() {
       @Override
       public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-
         Update delete =
             JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
                 "kv_delete");
@@ -326,11 +333,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   public synchronized boolean deleteHard(final Key realKey) throws KazukiException {
     availability.assertAvailable();
 
+    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+
     return database.inTransaction(new TransactionCallback<Boolean>() {
       @Override
       public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-
         Update delete =
             JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
                 "kv_delete_hard");
@@ -479,16 +486,20 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   public <T> KeyValueIterable<Key> keys(final String type, final Class<T> clazz,
       @Nullable final Long offset, @Nullable final Long limit) {
     return new KeyValueIterable<Key>() {
-      private final KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
+      private volatile KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
           clazz, offset, limit, false);
 
       @Override
       public KeyValueIterator<Key> iterator() {
-        final KeyValueIterator<KeyValuePair<T>> innerIter = inner.iterator();
-
         return new KeyValueIterator<Key>() {
+          volatile KeyValueIterator<KeyValuePair<T>> innerIter = inner.iterator();
+
           @Override
           public boolean hasNext() {
+            if (innerIter == null) {
+              return false;
+            }
+
             return innerIter.hasNext();
           }
 
@@ -504,14 +515,16 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public void close() {
-            innerIter.close();
+            closeQuietly(innerIter);
+            innerIter = null;
           }
         };
       }
 
       @Override
       public void close() {
-        inner.close();
+        closeQuietly(inner);
+        inner = null;
       }
     };
   }
@@ -525,16 +538,20 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   public <T> KeyValueIterable<T> values(final String type, final Class<T> clazz,
       @Nullable final Long offset, @Nullable final Long limit) {
     return new KeyValueIterable<T>() {
-      private final KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
+      private volatile KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
           clazz, offset, limit, true);
 
       @Override
       public KeyValueIterator<T> iterator() {
-        final KeyValueIterator<KeyValuePair<T>> innerIter = inner.iterator();
-
         return new KeyValueIterator<T>() {
+          volatile KeyValueIterator<KeyValuePair<T>> innerIter = inner.iterator();
+
           @Override
           public boolean hasNext() {
+            if (innerIter == null) {
+              return false;
+            }
+
             return innerIter.hasNext();
           }
 
@@ -550,43 +567,39 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public void close() {
-            innerIter.close();
+            closeQuietly(innerIter);
+            innerIter = null;
           }
         };
       }
 
       @Override
       public void close() {
-        inner.close();
+        closeQuietly(inner);
+        inner = null;
       }
     };
   }
 
-  private byte[] getObjectBytes(final ResolvedKey key) throws KazukiException {
-    return database.inTransaction(new TransactionCallback<byte[]>() {
-      @Override
-      public byte[] inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        Query<Map<String, Object>> select =
-            JDBIHelper
-                .getBoundQuery(handle, getPrefix(), "kv_table_name", tableName, "kv_retrieve");
+  private byte[] getObjectBytes(final Handle handle, final ResolvedKey key) throws KazukiException {
+    Query<Map<String, Object>> select =
+        JDBIHelper.getBoundQuery(handle, getPrefix(), "kv_table_name", tableName, "kv_retrieve");
 
-        select.bind("key_type", key.getTypeTag());
-        select.bind("key_id_hi", key.getIdentifierHi());
-        select.bind("key_id_lo", key.getIdentifierLo());
+    select.bind("key_type", key.getTypeTag());
+    select.bind("key_id_hi", key.getIdentifierHi());
+    select.bind("key_id_lo", key.getIdentifierLo());
 
-        List<Map<String, Object>> results = select.list();
+    List<Map<String, Object>> results = select.list();
 
-        if (results == null || results.isEmpty()) {
-          return null;
-        }
+    if (results == null || results.isEmpty()) {
+      return null;
+    }
 
-        Map<String, Object> first = results.iterator().next();
+    Map<String, Object> first = results.iterator().next();
 
-        byte[] foundBytes = (byte[]) first.get("_value");
+    byte[] foundBytes = (byte[]) first.get("_value");
 
-        return foundBytes;
-      }
-    });
+    return foundBytes;
   }
 
   private KeyValueIterator<Map<String, Object>> createKeyValueIterator(final String type,
@@ -620,10 +633,15 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
       @Override
       public boolean hasNext() {
+        if (theHandle == null) {
+          return false;
+        }
+
         boolean hasNext = iter.hasNext();
 
         if (!hasNext) {
-          closeQuietly();
+          closeQuietly(theHandle);
+          theHandle = null;
         }
 
         return hasNext;
@@ -641,23 +659,14 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
       @Override
       public void close() {
-        closeQuietly();
+        closeQuietly(theHandle);
+        theHandle = null;
       }
 
       @Override
       protected void finalize() throws Throwable {
-        closeQuietly();
-      }
-
-      private void closeQuietly() {
-        try {
-          if (theHandle != null) {
-            theHandle.close();
-            theHandle = null;
-          }
-        } catch (Exception e) {
-          throw Throwables.propagate(e);
-        }
+        closeQuietly(theHandle);
+        theHandle = null;
       }
     };
   }
@@ -714,13 +723,23 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
     return (int) (new DateTime().withZone(DateTimeZone.UTC).getMillis() / 1000);
   }
 
+  private void closeQuietly(AutoCloseable toClose) {
+    if (toClose != null) {
+      try {
+        toClose.close();
+      } catch (Exception e) {
+        log.debug("Exception during close {}", e);
+      }
+    }
+  }
+
   class KeyValueIterableJdbiImpl<T> implements KeyValueIterable<KeyValuePair<T>> {
     private final String type;
     private final Class<T> clazz;
     private final Long offset;
     private final Long limit;
     private final boolean includeValues;
-    private KeyValueIterator<KeyValuePair<T>> theIter = null;
+    private volatile KeyValueIterator<KeyValuePair<T>> theIter = null;
     private boolean instantiated = false;
 
     public KeyValueIterableJdbiImpl(String type, Class<T> clazz, Long offset, Long limit,
@@ -823,17 +842,14 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public void close() {
-            if (inner != null) {
-              inner.close();
-              inner = null;
-            }
+            closeQuietly(inner);
+            inner = null;
           }
 
           @Override
           protected void finalize() throws Throwable {
-            if (inner != null) {
-              inner.close();
-            }
+            closeQuietly(inner);
+            inner = null;
           }
         };
       } catch (KazukiException e) {
@@ -847,10 +863,8 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
     @Override
     public void close() {
-      if (theIter != null) {
-        theIter.close();
-        theIter = null;
-      }
+      closeQuietly(theIter);
+      theIter = null;
     }
   }
 }
