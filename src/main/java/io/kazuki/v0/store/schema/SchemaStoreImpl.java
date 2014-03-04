@@ -38,7 +38,7 @@ public class SchemaStoreImpl implements SchemaStore {
     this.store = store;
   }
 
-  public Key createSchema(String type, Schema value) throws KazukiException {
+  public synchronized Key createSchema(String type, Schema value) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -68,7 +68,7 @@ public class SchemaStoreImpl implements SchemaStore {
     return realKey;
   }
 
-  public Schema retrieveSchema(String type) throws KazukiException {
+  public synchronized Schema retrieveSchema(String type) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -82,7 +82,7 @@ public class SchemaStoreImpl implements SchemaStore {
     return store.retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue()), Schema.class);
   }
 
-  public boolean updateSchema(final String type, final Schema value) throws KazukiException {
+  public synchronized boolean updateSchema(final String type, final Schema value) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -111,7 +111,7 @@ public class SchemaStoreImpl implements SchemaStore {
     return store.update(theKey, Schema.class, value);
   }
 
-  public boolean deleteSchema(final String type) throws KazukiException {
+  public synchronized boolean deleteSchema(final String type) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -127,7 +127,7 @@ public class SchemaStoreImpl implements SchemaStore {
     return store.deleteHard(theKey);
   }
 
-  public void clear() throws KazukiException {
+  public synchronized void clear() throws KazukiException {
     this.store.clear(SCHEMA_PREFIX);
   }
 
