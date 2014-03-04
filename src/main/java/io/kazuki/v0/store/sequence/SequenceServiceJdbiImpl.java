@@ -23,7 +23,6 @@ import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
-import org.skife.jdbi.v2.tweak.HandleCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,7 +174,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   @Override
-  public ResolvedKey resolveKey(Key key) throws KazukiException {
+  public synchronized ResolvedKey resolveKey(Key key) throws KazukiException {
     Integer typeId = this.getTypeId(key.getTypePart(), false);
 
     if (typeId == null) {
@@ -188,12 +187,12 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   @Override
-  public Key unresolveKey(ResolvedKey key) throws KazukiException {
+  public synchronized Key unresolveKey(ResolvedKey key) throws KazukiException {
     return KeyImpl.createInternal(this.getTypeName(key.getTypeTag()), key.getIdentifierLo());
   }
 
   @Nullable
-  public Key peekKey(final String type) throws KazukiException {
+  public synchronized Key peekKey(final String type) throws KazukiException {
     Counter counter = counters.get(type);
 
     if (counter == null) {
@@ -203,7 +202,8 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     return counter.peekNext();
   }
 
-  public Integer getTypeId(final String type, final boolean create) throws KazukiException {
+  public synchronized Integer getTypeId(final String type, final boolean create)
+      throws KazukiException {
     if (type == null) {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
@@ -224,7 +224,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     return result;
   }
 
-  public String getTypeName(final Integer id) throws KazukiException {
+  public synchronized String getTypeName(final Integer id) throws KazukiException {
     if (typeNames.containsKey(id)) {
       return typeNames.get(id);
     }
@@ -316,16 +316,16 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   private Counter createCounter(final String type) {
-    final int typeId = this.dataSource.withHandle(new HandleCallback<Integer>() {
+    final int typeId = this.dataSource.inTransaction(new TransactionCallback<Integer>() {
       @Override
-      public Integer withHandle(Handle handle) throws Exception {
+      public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
         return sequenceHelper.validateType(handle, typeCodes, typeNames, type, true);
       }
     });
 
-    long nextBase = this.dataSource.withHandle(new HandleCallback<Long>() {
+    long nextBase = this.dataSource.inTransaction(new TransactionCallback<Long>() {
       @Override
-      public Long withHandle(Handle handle) throws Exception {
+      public Long inTransaction(Handle handle, TransactionStatus status) throws Exception {
         return sequenceHelper.getNextId(handle, typeId, incrementBlockSize);
       }
     });

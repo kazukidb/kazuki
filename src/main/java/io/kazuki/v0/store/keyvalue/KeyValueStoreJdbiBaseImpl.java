@@ -662,12 +662,6 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
         closeQuietly(theHandle);
         theHandle = null;
       }
-
-      @Override
-      protected void finalize() throws Throwable {
-        closeQuietly(theHandle);
-        theHandle = null;
-      }
     };
   }
 
@@ -842,12 +836,6 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
           @Override
           public void close() {
-            closeQuietly(inner);
-            inner = null;
-          }
-
-          @Override
-          protected void finalize() throws Throwable {
             closeQuietly(inner);
             inner = null;
           }
