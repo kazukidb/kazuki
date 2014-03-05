@@ -20,13 +20,13 @@ import com.google.inject.Scopes;
 import com.google.inject.name.Names;
 import com.jolbox.bonecp.BoneCPDataSource;
 
-public class JdbiDataSourceModule extends PrivateModule {
+public class BoneCpDataSourceModule extends PrivateModule {
   private final String name;
   private final String propertiesPath;
   private final String[] additionalNames;
   private final AtomicReference<JdbiDataSourceConfiguration> config;
 
-  public JdbiDataSourceModule(String name, @Nullable String propertiesPath,
+  public BoneCpDataSourceModule(String name, @Nullable String propertiesPath,
       String... additionalNames) {
     this.name = name;
     this.propertiesPath = propertiesPath;
@@ -34,7 +34,7 @@ public class JdbiDataSourceModule extends PrivateModule {
     this.config = new AtomicReference<JdbiDataSourceConfiguration>();
   }
 
-  public JdbiDataSourceModule withConfiguration(JdbiDataSourceConfiguration config) {
+  public BoneCpDataSourceModule withConfiguration(JdbiDataSourceConfiguration config) {
     this.config.set(config);
 
     return this;
