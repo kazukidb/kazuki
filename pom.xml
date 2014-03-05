@@ -55,6 +55,8 @@
     <jackson.version>2.3.0</jackson.version>
     <guice.version>3.0</guice.version>
     <joda-time.version>2.3</joda-time.version>
+    <jdbi.version>2.53</jdbi.version>
+    <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <packageVersion.dir>io/kazuki/v0</packageVersion.dir>
     <packageVersion.package>io.kazuki.v0</packageVersion.package>
   </properties>
@@ -114,14 +116,14 @@
     <dependency>
       <groupId>org.jdbi</groupId>
       <artifactId>jdbi</artifactId>
-      <version>2.51</version>
+      <version>${jdbi.version}</version>
       <optional>true</optional>
     </dependency>
     <!-- BoneCP (optional) -->
     <dependency>
       <groupId>com.jolbox</groupId>
       <artifactId>bonecp</artifactId>
-      <version>0.8.0.RELEASE</version>
+      <version>${bonecp.version}</version>
       <optional>true</optional>
     </dependency>
     <!-- ANTLR (optional) -->
