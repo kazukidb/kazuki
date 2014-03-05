@@ -3,7 +3,7 @@ package io.kazuki.v0.store.sequence;
 
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.store.Key;
-import io.kazuki.v0.store.jdbi.JdbiDataSourceModule;
+import io.kazuki.v0.store.jdbi.H2DataSourceModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl.Counter;
@@ -24,7 +24,7 @@ public class SequenceServiceJdbiImplTest {
 
   public SequenceServiceJdbiImplTest() {
     inject =
-        Guice.createInjector(new LifecycleModule("foo"), new JdbiDataSourceModule("foo",
+        Guice.createInjector(new LifecycleModule("foo"), new H2DataSourceModule("foo",
             "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
             "test/io/kazuki/v0/store/sequence/sequence.properties"));
   }

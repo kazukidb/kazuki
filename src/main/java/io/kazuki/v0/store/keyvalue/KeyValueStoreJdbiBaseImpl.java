@@ -88,6 +88,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
       public void init() {
         KeyValueStoreJdbiBaseImpl.this.initialize();
       }
+
+      @Override
+      public void stop() {
+        availability.setAvailable(false);
+      }
     });
   }
 

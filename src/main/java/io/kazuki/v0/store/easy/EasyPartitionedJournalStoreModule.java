@@ -1,7 +1,7 @@
 package io.kazuki.v0.store.easy;
 
+import io.kazuki.v0.store.jdbi.H2DataSourceModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
-import io.kazuki.v0.store.jdbi.JdbiDataSourceModule;
 import io.kazuki.v0.store.journal.PartitionedJournalStoreModule;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.sequence.H2SequenceServiceModule;
@@ -46,7 +46,7 @@ public class EasyPartitionedJournalStoreModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    install(new JdbiDataSourceModule(name, propertiesBase == null ? null : propertiesBase
+    install(new H2DataSourceModule(name, propertiesBase == null ? null : propertiesBase
         + "/jdbi.properties").withConfiguration(this.jdbiConfig.get()));
     install(new H2SequenceServiceModule(name, propertiesBase == null ? null : propertiesBase
         + "/sequence.properties").withConfiguration(this.sequenceConfig.get()));
