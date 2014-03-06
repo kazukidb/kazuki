@@ -9,14 +9,16 @@ public class PartitionInfoImpl implements PartitionInfo {
   private final String partitionId;
   private final long minId;
   private AtomicLong maxId;
+  private AtomicLong size;
   private AtomicBoolean closed;
 
   public PartitionInfoImpl(@JsonProperty("partitionId") String partitionId,
       @JsonProperty("minId") long minId, @JsonProperty("maxId") long maxId,
-      @JsonProperty("closed") boolean closed) {
+      @JsonProperty("size") long size, @JsonProperty("closed") boolean closed) {
     this.partitionId = partitionId;
     this.minId = minId;
     this.maxId = new AtomicLong(maxId);
+    this.size = new AtomicLong(size);
     this.closed = new AtomicBoolean(closed);
   }
 
@@ -37,12 +39,16 @@ public class PartitionInfoImpl implements PartitionInfo {
 
   @Override
   public long getSize() {
-    return 1L + (this.maxId.get() - this.minId);
+    return this.size.get();
   }
 
   @Override
   public boolean isClosed() {
     return this.closed.get();
+  }
+
+  public void setSize(long size) {
+    this.size.set(size);
   }
 
   public void setClosed(boolean closed) {
@@ -55,6 +61,6 @@ public class PartitionInfoImpl implements PartitionInfo {
 
   public PartitionInfo snapshot() {
     return new PartitionInfoSnapshot(this.partitionId, this.minId, this.maxId.get(),
-        this.closed.get());
+        this.size.get(), this.closed.get());
   }
 }
