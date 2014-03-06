@@ -27,4 +27,16 @@ public class ResourceHelper {
 
     return properties;
   }
+
+  public static void forName(String className, Class<?> fallbackClassForLoading) {
+    try {
+      Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+    } catch (Exception unused) {
+      try {
+        Class.forName(className, true, fallbackClassForLoading.getClassLoader());
+      } catch (Exception e) {
+        throw Throwables.propagate(e);
+      }
+    }
+  }
 }
