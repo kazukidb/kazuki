@@ -6,6 +6,8 @@ import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.schema.TypeValidation;
 
+import javax.annotation.Nullable;
+
 public interface JournalStore {
   void initialize() throws KazukiException;
 
@@ -20,6 +22,7 @@ public interface JournalStore {
 
   KeyValueIterable<PartitionInfoSnapshot> getAllPartitions() throws KazukiException;
 
+  @Nullable
   PartitionInfo getActivePartition() throws KazukiException;
 
   boolean closeActivePartition() throws KazukiException;

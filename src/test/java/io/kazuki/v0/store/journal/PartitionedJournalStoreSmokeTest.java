@@ -103,9 +103,13 @@ public class PartitionedJournalStoreSmokeTest {
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
-      assertThat(journal.getActivePartition(), notNullValue());
-      assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
-      assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
+      if ((i + 1) % 10 != 0) {
+        assertThat(journal.getActivePartition(), notNullValue());
+        assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
+        assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
+      } else {
+        assertThat(journal.getActivePartition(), nullValue());
+      }
     }
 
     try (KeyValueIterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator()) {
@@ -134,7 +138,8 @@ public class PartitionedJournalStoreSmokeTest {
       assertThat(theIter, isIterOfLength(10));
     }
 
-    assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:10"));
+    journal.append("foo", Foo.class, new Foo("k100", "v100"), TypeValidation.STRICT);
+    assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:11"));
 
     System.out.println("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
@@ -181,11 +186,11 @@ public class PartitionedJournalStoreSmokeTest {
     }
 
     try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
-      assertThat(theIter, isIterOfLength(9));
+      assertThat(theIter, isIterOfLength(10));
     }
 
     Long[][] absConfigs =
-        { {0L, 10L, 0L}, {10L, 10L, 10L}, {10L, 20L, 20L}, {90L, 10L, 10L}, {90L, 20L, 10L}};
+        { {0L, 10L, 0L}, {10L, 10L, 10L}, {10L, 20L, 20L}, {90L, 10L, 10L}, {90L, 20L, 11L}};
 
     for (Long[] config : absConfigs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
@@ -195,8 +200,8 @@ public class PartitionedJournalStoreSmokeTest {
     }
 
     Long[][] relConfigs =
-        { {0L, null, 90L}, {0L, 10L, 10L}, {0L, 20L, 20L}, {11L, 79L, 79L}, {11L, null, 79L},
-            {10L, 10L, 10L}, {5L, 10L, 10L}, {80L, 10L, 10L}, {90L, 10L, 0L},};
+        { {0L, null, 91L}, {0L, 10L, 10L}, {0L, 20L, 20L}, {11L, 79L, 79L}, {11L, null, 80L},
+            {10L, 10L, 10L}, {5L, 10L, 10L}, {80L, 10L, 10L}, {90L, 10L, 1L},};
 
     for (Long[] config : relConfigs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
@@ -228,12 +233,12 @@ public class PartitionedJournalStoreSmokeTest {
 
     try (KeyValueIterator<KeyValuePair<Foo>> theIter =
         journal.entriesAbsolute("foo", Foo.class, 10L, null).iterator()) {
-      assertThat(theIter, isIterOfLength(91));
+      assertThat(theIter, isIterOfLength(92));
     }
 
     try (KeyValueIterator<KeyValuePair<Foo>> theIter =
         journal.entriesRelative("foo", Foo.class, 0L, null).iterator()) {
-      assertThat(theIter, isIterOfLength(91));
+      assertThat(theIter, isIterOfLength(92));
     }
   }
 }

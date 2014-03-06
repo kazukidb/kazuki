@@ -367,7 +367,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     public Key getNext() throws KazukiException {
       long next = base + offset.incrementAndGet();
 
-      if (next < max) {
+      if (next <= max) {
         return KeyImpl.createInternal(type, next);
       }
 
@@ -378,7 +378,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     public Key peekNext() throws KazukiException {
       long next = base + offset.get() + 1L;
 
-      if (next < max) {
+      if (next <= max) {
         return KeyImpl.createInternal(type, next);
       }
 
