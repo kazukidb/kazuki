@@ -3,6 +3,7 @@ package io.kazuki.v0.store.sequence;
 
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.jdbi.H2DataSourceModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
@@ -37,6 +38,11 @@ public class SequenceServiceJdbiImplTest {
     final SequenceServiceJdbiImpl seq =
         (SequenceServiceJdbiImpl) inject.getInstance(com.google.inject.Key.<SequenceService>get(
             SequenceService.class, Names.named("foo")));
+
+    final SequenceServiceConfiguration cfg =
+        new ConfigurationProvider<SequenceServiceConfiguration>("foo",
+            SequenceServiceConfiguration.class,
+            "test/io/kazuki/v0/store/sequence/sequence.properties", false).get();
 
     DataSource database =
         inject.getInstance(com.google.inject.Key.get(DataSource.class, Names.named("foo")));
@@ -75,7 +81,21 @@ public class SequenceServiceJdbiImplTest {
     Assert
         .assertEquals(counters2.toString(), "{foo=Counter[type=foo,base=0,offset=10,max=100000]}");
 
-    for (int i = 0; i < 10; i++) {
+    seq.clear(false, false);
+
+    for (int i = 0; i < cfg.getIncrementBlockSize() + 1; i++) {
+      Key key = seq.nextKey("foo");
+      ResolvedKey resolvedKey = seq.resolveKey(key);
+      Assert.assertEquals(key.getTypePart(), "foo");
+      Assert.assertEquals(resolvedKey.getIdentifierHi(), 0L);
+      Assert.assertEquals(resolvedKey.getIdentifierLo(), (long) i + 1L);
+    }
+
+    Map<String, Counter> counters3 = seq.getCurrentCounters();
+    Assert.assertEquals(counters3.toString(),
+        "{foo=Counter[type=foo,base=100000,offset=1,max=200000]}");
+
+    for (int i = 0; i < cfg.getIncrementBlockSize() + 1; i++) {
       Key key = seq.nextKey("bar");
       ResolvedKey resolvedKey = seq.resolveKey(key);
       Assert.assertEquals(key.getTypePart(), "bar");
@@ -86,8 +106,8 @@ public class SequenceServiceJdbiImplTest {
     lifecycle.shutdown();
     lifecycle.init();
 
-    Assert.assertEquals(seq.resolveKey(seq.nextKey("foo")).getIdentifierLo(), 11L);
-    Assert.assertEquals(seq.resolveKey(seq.nextKey("bar")).getIdentifierLo(), 11L);
+    Assert.assertEquals(seq.resolveKey(seq.nextKey("foo")).getIdentifierLo(), 100002L);
+    Assert.assertEquals(seq.resolveKey(seq.nextKey("bar")).getIdentifierLo(), 100002L);
 
     seq.clear(true, true);
   }

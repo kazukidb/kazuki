@@ -153,13 +153,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       throw new IllegalStateException("unable to allocate new key of type: " + type);
     }
 
-    KeyValueStore targetStore = activePartitionStore.get();
     PartitionInfoImpl theActivePartitionInfo = activePartitionInfo.get();
-
-    if (theActivePartitionInfo != null && theActivePartitionInfo.getSize() >= this.partitionSize) {
-      this.closeActivePartition();
-      theActivePartitionInfo = null;
-    }
+    KeyValueStore targetStore = activePartitionStore.get();
 
     if (theActivePartitionInfo == null) {
       KeyImpl partitionKey = (KeyImpl) sequence.nextKey(this.typeName);
@@ -178,7 +173,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
       this.activePartitionInfo.set(theActivePartitionInfo);
 
-      this.metaStore.create(this.typeName, PartitionInfo.class, theActivePartitionInfo,
+      this.metaStore.create(this.typeName, PartitionInfo.class, theActivePartitionInfo.snapshot(),
           resolvedPartitionKey, TypeValidation.STRICT);
 
       targetStore = getKeyValueStore(partitionName, true);
@@ -189,8 +184,18 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
     theActivePartitionInfo.setMaxId(resolvedKey.getIdentifierLo());
     theActivePartitionInfo.setSize(theActivePartitionInfo.getSize() + 1L);
-    this.metaStore.update(KeyImpl.valueOf(theActivePartitionInfo.getPartitionId()),
-        PartitionInfo.class, theActivePartitionInfo);
+
+    boolean success =
+        this.metaStore.update(KeyImpl.valueOf(theActivePartitionInfo.getPartitionId()),
+            PartitionInfo.class, theActivePartitionInfo.snapshot());
+
+    if (!success) {
+      throw new KazukiException("unable to update partition info");
+    }
+
+    if (theActivePartitionInfo.getSize() >= this.partitionSize) {
+      this.closeActivePartition();
+    }
 
     return theKey;
   }

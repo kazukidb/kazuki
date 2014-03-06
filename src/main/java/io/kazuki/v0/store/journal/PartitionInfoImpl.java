@@ -47,16 +47,16 @@ public class PartitionInfoImpl implements PartitionInfo {
     return this.closed.get();
   }
 
-  public void setSize(long size) {
-    this.size.set(size);
+  public synchronized void setSize(long theSize) {
+    this.size.set(theSize);
   }
 
-  public void setClosed(boolean closed) {
-    this.closed.set(closed);
+  public synchronized void setClosed(boolean theClosed) {
+    this.closed.set(theClosed);
   }
 
-  public synchronized void setMaxId(long maxId) {
-    this.maxId.set(maxId);
+  public synchronized void setMaxId(long theMaxId) {
+    this.maxId.set(theMaxId);
   }
 
   public PartitionInfo snapshot() {

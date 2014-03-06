@@ -26,6 +26,7 @@ import io.kazuki.v0.store.sequence.KeyImpl;
 import java.io.File;
 
 import org.hamcrest.Matchers;
+import org.hamcrest.core.IsNull;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -97,13 +98,19 @@ public class PartitionedJournalStoreClearTest {
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
-      assertThat(journal.getActivePartition(), notNullValue());
-      assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
-      assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
+
+      if ((i + 1) % 10 != 0) {
+        assertThat(journal.getActivePartition(), notNullValue());
+        assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
+        assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
+      } else {
+        assertThat(journal.getActivePartition(), nullValue());
+      }
     }
 
+    journal.append("foo", Foo.class, new Foo("k100", "v100"), TypeValidation.STRICT);
     assertThat(journal.getActivePartition().getPartitionId(),
-        equalTo("PartitionInfo-bar-barstore:10"));
+        equalTo("PartitionInfo-bar-barstore:11"));
 
     try (KeyValueIterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator()) {
       assertThat(piter, isNotEmptyIter());
@@ -121,13 +128,18 @@ public class PartitionedJournalStoreClearTest {
 
     for (int i = 0; i < 100; i++) {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
-      assertThat(journal.getActivePartition(), notNullValue());
-      assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
-      assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
+      if ((i + 1) % 10 != 0) {
+        assertThat(journal.getActivePartition(), notNullValue());
+        assertThat(journal.getActivePartition().getMinId(), lessThanOrEqualTo(i + 1L));
+        assertThat(journal.getActivePartition().getMaxId(), is(i + 1L));
+      } else {
+        assertThat(journal.getActivePartition(), nullValue());
+      }
     }
 
+    journal.append("foo", Foo.class, new Foo("k100", "v100"), TypeValidation.STRICT);
     assertThat(journal.getActivePartition().getPartitionId(),
-        equalTo("PartitionInfo-bar-barstore:10"));
+        equalTo("PartitionInfo-bar-barstore:11"));
 
     try (KeyValueIterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions().iterator()) {
       assertThat(piter2, isNotEmptyIter());
