@@ -1,6 +1,7 @@
 package io.kazuki.v0.store.jdbi;
 
 import io.kazuki.v0.internal.helper.MaskProxy;
+import io.kazuki.v0.internal.helper.ResourceHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
@@ -111,11 +112,7 @@ public class BoneCpDataSourceModule extends PrivateModule {
     }
 
     private BoneCPDataSource createDataSource() {
-      try {
-        Class.forName(config.getJdbcDriver());
-      } catch (Exception e) {
-        throw Throwables.propagate(e);
-      }
+      ResourceHelper.forName(config.getJdbcDriver(), getClass());
 
       BoneCPDataSource datasource = new BoneCPDataSource();
 
