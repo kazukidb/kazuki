@@ -83,7 +83,7 @@ public class SequenceServiceJdbiImplTest {
 
     seq.clear(false, false);
 
-    for (int i = 0; i < cfg.getIncrementBlockSize() + 1; i++) {
+    for (int i = 0; i < (cfg.getIncrementBlockSize() * 3) + 1; i++) {
       Key key = seq.nextKey("foo");
       ResolvedKey resolvedKey = seq.resolveKey(key);
       Assert.assertEquals(key.getTypePart(), "foo");
@@ -93,9 +93,9 @@ public class SequenceServiceJdbiImplTest {
 
     Map<String, Counter> counters3 = seq.getCurrentCounters();
     Assert.assertEquals(counters3.toString(),
-        "{foo=Counter[type=foo,base=100000,offset=1,max=200000]}");
+        "{foo=Counter[type=foo,base=300000,offset=1,max=400000]}");
 
-    for (int i = 0; i < cfg.getIncrementBlockSize() + 1; i++) {
+    for (int i = 0; i < (cfg.getIncrementBlockSize() * 3) + 1; i++) {
       Key key = seq.nextKey("bar");
       ResolvedKey resolvedKey = seq.resolveKey(key);
       Assert.assertEquals(key.getTypePart(), "bar");
@@ -106,8 +106,8 @@ public class SequenceServiceJdbiImplTest {
     lifecycle.shutdown();
     lifecycle.init();
 
-    Assert.assertEquals(seq.resolveKey(seq.nextKey("foo")).getIdentifierLo(), 100002L);
-    Assert.assertEquals(seq.resolveKey(seq.nextKey("bar")).getIdentifierLo(), 100002L);
+    Assert.assertEquals(seq.resolveKey(seq.nextKey("foo")).getIdentifierLo(), 300002L);
+    Assert.assertEquals(seq.resolveKey(seq.nextKey("bar")).getIdentifierLo(), 300002L);
 
     seq.clear(true, true);
   }
