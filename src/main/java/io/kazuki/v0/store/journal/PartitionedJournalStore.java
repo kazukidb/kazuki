@@ -118,7 +118,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
             log.debug("Found active partition: {}", partition.getPartitionId());
 
             this.activePartitionInfo.set(new PartitionInfoImpl(partition.getPartitionId(),
-                partition.getMinId(), partition.getMaxId(), partition.isClosed()));
+                partition.getMinId(), partition.getMaxId(), partition.getSize(), partition
+                    .isClosed()));
             this.activePartitionStore.set(getKeyValueStore(
                 getPartitionName(sequence.resolveKey(KeyImpl.valueOf(partition.getPartitionId()))),
                 false));
@@ -155,24 +156,12 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     KeyValueStore targetStore = activePartitionStore.get();
     PartitionInfoImpl theActivePartitionInfo = activePartitionInfo.get();
 
-    if (theActivePartitionInfo == null) {
-      try (KeyValueIterator<PartitionInfoImpl> iter =
-          metaStore.iterators().values(this.typeName, PartitionInfoImpl.class).iterator()) {
-        while (iter.hasNext()) {
-          PartitionInfoImpl part = iter.next();
-
-          if (!part.isClosed()) {
-            theActivePartitionInfo = part;
-          }
-        }
-      }
-    }
-
     if (theActivePartitionInfo != null && theActivePartitionInfo.getSize() >= this.partitionSize) {
       this.closeActivePartition();
+      theActivePartitionInfo = null;
     }
 
-    if (theActivePartitionInfo == null || theActivePartitionInfo.isClosed()) {
+    if (theActivePartitionInfo == null) {
       KeyImpl partitionKey = (KeyImpl) sequence.nextKey(this.typeName);
 
       if (partitionKey == null) {
@@ -181,24 +170,25 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       }
 
       ResolvedKey resolvedPartitionKey = sequence.resolveKey(partitionKey);
+      String partitionName = getPartitionName(resolvedPartitionKey);
 
       theActivePartitionInfo =
           new PartitionInfoImpl(partitionKey.getInternalIdentifier(),
-              resolvedKey.getIdentifierLo(), resolvedKey.getIdentifierLo(), false);
-
-      this.metaStore.create(this.typeName, PartitionInfo.class, theActivePartitionInfo,
-          resolvedPartitionKey, typeSafety);
-
-      String partitionName = getPartitionName(resolvedPartitionKey);
-      targetStore = getKeyValueStore(partitionName, true);
+              resolvedKey.getIdentifierLo(), resolvedKey.getIdentifierLo(), 0L, false);
 
       this.activePartitionInfo.set(theActivePartitionInfo);
+
+      this.metaStore.create(this.typeName, PartitionInfo.class, theActivePartitionInfo,
+          resolvedPartitionKey, TypeValidation.STRICT);
+
+      targetStore = getKeyValueStore(partitionName, true);
       this.activePartitionStore.set(targetStore);
     }
 
     targetStore.create(type, clazz, inValue, resolvedKey, typeSafety);
 
     theActivePartitionInfo.setMaxId(resolvedKey.getIdentifierLo());
+    theActivePartitionInfo.setSize(theActivePartitionInfo.getSize() + 1L);
     this.metaStore.update(KeyImpl.valueOf(theActivePartitionInfo.getPartitionId()),
         PartitionInfo.class, theActivePartitionInfo);
 
@@ -313,8 +303,10 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
     long size = 0L;
 
-    for (PartitionInfo partition : this.getAllPartitions()) {
-      size += 1 + partition.getMaxId() - partition.getMinId();
+    try (KeyValueIterable<PartitionInfoSnapshot> parts = this.getAllPartitions()) {
+      for (PartitionInfo partition : parts) {
+        size += partition.getSize();
+      }
     }
 
     return size;

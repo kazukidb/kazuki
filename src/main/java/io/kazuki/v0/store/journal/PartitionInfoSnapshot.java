@@ -6,14 +6,16 @@ public class PartitionInfoSnapshot implements PartitionInfo {
   private final String partitionId;
   private final long maxId;
   private final long minId;
+  private final long size;
   private final boolean closed;
 
   public PartitionInfoSnapshot(@JsonProperty("partitionId") String partitionId,
       @JsonProperty("minId") long minId, @JsonProperty("maxId") long maxId,
-      @JsonProperty("closed") boolean closed) {
+      @JsonProperty("size") long size, @JsonProperty("closed") boolean closed) {
     this.partitionId = partitionId;
     this.minId = minId;
     this.maxId = maxId;
+    this.size = size;
     this.closed = closed;
   }
 
@@ -34,7 +36,7 @@ public class PartitionInfoSnapshot implements PartitionInfo {
 
   @Override
   public long getSize() {
-    return 1L + (this.maxId - this.minId);
+    return this.size;
   }
 
   @Override
