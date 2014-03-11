@@ -1,19 +1,20 @@
 package io.kazuki.v0.internal.availability;
 
+import io.kazuki.v0.internal.helper.LogTranslation;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Throwables;
 
 public class AvailabilityManager implements Releasable {
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final Logger log = LogTranslation.getLogger(getClass());
 
   private final AtomicBoolean available = new AtomicBoolean();
 
   public <T> T doProtected(ProtectedCommand<T> command) {
-    log.info("Executing protected command: {}", command);
+    log.debug("Executing protected command: {}", command);
 
     boolean allowed = available.compareAndSet(true, false);
     try {

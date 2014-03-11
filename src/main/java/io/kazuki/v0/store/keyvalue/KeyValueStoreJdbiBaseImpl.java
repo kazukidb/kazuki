@@ -3,6 +3,7 @@ package io.kazuki.v0.store.keyvalue;
 import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
@@ -40,7 +41,6 @@ import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.Update;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -52,7 +52,7 @@ import com.google.common.base.Throwables;
 public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyValueStoreIteration {
   public static int MULTIGET_MAX_KEYS = 3000;
 
-  protected final Logger log = LoggerFactory.getLogger(getClass());
+  protected final Logger log = LogTranslation.getLogger(getClass());
 
   protected final AvailabilityManager availability;
 
@@ -98,7 +98,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
   @Override
   public void initialize() {
-    log.info("Intitializing KeyValueStore {}", this);
+    log.debug("Intitializing KeyValueStore {}", this);
 
     database.inTransaction(new TransactionCallback<Void>() {
       @Override

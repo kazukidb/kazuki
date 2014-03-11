@@ -4,6 +4,7 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.availability.AvailabilityManager.ProtectedCommand;
 import io.kazuki.v0.internal.availability.Releasable;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
@@ -24,7 +25,6 @@ import org.skife.jdbi.v2.IDBI;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Throwables;
 
@@ -32,7 +32,7 @@ import com.google.common.base.Throwables;
 public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegistration {
   public static final long DEFAULT_INCREMENT_BLOCK_SIZE = 100000L;
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final Logger log = LogTranslation.getLogger(getClass());
 
   protected final Map<String, Counter> counters = new ConcurrentHashMap<String, Counter>();
   protected final Map<String, Integer> typeCodes = new ConcurrentHashMap<String, Integer>();
@@ -79,7 +79,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public synchronized void initialize() {
-    log.info("Initializing Sequence Service {}", this);
+    log.debug("Initializing Sequence Service {}", this);
 
     availabilityManager.setAvailable(false);
 
@@ -120,7 +120,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public synchronized void shutdown() {
-    log.info("Shutting down Sequence Service {}", this);
+    log.debug("Shutting down Sequence Service {}", this);
 
     availabilityManager.assertAvailable();
     availabilityManager.setAvailable(false);
@@ -244,7 +244,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   public synchronized void clear(final boolean preserveTypes, final boolean preserveCounters) {
-    log.info("Clearing SequenceService {}", this);
+    log.debug("Clearing SequenceService {}", this);
 
     availabilityManager.doProtected(new ProtectedCommand<Void>() {
       @Override
@@ -293,7 +293,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       }
     });
 
-    log.info("Cleared SequenceService {}", this);
+    log.debug("Cleared SequenceService {}", this);
   }
 
   @Override

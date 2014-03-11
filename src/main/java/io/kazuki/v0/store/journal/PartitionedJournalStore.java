@@ -1,6 +1,7 @@
 package io.kazuki.v0.store.journal;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
+import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
@@ -35,7 +36,6 @@ import javax.inject.Inject;
 
 import org.skife.jdbi.v2.IDBI;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -43,7 +43,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Provider;
 
 public class PartitionedJournalStore implements JournalStore, LifecycleRegistration {
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final Logger log = LogTranslation.getLogger(getClass());
   private final AvailabilityManager availability;
   private final IDBI database;
   private final SqlTypeHelper typeHelper;
@@ -104,7 +104,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public synchronized void initialize() {
-    log.info("Intitializing PartitionedJournalStore {}", this);
+    log.debug("Intitializing PartitionedJournalStore {}", this);
     this.metaStore = getKeyValueStore("META", true);
 
     try {
@@ -133,7 +133,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     }
 
     availability.setAvailable(true);
-    log.info("Intitialized PartitionedJournalStore {}", this);
+    log.debug("Intitialized PartitionedJournalStore {}", this);
   }
 
   @Override
@@ -319,7 +319,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public synchronized void clear() throws KazukiException {
-    log.info("Clearing PartitionedJournalStore {}", this);
+    log.debug("Clearing PartitionedJournalStore {}", this);
 
     availability.assertAvailable();
 
@@ -348,7 +348,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
       nukeLock.unlock();
     }
 
-    log.info("Cleared PartitionedJournalStore {}", this);
+    log.debug("Cleared PartitionedJournalStore {}", this);
   }
 
   @Override
