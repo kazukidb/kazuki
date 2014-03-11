@@ -1,14 +1,15 @@
 package io.kazuki.v0.store.lifecycle;
 
+import io.kazuki.v0.internal.helper.LogTranslation;
+
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Abstract base class to make it easy to implement Lifecycle support by only overriding one or two
  * methods.
  */
 public abstract class LifecycleSupportBase implements LifecycleRegistration, LifecycleAware {
-  protected final Logger log = LoggerFactory.getLogger(getClass());
+  protected final Logger log = LogTranslation.getLogger(getClass());
 
   @Override
   public void register(Lifecycle lifecycle) {

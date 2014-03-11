@@ -1,11 +1,12 @@
 package io.kazuki.v0.store.lifecycle;
 
+import io.kazuki.v0.internal.helper.LogTranslation;
+
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -14,7 +15,7 @@ import org.slf4j.LoggerFactory;
  * the app that invokes Lifecycle methods to inform components of application state changes.
  */
 public class Lifecycle {
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final Logger log = LogTranslation.getLogger(getClass());
 
   private static final EnumSet<LifecycleEvent> reverseOrder = EnumSet.of(LifecycleEvent.UNANNOUNCE,
       LifecycleEvent.STOP, LifecycleEvent.SHUTDOWN);
@@ -84,7 +85,7 @@ public class Lifecycle {
    * Sends the event synchronously to each listener in order.
    */
   private void fireEvent(LifecycleEvent event) {
-    log.info("Firing lifecycle event {} to all listeners", event.name());
+    log.debug("Firing lifecycle event {} to all listeners", event.name());
 
     Iterator<LifecycleAware> iter =
         reverseOrder.contains(event) ? listeners.descendingIterator() : listeners.iterator();
@@ -92,7 +93,7 @@ public class Lifecycle {
     while (iter.hasNext()) {
       LifecycleAware listener = iter.next();
 
-      log.debug("Firing lifecycle event {} to listener {}", event.name(), listener);
+      log.trace("Firing lifecycle event {} to listener {}", event.name(), listener);
 
       listener.eventFired(event);
     }

@@ -1,5 +1,6 @@
 package io.kazuki.v0.store.schema;
 
+import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.internal.v2schema.types.TransformException;
@@ -13,7 +14,6 @@ import io.kazuki.v0.store.sequence.SequenceService;
 import javax.inject.Inject;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Throwables;
 
@@ -21,7 +21,7 @@ import com.google.common.base.Throwables;
 public class SchemaStoreImpl implements SchemaStore {
   public static final String SCHEMA_PREFIX = "$schema";
 
-  private final Logger log = LoggerFactory.getLogger(getClass());
+  private final Logger log = LogTranslation.getLogger(getClass());
 
   private final SequenceService sequences;
   private KeyValueStore store;
