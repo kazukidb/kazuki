@@ -2,7 +2,7 @@ package io.kazuki.v0.store.keyvalue;
 
 
 import io.kazuki.v0.internal.helper.Configurations;
-import io.kazuki.v0.internal.helper.TestHelper;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -24,7 +24,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class H2KeyValueStorageTest {
+public class H2KeyValueStorageTest extends TestSupport {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
       new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
           .withJdbiConfig(Configurations.getJdbi().build()));
@@ -65,11 +65,11 @@ public class H2KeyValueStorageTest {
     }
 
     Key foo1Key = store.create("foo", Foo.class, new Foo("k", "v"), TypeValidation.STRICT);
-    System.out.println("created key = " + foo1Key);
+    log.info("created key = " + foo1Key);
     Assert.assertNotNull(store.retrieve(foo1Key, Foo.class));
 
     Key foo2Key = store.create("foo", Foo.class, new Foo("a", "b"), TypeValidation.STRICT);
-    System.out.println("created key = " + foo2Key);
+    log.info("created key = " + foo2Key);
     Assert.assertNotNull(store.retrieve(foo2Key, Foo.class));
 
     try (KeyValueIterator<Foo> iter = store.iterators().iterator("foo", Foo.class)) {
@@ -77,35 +77,35 @@ public class H2KeyValueStorageTest {
       while (iter.hasNext()) {
         Foo theNext = iter.next();
         Assert.assertNotNull(theNext);
-        System.out.println("dump all : " + dump(theNext));
+        log.info("dump all : " + dump(theNext));
       }
     }
 
     Foo foo1Found = store.retrieve(foo1Key, Foo.class);
-    System.out.println("retrieved value 1 = " + dump(foo1Found));
+    log.info("retrieved value 1 = " + dump(foo1Found));
     Foo foo2Found = store.retrieve(foo2Key, Foo.class);
-    System.out.println("retrieved value 2 = " + dump(foo2Found));
+    log.info("retrieved value 2 = " + dump(foo2Found));
 
     Map<Key, Foo> multiFound = store.multiRetrieve(ImmutableList.of(foo1Key, foo2Key), Foo.class);
-    System.out.println("multi-retrieved values = " + dump(multiFound));
+    log.info("multi-retrieved values = " + dump(multiFound));
     Assert.assertEquals(multiFound.size(), 2);
     Assert.assertEquals(multiFound.get(foo1Key), foo1Found);
     Assert.assertEquals(multiFound.get(foo2Key), foo2Found);
 
     boolean updated = store.update(foo1Key, Foo.class, new Foo("x", "y"));
-    System.out.println("updated? " + updated);
+    log.info("updated? " + updated);
     Assert.assertTrue(updated);
 
     Foo foo1FoundAgain = store.retrieve(foo1Key, Foo.class);
-    System.out.println("retrieved value = " + dump(foo1FoundAgain));
+    log.info("retrieved value = " + dump(foo1FoundAgain));
     Assert.assertNotSame(foo1FoundAgain, foo1Found);
 
     boolean deleted = store.delete(foo1Key);
-    System.out.println("deleted? " + deleted);
+    log.info("deleted? " + deleted);
     Assert.assertTrue(deleted);
 
     foo1Found = store.retrieve(foo1Key, Foo.class);
-    System.out.println("retrieved value = " + dump(foo1Found));
+    log.info("retrieved value = " + dump(foo1Found));
     Assert.assertNull(foo1Found);
 
     lifecycle.stop();
@@ -114,11 +114,11 @@ public class H2KeyValueStorageTest {
     lifecycle.start();
 
     foo1Found = store.retrieve(foo1Key, Foo.class);
-    System.out.println("retrieved value = " + dump(foo1Found));
+    log.info("retrieved value = " + dump(foo1Found));
     Assert.assertNull(foo1Found);
 
     foo1Found = store.retrieve(foo2Key, Foo.class);
-    System.out.println("retrieved value = " + dump(foo2Found));
+    log.info("retrieved value = " + dump(foo2Found));
     Assert.assertNotNull(foo2Found);
 
     store.clear(false, false);

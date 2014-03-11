@@ -3,6 +3,7 @@ package io.kazuki.v0.store.journal;
 
 import static io.kazuki.v0.internal.helper.TestHelper.isIterOfLength;
 import static org.hamcrest.MatcherAssert.assertThat;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
@@ -25,7 +26,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class PartitionedJournalStoreScaleTest {
+public class PartitionedJournalStoreScaleTest extends TestSupport {
   private static final String dbName = "target/testdb.db";
   private Injector inject;
   private Lifecycle lifecycle;
@@ -83,8 +84,7 @@ public class PartitionedJournalStoreScaleTest {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
 
       if (i % 10000 == 0) {
-        System.out
-            .println(new DateTime() + " " + i + " " + +(new File(dbName + ".h2.db")).length());
+        log.info(new DateTime() + " " + i + " " + +(new File(dbName + ".h2.db")).length());
       }
 
       if (i % 10000 == 0 && i > 0) {
@@ -116,8 +116,7 @@ public class PartitionedJournalStoreScaleTest {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
 
       if (i % 10000 == 0) {
-        System.out
-            .println(new DateTime() + " " + i + " " + +(new File(dbName + ".h2.db")).length());
+        log.info(new DateTime() + " " + i + " " + +(new File(dbName + ".h2.db")).length());
       }
 
       if (i % 10000 == 0 && i > 0) {

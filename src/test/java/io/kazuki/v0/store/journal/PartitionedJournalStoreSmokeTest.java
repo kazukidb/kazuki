@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -37,7 +38,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class PartitionedJournalStoreSmokeTest {
+public class PartitionedJournalStoreSmokeTest extends TestSupport {
   private Injector inject;
   private JdbiDataSourceConfiguration config;
   private String dbName;
@@ -94,7 +95,7 @@ public class PartitionedJournalStoreSmokeTest {
     assertThat(manager.createSchema("foo", schema), is(KeyImpl.valueOf("$schema:3")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
-    System.out.println(dump(journal.getActivePartition()));
+    log.info(dump(journal.getActivePartition()));
     assertThat(journal.getActivePartition(), nullValue());
 
     try (KeyValueIterator<PartitionInfoSnapshot> theIter = journal.getAllPartitions().iterator()) {
@@ -115,10 +116,10 @@ public class PartitionedJournalStoreSmokeTest {
     try (KeyValueIterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator()) {
       assertThat(piter, isNotEmptyIter());
 
-      System.out.println("PARTITIONS:");
+      log.info("PARTITIONS:");
       while (piter.hasNext()) {
         PartitionInfoSnapshot snap = piter.next();
-        System.out.println(" - part - " + dump(snap) + " " + snap.getSize());
+        log.info(" - part - " + dump(snap) + " " + snap.getSize());
         assertThat(snap.getSize(), is(10L));
       }
     }
@@ -141,7 +142,7 @@ public class PartitionedJournalStoreSmokeTest {
     journal.append("foo", Foo.class, new Foo("k100", "v100"), TypeValidation.STRICT);
     assertThat(journal.getActivePartition().getPartitionId(), is("PartitionInfo-foo-foostore:11"));
 
-    System.out.println("RELATIVE ITER TEST:");
+    log.info("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       try (KeyValueIterator<KeyValuePair<Foo>> iter =
           journal.entriesRelative("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
@@ -150,14 +151,14 @@ public class PartitionedJournalStoreSmokeTest {
         while (iter.hasNext()) {
           Foo foo = iter.next().getValue();
           assertThat(foo, notNullValue());
-          System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          log.info("i=" + i + ",j=" + j + ",foo=" + dump(foo));
           j += 1;
         }
         assertThat(j, is(10));
       }
     }
 
-    System.out.println("ABSOLUTE ITER TEST:");
+    log.info("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       try (KeyValueIterator<KeyValuePair<Foo>> iter =
           journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
@@ -166,7 +167,7 @@ public class PartitionedJournalStoreSmokeTest {
         while (iter.hasNext()) {
           Foo foo = iter.next().getValue();
           assertThat(foo, notNullValue());
-          System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          log.info("i=" + i + ",j=" + j + ",foo=" + dump(foo));
           j += 1;
         }
         assertThat(j, is(10));
@@ -177,11 +178,11 @@ public class PartitionedJournalStoreSmokeTest {
       assertThat(journal.dropPartition(theIter.next().getPartitionId()), is(true));
     }
 
-    System.out.println("PARTITIONS:");
+    log.info("PARTITIONS:");
 
     try (KeyValueIterable<PartitionInfoSnapshot> piter2 = journal.getAllPartitions()) {
       for (PartitionInfoSnapshot snap : piter2) {
-        System.out.println(" - part - " + dump(snap));
+        log.info(" - part - " + dump(snap));
       }
     }
 
