@@ -30,6 +30,7 @@ Supported Backends:
 
 Notable Features:
 
+* Schema Support: including structured and primitive types, JSON-compatible
 * Schema Extraction: KV types may have an associated schema to reduce duplication
 * Compact Binary Encoding: using SMILE (binary JSON format)
 * Compression: using LZF
