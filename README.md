@@ -40,7 +40,7 @@ Notable Features:
 
 Persistence Interfaces:
 
-* Secondary Index
+* Secondary Index (including Unique index support)
 * Full-Text Search
 * KV Cache (for KV and unique indexes)
 * Counters
