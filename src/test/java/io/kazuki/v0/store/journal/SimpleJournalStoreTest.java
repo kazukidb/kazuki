@@ -4,6 +4,7 @@ package io.kazuki.v0.store.journal;
 import static io.kazuki.v0.internal.helper.TestHelper.dump;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestHelper;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -27,7 +28,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class SimpleJournalStoreTest {
+public class SimpleJournalStoreTest extends TestSupport {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
       new EasyJournalStoreModule("foo", "test/io/kazuki/v0/store/sequence")
           .withJdbiConfig(Configurations.getJdbi().build()));
@@ -66,7 +67,7 @@ public class SimpleJournalStoreTest {
       journal.append("foo", Foo.class, new Foo("k" + i, "v" + i), TypeValidation.STRICT);
     }
 
-    System.out.println("ITER TEST:");
+    log.info("ITER TEST:");
     for (int i = 0; i < 10; i++) {
       try (KeyValueIterator<KeyValuePair<Foo>> iter =
           journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
@@ -75,7 +76,7 @@ public class SimpleJournalStoreTest {
         while (iter.hasNext()) {
           Foo foo = iter.next().getValue();
           Assert.assertNotNull(foo);
-          System.out.println("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          log.info("i=" + i + ",j=" + j + ",foo=" + dump(foo));
           j += 1;
         }
       }

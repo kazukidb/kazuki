@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.internal.v2schema.Attribute;
 import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
@@ -26,7 +27,6 @@ import io.kazuki.v0.store.sequence.KeyImpl;
 import java.io.File;
 
 import org.hamcrest.Matchers;
-import org.hamcrest.core.IsNull;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -36,7 +36,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class PartitionedJournalStoreClearTest {
+public class PartitionedJournalStoreClearTest extends TestSupport {
   private JdbiDataSourceConfiguration config;
   private String dbName;
   private Injector inject;
@@ -114,10 +114,10 @@ public class PartitionedJournalStoreClearTest {
 
     try (KeyValueIterator<PartitionInfoSnapshot> piter = journal.getAllPartitions().iterator()) {
       assertThat(piter, isNotEmptyIter());
-      System.out.println("PARTITIONS PRE:");
+      log.info("PARTITIONS PRE:");
 
       while (piter.hasNext()) {
-        System.out.println(" - part - " + dump(piter.next()));
+        log.info(" - part - " + dump(piter.next()));
       }
     }
 
@@ -144,9 +144,9 @@ public class PartitionedJournalStoreClearTest {
     try (KeyValueIterator<PartitionInfoSnapshot> piter2 = journal.getAllPartitions().iterator()) {
       assertThat(piter2, isNotEmptyIter());
 
-      System.out.println("PARTITIONS POST:");
+      log.info("PARTITIONS POST:");
       while (piter2.hasNext()) {
-        System.out.println(" - part - " + dump(piter2.next()));
+        log.info(" - part - " + dump(piter2.next()));
       }
     }
   }

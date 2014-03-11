@@ -2,6 +2,7 @@ package io.kazuki.v0.store.sequence;
 
 
 import io.kazuki.v0.internal.helper.TestHelper;
+import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.jdbi.H2DataSourceModule;
@@ -20,7 +21,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class SequenceServiceJdbiImplTest {
+public class SequenceServiceJdbiImplTest extends TestSupport {
   private final Injector inject;
 
   public SequenceServiceJdbiImplTest() {
