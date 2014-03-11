@@ -114,11 +114,10 @@ The Journal Store is efficient for JDBI-based stores because it does not
 have to support a fine-grained DELETE operation (we could actually implement
 an efficient in-place soft delete, just not yet). We can support partition
 DROP using TRUNCATE TABLE or DROP TABLE, allowing the underlying database
-to reclaim storage efficiently.
-
-
-
-
+to reclaim storage efficiently. With distributed backends in the future,
+this will use the most efficient bulk deletion mechanism available (KV
+stores like AWS S3 and Riak don't have efficient bucket destruction APIs
+just yet).
 
 
 
