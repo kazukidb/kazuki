@@ -12,6 +12,7 @@ import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Impl;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
@@ -202,8 +203,12 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public <T> KeyValueIterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz,
-      Long offset, Long limit) throws KazukiException {
+      SortDirection sortDirection, Long offset, Long limit) throws KazukiException {
     availability.assertAvailable();
+
+    if (sortDirection != null && SortDirection.DESCENDING.equals(sortDirection)) {
+      throw new IllegalArgumentException("absolute iterator only supports order ASCENDING");
+    }
 
     if (!this.dataType.equals(type)) {
       throw new IllegalArgumentException("invalid type: expected " + this.dataType + ", was "
@@ -220,7 +225,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     List<KeyValueIterable<KeyValuePair<T>>> iters =
         new ArrayList<KeyValueIterable<KeyValuePair<T>>>();
 
-    try (KeyValueIterator<PartitionInfoSnapshot> iter = this.getAllPartitions().iterator()) {
+    try (KeyValueIterator<PartitionInfoSnapshot> iter =
+        this.getAllPartitions(sortDirection).iterator()) {
       while (iter.hasNext() && (limit == null || limit > 0L)) {
         PartitionInfo partition = iter.next();
 
@@ -235,7 +241,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
           iters.add(new LazyIterable<KeyValuePair<T>>(getIterableProvider(type, clazz,
               getPartitionName(sequence.resolveKey(KeyImpl.valueOf(partition.getPartitionId()))),
-              idOffset - partition.getMinId(), specificLimit)));
+              sortDirection, idOffset - partition.getMinId(), specificLimit)));
 
           idOffset = partition.getMaxId() + 1;
         }
@@ -251,7 +257,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public <T> KeyValueIterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz,
-      Long offset, Long limit) throws KazukiException {
+      SortDirection sortDirection, Long offset, Long limit) throws KazukiException {
     availability.assertAvailable();
 
     if (!this.dataType.equals(type)) {
@@ -268,10 +274,11 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     List<KeyValueIterable<KeyValuePair<T>>> iters =
         new ArrayList<KeyValueIterable<KeyValuePair<T>>>();
 
-    try (KeyValueIterator<PartitionInfoSnapshot> iter = this.getAllPartitions().iterator()) {
+    try (KeyValueIterator<PartitionInfoSnapshot> iter =
+        this.getAllPartitions(sortDirection).iterator()) {
       while (iter.hasNext() && (limit == null || limit > 0L)) {
         PartitionInfo partition = iter.next();
-        long size = 1 + partition.getMaxId() - partition.getMinId();
+        long size = partition.getSize();
         long toIgnore = Math.min(sizeOffset, size);
 
         if (toIgnore == size) {
@@ -289,7 +296,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
         iters.add(new LazyIterable<KeyValuePair<T>>(getIterableProvider(type, clazz,
             getPartitionName(sequence.resolveKey(KeyImpl.valueOf(partition.getPartitionId()))),
-            sizeOffset, specificLimit)));
+            sortDirection, sizeOffset, specificLimit)));
 
         sizeOffset = 0L;
       }
@@ -422,9 +429,15 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
   @Override
   public KeyValueIterable<PartitionInfoSnapshot> getAllPartitions() throws KazukiException {
+    return getAllPartitions(SortDirection.ASCENDING);
+  }
+
+  @Override
+  public KeyValueIterable<PartitionInfoSnapshot> getAllPartitions(SortDirection sortDirection)
+      throws KazukiException {
     availability.assertAvailable();
 
-    return metaStore.iterators().values(this.typeName, PartitionInfoSnapshot.class);
+    return metaStore.iterators().values(this.typeName, PartitionInfoSnapshot.class, sortDirection);
   }
 
   private KeyValueStore getKeyValueStore(String partitionName, boolean initialize) {
@@ -562,13 +575,14 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   private <T> Provider<KeyValueIterable<KeyValuePair<T>>> getIterableProvider(final String type,
-      final Class<T> clazz, final String partitionName, final Long offset, final Long limit) {
+      final Class<T> clazz, final String partitionName, final SortDirection sortDirection,
+      final Long offset, final Long limit) {
     return new Provider<KeyValueIterable<KeyValuePair<T>>>() {
       @Override
       public KeyValueIterable<KeyValuePair<T>> get() {
         try {
-          return getKeyValueStore(partitionName, false).iterators().entries(type, clazz, offset,
-              limit);
+          return getKeyValueStore(partitionName, false).iterators().entries(type, clazz,
+              sortDirection, offset, limit);
         } catch (Exception e) {
           throw Throwables.propagate(e);
         }

@@ -6,6 +6,7 @@ import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.schema.TypeValidation;
 
 import javax.inject.Inject;
@@ -35,15 +36,15 @@ public class SimpleJournalStore implements JournalStore {
   }
 
   @Override
-  public <T> KeyValueIterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz, Long offset,
-      Long limit) throws KazukiException {
-    return store.iterators().entries(type, clazz, offset, limit);
+  public <T> KeyValueIterable<KeyValuePair<T>> entriesAbsolute(String type, Class<T> clazz,
+      SortDirection sortDirection, Long offset, Long limit) throws KazukiException {
+    return store.iterators().entries(type, clazz, sortDirection, offset, limit);
   }
 
   @Override
-  public <T> KeyValueIterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz, Long offset,
-      Long limit) throws KazukiException {
-    return entriesAbsolute(type, clazz, offset, limit);
+  public <T> KeyValueIterable<KeyValuePair<T>> entriesRelative(String type, Class<T> clazz,
+      SortDirection sortDirection, Long offset, Long limit) throws KazukiException {
+    return entriesAbsolute(type, clazz, sortDirection, offset, limit);
   }
 
   @Override
@@ -73,6 +74,11 @@ public class SimpleJournalStore implements JournalStore {
 
   @Override
   public KeyValueIterable<PartitionInfoSnapshot> getAllPartitions() {
+    throw new UnsupportedOperationException("getAllPartitions() not yet supported");
+  }
+
+  @Override
+  public KeyValueIterable<PartitionInfoSnapshot> getAllPartitions(SortDirection sortDirection) {
     throw new UnsupportedOperationException("getAllPartitions() not yet supported");
   }
 }

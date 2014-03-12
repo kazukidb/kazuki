@@ -11,6 +11,7 @@ import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.easy.EasyJournalStoreModule;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
@@ -70,7 +71,8 @@ public class SimpleJournalStoreTest extends TestSupport {
     log.info("ITER TEST:");
     for (int i = 0; i < 10; i++) {
       try (KeyValueIterator<KeyValuePair<Foo>> iter =
-          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
+          journal.entriesAbsolute("foo", Foo.class, SortDirection.ASCENDING, Long.valueOf(i * 10),
+              10L).iterator()) {
         Assert.assertTrue(iter.hasNext());
         int j = 0;
         while (iter.hasNext()) {

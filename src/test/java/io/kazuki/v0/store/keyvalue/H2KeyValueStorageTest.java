@@ -8,6 +8,7 @@ import io.kazuki.v0.internal.v2schema.Schema;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
@@ -51,14 +52,16 @@ public class H2KeyValueStorageTest extends TestSupport {
     lifecycle.init();
     lifecycle.start();
 
-    Assert.assertFalse(store.iterators().iterator("$schema", Schema.class).hasNext());
+    Assert.assertFalse(store.iterators().iterator("$schema", Schema.class, SortDirection.ASCENDING)
+        .hasNext());
 
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
 
     manager.createSchema("foo", schema);
-    try (KeyValueIterator<Schema> sIter = store.iterators().iterator("$schema", Schema.class)) {
+    try (KeyValueIterator<Schema> sIter =
+        store.iterators().iterator("$schema", Schema.class, SortDirection.ASCENDING)) {
       Assert.assertTrue(sIter.hasNext());
       sIter.next();
       Assert.assertFalse(sIter.hasNext());
@@ -72,7 +75,8 @@ public class H2KeyValueStorageTest extends TestSupport {
     log.info("created key = " + foo2Key);
     Assert.assertNotNull(store.retrieve(foo2Key, Foo.class));
 
-    try (KeyValueIterator<Foo> iter = store.iterators().iterator("foo", Foo.class)) {
+    try (KeyValueIterator<Foo> iter =
+        store.iterators().iterator("foo", Foo.class, SortDirection.ASCENDING)) {
       Assert.assertTrue(iter.hasNext());
       while (iter.hasNext()) {
         Foo theNext = iter.next();

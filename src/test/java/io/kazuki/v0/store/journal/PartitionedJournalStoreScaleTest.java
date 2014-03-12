@@ -10,6 +10,7 @@ import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.TypeValidation;
@@ -98,7 +99,7 @@ public class PartitionedJournalStoreScaleTest extends TestSupport {
     }
 
     try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-        journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator()) {
+        journal.entriesRelative("foo", Foo.class, SortDirection.ASCENDING, 0L, 1L).iterator()) {
       assertThat(theIter.next().getValue().getFooKey(), Matchers.is("k25001"));
     }
 
@@ -130,7 +131,7 @@ public class PartitionedJournalStoreScaleTest extends TestSupport {
     }
 
     try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-        journal.entriesRelative("foo", Foo.class, 0L, 1L).iterator()) {
+        journal.entriesRelative("foo", Foo.class, SortDirection.ASCENDING, 0L, 1L).iterator()) {
       assertThat(theIter.next().getValue().getFooKey(), Matchers.is("k25001"));
     }
 
