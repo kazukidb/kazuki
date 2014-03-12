@@ -461,38 +461,39 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> KeyValueIterator<T> iterator(String type, Class<T> clazz) {
-    return this.values(type, clazz).iterator();
+  public <T> KeyValueIterator<T> iterator(String type, Class<T> clazz, SortDirection sortDirection) {
+    return this.values(type, clazz, sortDirection).iterator();
   }
 
   @Override
-  public <T> KeyValueIterator<T> iterator(String type, Class<T> clazz, @Nullable Long offset,
-      @Nullable Long limit) {
-    return this.values(type, clazz, offset, limit).iterator();
+  public <T> KeyValueIterator<T> iterator(String type, Class<T> clazz, SortDirection sortDirection,
+      @Nullable Long offset, @Nullable Long limit) {
+    return this.values(type, clazz, sortDirection, offset, limit).iterator();
   }
 
   @Override
-  public <T> KeyValueIterable<KeyValuePair<T>> entries(String type, Class<T> clazz) {
-    return this.entries(type, clazz, null, null);
+  public <T> KeyValueIterable<KeyValuePair<T>> entries(String type, Class<T> clazz,
+      SortDirection sortDirection) {
+    return this.entries(type, clazz, sortDirection, null, null);
   }
 
   @Override
   public <T> KeyValueIterable<KeyValuePair<T>> entries(final String type, final Class<T> clazz,
-      @Nullable final Long offset, @Nullable final Long limit) {
-    return new KeyValueIterableJdbiImpl<T>(type, clazz, offset, limit, true);
+      SortDirection sortDirection, @Nullable final Long offset, @Nullable final Long limit) {
+    return new KeyValueIterableJdbiImpl<T>(type, clazz, sortDirection, offset, limit, true);
   }
 
   @Override
-  public <T> KeyValueIterable<Key> keys(String type, Class<T> clazz) {
-    return this.keys(type, clazz, null, null);
+  public <T> KeyValueIterable<Key> keys(String type, Class<T> clazz, SortDirection sortDirection) {
+    return this.keys(type, clazz, sortDirection, null, null);
   }
 
   @Override
   public <T> KeyValueIterable<Key> keys(final String type, final Class<T> clazz,
-      @Nullable final Long offset, @Nullable final Long limit) {
+      final SortDirection sortDirection, @Nullable final Long offset, @Nullable final Long limit) {
     return new KeyValueIterable<Key>() {
       private volatile KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
-          clazz, offset, limit, false);
+          clazz, sortDirection, offset, limit, false);
 
       @Override
       public KeyValueIterator<Key> iterator() {
@@ -535,16 +536,16 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   @Override
-  public <T> KeyValueIterable<T> values(String type, Class<T> clazz) {
-    return this.values(type, clazz, null, null);
+  public <T> KeyValueIterable<T> values(String type, Class<T> clazz, SortDirection sortDirection) {
+    return this.values(type, clazz, sortDirection, null, null);
   }
 
   @Override
   public <T> KeyValueIterable<T> values(final String type, final Class<T> clazz,
-      @Nullable final Long offset, @Nullable final Long limit) {
+      final SortDirection sortDirection, @Nullable final Long offset, @Nullable final Long limit) {
     return new KeyValueIterable<T>() {
       private volatile KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(type,
-          clazz, offset, limit, true);
+          clazz, sortDirection, offset, limit, true);
 
       @Override
       public KeyValueIterator<T> iterator() {
@@ -608,7 +609,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   }
 
   private KeyValueIterator<Map<String, Object>> createKeyValueIterator(final String type,
-      final Long offset, final Long limit, boolean hasValue) {
+      final SortDirection sortDirection, final Long offset, final Long limit, boolean hasValue) {
     final Integer typeId;
     try {
       typeId = sequences.getTypeId(type, false);
@@ -626,6 +627,11 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
 
     final Query<Map<String, Object>> select =
         JDBIHelper.getBoundQuery(handle, getPrefix(), "kv_table_name", tableName, query);
+
+    String order =
+        (sortDirection == null || SortDirection.ASCENDING.equals(sortDirection)) ? "ASC" : "DESC";
+
+    select.define("order", order);
 
     select.bind("key_type", typeId);
     select.bind("offset", offset);
@@ -735,16 +741,18 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
   class KeyValueIterableJdbiImpl<T> implements KeyValueIterable<KeyValuePair<T>> {
     private final String type;
     private final Class<T> clazz;
+    private final SortDirection sortDirection;
     private final Long offset;
     private final Long limit;
     private final boolean includeValues;
     private volatile KeyValueIterator<KeyValuePair<T>> theIter = null;
     private boolean instantiated = false;
 
-    public KeyValueIterableJdbiImpl(String type, Class<T> clazz, Long offset, Long limit,
-        boolean includeValues) {
+    public KeyValueIterableJdbiImpl(String type, Class<T> clazz, SortDirection sortDirection,
+        Long offset, Long limit, boolean includeValues) {
       this.type = type;
       this.clazz = clazz;
+      this.sortDirection = sortDirection;
       this.offset = offset;
       this.limit = limit;
       this.includeValues = includeValues;
@@ -759,7 +767,7 @@ public abstract class KeyValueStoreJdbiBaseImpl implements KeyValueStore, KeyVal
       try {
         theIter = new KeyValueIterator<KeyValuePair<T>>() {
           private volatile KeyValueIterator<Map<String, Object>> inner = createKeyValueIterator(
-              type, offset, limit, includeValues);
+              type, sortDirection, offset, limit, includeValues);
           private final Schema schema = schemaService.retrieveSchema(type);
           private KeyValuePair<T> nextKv = advance();
           private KeyValuePair<T> currentKv = null;

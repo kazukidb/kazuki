@@ -20,6 +20,7 @@ import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
@@ -130,7 +131,8 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
 
     for (Long[] config : configs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-          journal.entriesAbsolute("foo", Foo.class, config[0], config[1]).iterator()) {
+          journal.entriesAbsolute("foo", Foo.class, SortDirection.ASCENDING, config[0], config[1])
+              .iterator()) {
         assertThat(theIter, isIterOfLength(config[2].intValue()));
       }
     }
@@ -145,7 +147,8 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
     log.info("RELATIVE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       try (KeyValueIterator<KeyValuePair<Foo>> iter =
-          journal.entriesRelative("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
+          journal.entriesRelative("foo", Foo.class, SortDirection.ASCENDING, Long.valueOf(i * 10),
+              10L).iterator()) {
         assertThat(iter, isNotEmptyIter());
         int j = 0;
         while (iter.hasNext()) {
@@ -156,12 +159,27 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
         }
         assertThat(j, is(10));
       }
+
+      try (KeyValueIterator<KeyValuePair<Foo>> iter =
+          journal.entriesRelative("foo", Foo.class, SortDirection.DESCENDING, Long.valueOf(i * 10),
+              10L).iterator()) {
+        assertThat(iter, isNotEmptyIter());
+        int j = 10;
+        while (iter.hasNext()) {
+          Foo foo = iter.next().getValue();
+          assertThat(foo, notNullValue());
+          log.info("i=" + i + ",j=" + j + ",foo=" + dump(foo));
+          j -= 1;
+        }
+        assertThat(j, is(0));
+      }
     }
 
     log.info("ABSOLUTE ITER TEST:");
     for (int i = 0; i < 10; i++) {
       try (KeyValueIterator<KeyValuePair<Foo>> iter =
-          journal.entriesAbsolute("foo", Foo.class, Long.valueOf(i * 10), 10L).iterator()) {
+          journal.entriesAbsolute("foo", Foo.class, SortDirection.ASCENDING, Long.valueOf(i * 10),
+              10L).iterator()) {
         assertThat(iter, isNotEmptyIter());
         int j = 0;
         while (iter.hasNext()) {
@@ -195,19 +213,33 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
 
     for (Long[] config : absConfigs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-          journal.entriesAbsolute("foo", Foo.class, config[0], config[1]).iterator()) {
+          journal.entriesAbsolute("foo", Foo.class, SortDirection.ASCENDING, config[0], config[1])
+              .iterator()) {
         assertThat(theIter, isIterOfLength(config[2].intValue()));
       }
     }
 
     Long[][] relConfigs =
-        { {0L, null, 91L}, {0L, 10L, 10L}, {0L, 20L, 20L}, {11L, 79L, 79L}, {11L, null, 80L},
-            {10L, 10L, 10L}, {5L, 10L, 10L}, {80L, 10L, 10L}, {90L, 10L, 1L},};
+        { {0L, null, 91L}, {1L, null, 90L}, {0L, 10L, 10L}, {0L, 20L, 20L}, {11L, 79L, 79L},
+            {11L, null, 80L}, {10L, 10L, 10L}, {5L, 10L, 10L}, {80L, 10L, 10L}, {90L, 10L, 1L},};
 
     for (Long[] config : relConfigs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-          journal.entriesRelative("foo", Foo.class, config[0], config[1]).iterator()) {
+          journal.entriesRelative("foo", Foo.class, SortDirection.ASCENDING, config[0], config[1])
+              .iterator()) {
         assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesRelative("foo", Foo.class, SortDirection.DESCENDING, config[2], config[1])
+              .iterator()) {
+        int limit = 91 - config[2].intValue();
+
+        if (config[1] != null) {
+          limit = Math.min(limit, config[1].intValue());
+        }
+
+        assertThat(theIter, isIterOfLength(limit));
       }
     }
 
@@ -218,27 +250,41 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
 
     for (Long[] config : absConfigs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-          journal.entriesAbsolute("foo", Foo.class, config[0], config[1]).iterator()) {
+          journal.entriesAbsolute("foo", Foo.class, SortDirection.ASCENDING, config[0], config[1])
+              .iterator()) {
         assertThat(theIter, isIterOfLength(config[2].intValue()));
       }
     }
 
     for (Long[] config : relConfigs) {
       try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-          journal.entriesRelative("foo", Foo.class, config[0], config[1]).iterator()) {
+          journal.entriesRelative("foo", Foo.class, SortDirection.ASCENDING, config[0], config[1])
+              .iterator()) {
         assertThat(theIter, isIterOfLength(config[2].intValue()));
+      }
+
+      try (KeyValueIterator<KeyValuePair<Foo>> theIter =
+          journal.entriesRelative("foo", Foo.class, SortDirection.DESCENDING, config[2], config[1])
+              .iterator()) {
+        int limit = 91 - config[2].intValue();
+
+        if (config[1] != null) {
+          limit = Math.min(limit, config[1].intValue());
+        }
+
+        assertThat(theIter, isIterOfLength(limit));
       }
     }
 
     journal.append("foo", Foo.class, new Foo("ab", "ac"), TypeValidation.STRICT);
 
     try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-        journal.entriesAbsolute("foo", Foo.class, 10L, null).iterator()) {
+        journal.entriesAbsolute("foo", Foo.class, SortDirection.ASCENDING, 10L, null).iterator()) {
       assertThat(theIter, isIterOfLength(92));
     }
 
     try (KeyValueIterator<KeyValuePair<Foo>> theIter =
-        journal.entriesRelative("foo", Foo.class, 0L, null).iterator()) {
+        journal.entriesRelative("foo", Foo.class, SortDirection.ASCENDING, 0L, null).iterator()) {
       assertThat(theIter, isIterOfLength(92));
     }
   }
