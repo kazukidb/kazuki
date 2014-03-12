@@ -183,7 +183,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
     KeyImpl keyImpl = (KeyImpl) key;
 
-    return new ResolvedKey(typeId, 0L, keyImpl.getInternalId());
+    return new ResolvedKeyImpl(typeId, 0L, keyImpl.getInternalId());
   }
 
   @Override

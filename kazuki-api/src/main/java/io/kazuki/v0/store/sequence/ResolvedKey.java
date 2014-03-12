@@ -1,57 +1,13 @@
 package io.kazuki.v0.store.sequence;
 
 
-/**
- * Resolves the internal representation of a Key. This class should only be used within Kazuki
- * itself.
- */
-public class ResolvedKey {
-  private final int typeTag;
-  private final long identifierLo;
-  private final long identifierHi;
-  private final int hashCode;
 
-  public ResolvedKey(int typeTag, long identifierHi, long identifierLo) {
-    this.typeTag = typeTag;
-    this.identifierHi = identifierHi;
-    this.identifierLo = identifierLo;
-    this.hashCode =
-        Integer.valueOf(this.typeTag).hashCode() ^ Long.valueOf(identifierHi).hashCode()
-            ^ Long.valueOf(identifierLo).hashCode();
-  }
+public interface ResolvedKey {
 
-  public int getTypeTag() {
-    return typeTag;
-  }
+  int getTypeTag();
 
-  public long getIdentifierHi() {
-    return identifierHi;
-  }
+  long getIdentifierHi();
 
-  public long getIdentifierLo() {
-    return identifierLo;
-  }
+  long getIdentifierLo();
 
-  @Override
-  public String toString() {
-    return "ResolvedKey:typeTag=" + typeTag + ",hi=0x" + Long.toHexString(identifierHi) + ",lo="
-        + Long.toHexString(identifierLo);
-  }
-
-  @Override
-  public int hashCode() {
-    return this.hashCode;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (!(obj instanceof ResolvedKey)) {
-      return false;
-    }
-
-    ResolvedKey other = (ResolvedKey) obj;
-
-    return other.typeTag == typeTag && other.identifierHi == identifierHi
-        && other.identifierLo == identifierLo;
-  }
 }
