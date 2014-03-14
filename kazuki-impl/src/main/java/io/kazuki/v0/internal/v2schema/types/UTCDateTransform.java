@@ -18,6 +18,7 @@
 package io.kazuki.v0.internal.v2schema.types;
 
 import io.kazuki.v0.store.schema.model.Transform;
+import io.kazuki.v0.store.schema.model.TransformException;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;

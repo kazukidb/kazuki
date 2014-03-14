@@ -16,6 +16,7 @@ package io.kazuki.v0.internal.v2schema.types;
 
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.TransformException;
 import io.kazuki.v0.store.schema.model.Attribute.Type;
 
 import java.util.Arrays;

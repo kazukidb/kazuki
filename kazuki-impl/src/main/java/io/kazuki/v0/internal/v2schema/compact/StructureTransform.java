@@ -18,6 +18,7 @@ import io.kazuki.v0.internal.v2schema.util.BitSetUtil;
 import io.kazuki.v0.store.schema.model.Attribute;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.schema.model.Transform;
+import io.kazuki.v0.store.schema.model.TransformException;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -26,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.xml.crypto.dsig.TransformException;
 
 /**
  * Structure-based compaction for object instances. For example, a map containing only 2 out of 10

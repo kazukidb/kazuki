@@ -14,8 +14,8 @@
  */
 package io.kazuki.v0.internal.v2schema;
 
-import io.kazuki.v0.internal.v2schema.types.TransformException;
 import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.TransformException;
 import io.kazuki.v0.store.schema.model.Attribute.Type;
 import io.kazuki.v0.store.schema.model.Schema;
 

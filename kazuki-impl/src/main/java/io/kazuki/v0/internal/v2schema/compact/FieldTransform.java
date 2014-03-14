@@ -18,12 +18,11 @@ import io.kazuki.v0.internal.v2schema.types.TypeTransforms;
 import io.kazuki.v0.store.schema.model.Attribute;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.schema.model.Transform;
+import io.kazuki.v0.store.schema.model.TransformException;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import javax.xml.crypto.dsig.TransformException;
 
 /**
  * Type-based compaction for object instances. For example, boolean compacts to char, datetime

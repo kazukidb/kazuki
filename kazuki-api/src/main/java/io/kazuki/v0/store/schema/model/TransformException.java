@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.kazuki.v0.internal.v2schema.types;
+package io.kazuki.v0.store.schema.model;
 
 /**
  * Exception class for errors encountered during validation.

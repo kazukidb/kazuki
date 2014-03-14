@@ -14,9 +14,6 @@
  */
 package io.kazuki.v0.store.schema.model;
 
-import javax.xml.crypto.dsig.TransformException;
-
-
 
 /**
  * A Transform turns objects of type T into objects of type U.

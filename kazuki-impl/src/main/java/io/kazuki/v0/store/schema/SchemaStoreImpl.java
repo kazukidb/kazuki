@@ -16,11 +16,11 @@ package io.kazuki.v0.store.schema;
 
 import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
-import io.kazuki.v0.internal.v2schema.types.TransformException;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.schema.model.Schema;
+import io.kazuki.v0.store.schema.model.TransformException;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 import io.kazuki.v0.store.sequence.SequenceService;

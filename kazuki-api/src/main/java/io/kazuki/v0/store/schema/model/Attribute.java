@@ -81,7 +81,7 @@ public class Attribute {
     if (values != null) {
       List<String> newVals = new ArrayList<String>();
       for (Object object : values) {
-        newVals.add(object.toString());
+        newVals.add(String.valueOf(object));
       }
 
       this.values = Collections.unmodifiableList(newVals);
