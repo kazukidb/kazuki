@@ -21,7 +21,7 @@
     <connection>scm:git:git://github.com/kazukidb/kazuki.git</connection>
     <developerConnection>scm:git:git@github.com:kazukidb/kazuki.git</developerConnection>
     <url>https://github.com/kazukidb/kazuki</url>
-    <tag>kazuki-parent-0.2.6</tag>
+    <tag>HEAD</tag>
   </scm>
   <properties>
     <slf4j.version>1.7.5</slf4j.version>
