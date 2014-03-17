@@ -10,7 +10,7 @@
   <artifactId>kazuki-parent</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <packaging>pom</packaging>
-  <version>0.2.2-SNAPSHOT</version>
+  <version>0.2.3-SNAPSHOT</version>
   <licenses>
     <license>
       <name>The Apache Software License, Version 2.0</name>
@@ -37,11 +37,6 @@
     </repository>
   </repositories>
   <distributionManagement>
-    <snapshotRepository>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots</name>
-      <url>${sonatypeOssDistMgmtSnapshotsUrl}</url>
-    </snapshotRepository>
     <repository>
       <id>sonatype-nexus-staging</id>
       <name>Nexus Release Repository</name>
