@@ -4,9 +4,16 @@
   <parent>
     <groupId>io.kazuki</groupId>
     <artifactId>kazuki-parent</artifactId>
-    <version>0.2.6-SNAPSHOT</version>
+    <version>0.2.7-SNAPSHOT</version>
   </parent>
   <artifactId>kazuki-impl</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <packaging>jar</packaging>
+  <dependencies>
+    <dependency>
+      <groupId>io.kazuki</groupId>
+      <artifactId>kazuki-db</artifactId>
+      <version>${project.version}</version>
+    <dependency>
+  </dependencies>
 </project>
