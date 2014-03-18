@@ -32,8 +32,6 @@
     <joda-time.version>2.3</joda-time.version>
     <jdbi.version>2.53</jdbi.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <packageVersion.dir>io/kazuki/v0</packageVersion.dir>
-    <packageVersion.package>io.kazuki.v0</packageVersion.package>
   </properties>
   <dependencyManagement>
     <dependencies>

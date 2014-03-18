@@ -9,6 +9,14 @@
   <artifactId>kazuki-impl</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <packaging>jar</packaging>
+
+  <properties>
+    <packageVersion.dir>io/kazuki/v0</packageVersion.dir>
+    <packageVersion.package>io.kazuki.v0</packageVersion.package>
+    <generatedSourcesDir>${project.build.directory}/generated-sources</generatedSourcesDir>
+    <packageVersion.template.input>${basedir}/src/main/java/${packageVersion.dir}/PackageVersion.java.in</packageVersion.template.input>
+    <packageVersion.template.output>${generatedSourcesDir}/${packageVersion.dir}/PackageVersion.java</packageVersion.template.output>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>io.kazuki</groupId>
@@ -113,4 +121,72 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.google.code.maven-replacer-plugin</groupId>
+        <artifactId>replacer</artifactId>
+        <version>1.5.2</version>
+        <executions>
+          <execution>
+            <id>process-packageVersion</id>
+            <goals>
+              <goal>replace</goal>
+            </goals>
+            <!--
+             | We explicitly omit 'phase' here so child poms can opt in to
+             | generating their PackageVersion.java file.
+             |
+             | If your child pom wants a PackageVersion.java file, define
+             | the 'packageVersion.dir' and 'packageVersion.package' properties
+             | and include the commented-out section in your child pom's plugin
+             | for this execution ID.
+            -->
+            <phase>generate-sources</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <ignoreErrors>true</ignoreErrors>
+          <file>${packageVersion.template.input}</file>
+          <outputFile>${packageVersion.template.output}</outputFile>
+          <replacements>
+            <replacement>
+              <token>@package@</token>
+              <value>${packageVersion.package}</value>
+            </replacement>
+            <replacement>
+              <token>@projectversion@</token>
+              <value>${project.version}</value>
+            </replacement>
+            <replacement>
+              <token>@projectgroupid@</token>
+              <value>${project.groupId}</value>
+            </replacement>
+            <replacement>
+              <token>@projectartifactid@</token>
+              <value>${project.artifactId}</value>
+            </replacement>
+          </replacements>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-generated-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${generatedSourcesDir}</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
