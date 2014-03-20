@@ -18,7 +18,9 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryTerm;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -36,4 +38,10 @@ public interface SecondaryIndexStore {
 
   <T> KeyValueIterable<Key> queryWithoutPagination(String type, Class<T> clazz, String indexName,
       List<QueryTerm> query, @Nullable Long offset, @Nullable Long limit);
+
+  Map<UniqueEntityDescription<?>, Key> multiRetrieveUniqueKeys(
+      Collection<UniqueEntityDescription<?>> entityDefinitions);
+
+  Map<UniqueEntityDescription<?>, ?> multiRetrieveUniqueEntities(
+      Collection<UniqueEntityDescription<?>> entityDefinitions);
 }

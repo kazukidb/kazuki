@@ -82,4 +82,6 @@ public class ValueHolder {
         throw new IllegalArgumentException("unknown type: " + valueType);
     }
   }
+
+  // TODO : equals, hashCode
 }

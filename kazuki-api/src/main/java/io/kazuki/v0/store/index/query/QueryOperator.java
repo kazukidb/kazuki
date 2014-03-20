@@ -18,5 +18,5 @@ package io.kazuki.v0.store.index.query;
  * All the supported Query operators.
  */
 public enum QueryOperator {
-    EQ, NE, GT, GE, LT, LE, IN;
+  EQ, NE, GT, GE, LT, LE, IN;
 }

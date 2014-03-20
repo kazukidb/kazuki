@@ -66,4 +66,6 @@ public class QueryTerm {
     return this.field + " " + this.operator.name() + " "
         + (this.value != null ? this.value : this.valueList);
   }
+
+  // TODO : equals, hashCode, toString
 }
