@@ -24,10 +24,12 @@ import javax.annotation.Nullable;
 
 public interface SecondaryIndexStore {
   <T> QueryResultsPage<T> queryWithPagination(String type, Class<T> clazz, String indexName,
-      String queryString, @Nullable PageToken token, @Nullable Long limit);
+      String queryString, @Nullable Boolean loadResults, @Nullable PageToken token,
+      @Nullable Long limit);
 
   <T> QueryResultsPage<T> queryWithPagination(String type, Class<T> clazz, String indexName,
-      List<QueryTerm> query, @Nullable PageToken token, @Nullable Long limit);
+      List<QueryTerm> query, @Nullable Boolean loadResults, @Nullable PageToken token,
+      @Nullable Long limit);
 
   <T> KeyValueIterable<Key> queryWithoutPagination(String type, Class<T> clazz, String indexName,
       String queryString, @Nullable Long offset, @Nullable Long limit);

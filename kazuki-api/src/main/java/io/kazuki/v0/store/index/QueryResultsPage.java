@@ -14,12 +14,17 @@
  */
 package io.kazuki.v0.store.index;
 
+import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 
 import java.util.List;
 
 public interface QueryResultsPage<T> {
-  List<KeyValuePair<T>> getResults();
+  List<Key> getResultKeys();
+
+  boolean hasResults();
+
+  List<KeyValuePair<T>> getResultList();
 
   boolean hasNext();
 
