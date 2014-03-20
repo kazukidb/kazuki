@@ -38,6 +38,7 @@ import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.IndexDefinition;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.KeyImpl;
 
@@ -105,7 +106,8 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
 
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
-            true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)));
+            true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)),
+            ImmutableList.<IndexDefinition>of());
 
     assertThat(manager.createSchema("foo", schema), is(KeyImpl.valueOf("$schema:3")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());

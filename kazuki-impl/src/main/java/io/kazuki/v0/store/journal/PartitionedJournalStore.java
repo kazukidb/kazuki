@@ -32,6 +32,7 @@ import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.IndexDefinition;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.ResolvedKey;
@@ -124,7 +125,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
 
     try {
       if (this.schema.retrieveSchema(this.typeName) == null) {
-        this.schema.createSchema(this.typeName, new Schema(Collections.<Attribute>emptyList()));
+        this.schema.createSchema(this.typeName, new Schema(Collections.<Attribute>emptyList(),
+            Collections.<IndexDefinition>emptyList()));
       }
 
       try (KeyValueIterable<PartitionInfoSnapshot> parts = this.getAllPartitions()) {
