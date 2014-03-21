@@ -21,7 +21,7 @@ public class QueryTerm {
   private final QueryOperator operator;
   private final String field;
   private final ValueHolder value;
-  private final QueryValueList valueList;
+  private final ValueHolderList valueList;
 
   public QueryTerm(QueryOperator operator, String field, ValueHolder value) {
     this.operator = operator;
@@ -30,7 +30,7 @@ public class QueryTerm {
     this.valueList = null;
   }
 
-  public QueryTerm(QueryOperator operator, String field, QueryValueList valueList) {
+  public QueryTerm(QueryOperator operator, String field, ValueHolderList valueList) {
     this.operator = operator;
     this.field = field;
     this.value = null;
@@ -53,7 +53,7 @@ public class QueryTerm {
     return value;
   }
 
-  public QueryValueList getValueList() {
+  public ValueHolderList getValueList() {
     if (value != null) {
       throw new IllegalStateException("valueList() not present in this term, use value() instead");
     }

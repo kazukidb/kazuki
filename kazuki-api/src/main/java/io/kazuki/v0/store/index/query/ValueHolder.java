@@ -36,13 +36,13 @@ public class ValueHolder {
         this.value = new BigInteger(literal);
         break;
       case STRING:
-        this.value = literal.substring(1, literal.length() - 1);
+        this.value = parseStringLiteral(literal);
         break;
       case BOOLEAN:
         this.value = Boolean.valueOf(literal);
         break;
       case REFERENCE:
-        this.value = literal.substring(1, literal.length() - 1);
+        this.value = parseStringLiteral(literal);
         break;
       case NULL:
         this.value = "";
@@ -81,6 +81,14 @@ public class ValueHolder {
       default:
         throw new IllegalArgumentException("unknown type: " + valueType);
     }
+  }
+
+  private static String parseStringLiteral(String literal) {
+    if (literal.startsWith("\"") && literal.endsWith("\"")) {
+      return literal.substring(1, literal.length() - 1);
+    }
+
+    return literal;
   }
 
   // TODO : equals, hashCode

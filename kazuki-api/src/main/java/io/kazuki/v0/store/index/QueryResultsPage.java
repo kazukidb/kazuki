@@ -28,9 +28,11 @@ public interface QueryResultsPage<T> {
 
   boolean hasNext();
 
-  PageToken nextPageToken();
+  PageToken getNextPageToken();
 
-  boolean hasPrev();
+  boolean hasPrevious();
 
-  PageToken prevPageToken();
+  PageToken getPreviousPageToken();
+
+  PageToken getCurrentPageToken();
 }

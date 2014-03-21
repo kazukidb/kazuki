@@ -18,30 +18,30 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import com.google.common.base.Preconditions;
+public class QueryBuilder {
+  public List<QueryTerm> query = new ArrayList<QueryTerm>();
 
-/**
- * Represents a list of values, typically for an IN clause.
- */
-public class QueryValueList {
-  private final List<ValueHolder> valueList;
+  public QueryBuilder andMatchesSingle(String field, QueryOperator op, ValueType valueType,
+      String literal) {
+    query.add(new QueryTerm(op, field, new ValueHolder(valueType, literal)));
 
-  public QueryValueList(List<ValueHolder> values) {
-    Preconditions.checkNotNull(values, "no values");
-    Preconditions.checkArgument(values.size() > 0, "no values");
-    Preconditions.checkArgument(values.size() < 100, "too many values");
-
-    List<ValueHolder> newValueList = new ArrayList<ValueHolder>();
-    newValueList.addAll(values);
-    this.valueList = Collections.unmodifiableList(newValueList);
+    return this;
   }
 
-  public List<ValueHolder> getValueList() {
-    return valueList;
+  public QueryBuilder andMatchesIn(String field, QueryOperator op, ValueType valueType,
+      List<String> literalList) {
+    List<ValueHolder> newValueHolders = new ArrayList<ValueHolder>();
+
+    for (String literal : literalList) {
+      newValueHolders.add(new ValueHolder(valueType, literal));
+    }
+
+    query.add(new QueryTerm(op, field, new ValueHolderList(newValueHolders)));
+
+    return this;
   }
 
-  @Override
-  public String toString() {
-    return valueList.toString();
+  public List<QueryTerm> build() {
+    return Collections.unmodifiableList(query);
   }
 }
