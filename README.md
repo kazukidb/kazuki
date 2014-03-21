@@ -120,9 +120,46 @@ stores like AWS S3 and Riak don't have efficient bucket destruction APIs
 just yet).
 
 
+# Secondary Index Store
+
+The Secondary Index store is a persistence pattern that uses the relational
+table model in a frugal manner designed for efficient access (which hopefully
+also allows for efficient non-relational implementation). Secondary Indexes
+are declared on Key-Value schemas, with each index declaration including an
+ordered list of columns with sort orders. For each of these indexes, an
+index is built with *just* those columns as well as the identifier
+of the object and an integer primary key for the index row. The index describes
+a logical model of a multi-level tree where each query term operates at the
+corresponding level in the tree.
+
+Indexes are queried by specifying a list of Query operators which must
+include at least one column starting at the "left side" of the index.
+The supported operators are EQ, NE, LT, LE, GT, and GE; the supported
+value types are INTEGER, DECIMAL, STRING, REFERENCE, BOOLEAN and NULL.
+
+In addition, index columns support Transforms: LOWER_CASE, UPPER_CASE or
+NONE (default) for cases when strings should be compared in a case-insensitive
+manner.
+
+The area of Secondary Indexes is one that can commonly lead to performance
+issues - there are a couple techniques we use to mitigate those. The first
+is pagination: Secondary Indexes are designed for use in a paginated way.
+There is also a non-paginated interface, but it only returns Key objects
+for efficiency.
+
+The Secondary Index Store also includes the ability to add at most one
+Unique Index per schema. Unique Indexes specify a subset of columns from
+the object which must *always* be non-null and which are always unique
+per-object when considered together. The Secondary Index Store includes
+an efficient multi-get operation which allows an encapsulated collection
+of unique values to be used as a primary key to retrieve the corresponding
+entities.
 
 
+# Acknowledgements
 
-
-
+Sonatype has graciously provided support for Open Source
+development of Kazuki components for scalable persistence.
+We are extremely grateful for their support, contributions,
+feedback and use of Kazuki in Sonatype products.
 
