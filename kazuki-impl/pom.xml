@@ -13,7 +13,7 @@
   <properties>
     <packageVersion.dir>io/kazuki/v0</packageVersion.dir>
     <packageVersion.package>io.kazuki.v0</packageVersion.package>
-    <generatedSourcesDir>${project.build.directory}/generated-sources</generatedSourcesDir>
+    <generatedSourcesDir>${project.build.directory}/generated-sources/replacer</generatedSourcesDir>
     <packageVersion.template.input>${basedir}/src/main/java/${packageVersion.dir}/PackageVersion.java.in</packageVersion.template.input>
     <packageVersion.template.output>${generatedSourcesDir}/${packageVersion.dir}/PackageVersion.java</packageVersion.template.output>
   </properties>
@@ -83,6 +83,11 @@
     <!-- ANTLR (optional) -->
     <dependency>
       <groupId>org.antlr</groupId>
+      <artifactId>antlr-runtime</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.antlr</groupId>
       <artifactId>stringtemplate</artifactId>
       <optional>true</optional>
     </dependency>
@@ -123,6 +128,18 @@
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>antlr3-maven-plugin</artifactId>
+        <version>1.0</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>antlr</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>com.google.code.maven-replacer-plugin</groupId>
         <artifactId>replacer</artifactId>
