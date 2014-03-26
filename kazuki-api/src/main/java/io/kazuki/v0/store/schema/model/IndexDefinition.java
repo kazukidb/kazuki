@@ -16,7 +16,9 @@ package io.kazuki.v0.store.schema.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -34,6 +36,7 @@ public class IndexDefinition {
   private final List<IndexAttribute> indexColumns;
   private final List<String> attributeNames;
   private final boolean unique;
+  private final Map<String, IndexAttribute> indexAttributeMap;
 
   @JsonCreator
   public IndexDefinition(@JsonProperty("name") String name,
@@ -41,17 +44,29 @@ public class IndexDefinition {
       @JsonProperty("unique") @Nullable Boolean unique) {
     Preconditions.checkNotNull(name, "name");
     Preconditions.checkNotNull(cols, "cols");
+    Preconditions.checkArgument(!cols.isEmpty(), "cols");
 
     this.name = name;
     this.unique = (unique != null && unique);
 
     List<String> newAttributeNames = new ArrayList<String>();
+    Map<String, IndexAttribute> newIndexAttributeMap = new LinkedHashMap<String, IndexAttribute>();
+
     for (IndexAttribute attr : cols) {
+      String attrName = attr.getName();
+
+      if (newIndexAttributeMap.containsKey(attrName)) {
+        throw new IllegalArgumentException("index definition contains duplicate attribute: "
+            + attrName);
+      }
+
       newAttributeNames.add(attr.getName());
+      newIndexAttributeMap.put(attrName, attr);
     }
 
     this.indexColumns = Collections.unmodifiableList(cols);
     this.attributeNames = Collections.unmodifiableList(newAttributeNames);
+    this.indexAttributeMap = Collections.unmodifiableMap(newIndexAttributeMap);
   }
 
   public String getName() {
@@ -62,13 +77,23 @@ public class IndexDefinition {
     return unique;
   }
 
+  @JsonIgnore
+  public List<String> getAttributeNames() {
+    return attributeNames;
+  }
+
+  @JsonIgnore
+  public IndexAttribute getIndexAttribute(String attrName) {
+    return this.indexAttributeMap.get(attrName);
+  }
+
   @JsonProperty("cols")
   public List<IndexAttribute> getIndexAttributes() {
     return indexColumns;
   }
 
   @JsonIgnore
-  public List<String> getAttributeNames() {
-    return attributeNames;
+  public Map<String, IndexAttribute> getIndexAttributeMap() {
+    return indexAttributeMap;
   }
 }

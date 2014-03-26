@@ -31,6 +31,8 @@ import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.AttributeTransform;
+import io.kazuki.v0.store.schema.model.IndexAttribute;
 import io.kazuki.v0.store.schema.model.IndexDefinition;
 import io.kazuki.v0.store.schema.model.Schema;
 
@@ -58,7 +60,7 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
     SchemaStore manager =
         inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));
 
-    SecondaryIndexStore index = new SecondaryIndexBruteForceImpl(store);
+    SecondaryIndexStore index = new SecondaryIndexBruteForceImpl(store, manager);
 
     lifecycle.init();
     lifecycle.start();
@@ -69,7 +71,9 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
     Schema schema =
         new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
             true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)),
-            ImmutableList.<IndexDefinition>of());
+            ImmutableList.<IndexDefinition>of(new IndexDefinition("fooKey",
+                ImmutableList.of(new IndexAttribute("fooKey", SortDirection.ASCENDING,
+                    AttributeTransform.NONE)), false)));
 
     manager.createSchema("foo", schema);
 
@@ -84,7 +88,7 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
         index.queryWithoutPagination(
             "foo",
             Foo.class,
-            "ignored",
+            "fooKey",
             new QueryBuilder()
                 .andMatchesSingle("fooKey", QueryOperator.EQ, ValueType.STRING, "k00").build(),
             SortDirection.ASCENDING, null, null).iterator()) {
@@ -102,7 +106,7 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
         index.queryWithoutPagination(
             "foo",
             Foo.class,
-            "ignored",
+            "fooKey",
             new QueryBuilder()
                 .andMatchesSingle("fooKey", QueryOperator.EQ, ValueType.STRING, "k00").build(),
             SortDirection.DESCENDING, null, null).iterator()) {
@@ -118,7 +122,7 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
 
     for (QueryOperator op : ImmutableList.of(QueryOperator.NE, QueryOperator.GT)) {
       try (KeyValueIterator<Key> iter =
-          index.queryWithoutPagination("foo", Foo.class, "ignored",
+          index.queryWithoutPagination("foo", Foo.class, "fooKey",
               new QueryBuilder().andMatchesSingle("fooKey", op, ValueType.STRING, "k00").build(),
               SortDirection.ASCENDING, null, null).iterator()) {
 
@@ -140,7 +144,7 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
 
     for (QueryOperator op : ImmutableList.of(QueryOperator.NE, QueryOperator.GT)) {
       try (KeyValueIterator<Key> iter =
-          index.queryWithoutPagination("foo", Foo.class, "ignored",
+          index.queryWithoutPagination("foo", Foo.class, "fooKey",
               new QueryBuilder().andMatchesSingle("fooKey", op, ValueType.STRING, "k00").build(),
               SortDirection.DESCENDING, null, null).iterator()) {
 

@@ -14,7 +14,7 @@
  */
 package io.kazuki.v0.store.index;
 
-import io.kazuki.v0.internal.helper.EncodingHelper;
+import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryEvaluator;
 import io.kazuki.v0.store.index.query.QueryHelper;
@@ -23,6 +23,8 @@ import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
+import io.kazuki.v0.store.schema.SchemaStore;
+import io.kazuki.v0.store.schema.model.Schema;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -38,10 +40,12 @@ import com.google.common.base.Throwables;
 
 public class SecondaryIndexBruteForceImpl implements SecondaryIndexStore {
   private final KeyValueStore kvStore;
+  private final SchemaStore schemaStore;
 
   @Inject
-  public SecondaryIndexBruteForceImpl(KeyValueStore kvStore) {
+  public SecondaryIndexBruteForceImpl(KeyValueStore kvStore, SchemaStore schemaStore) {
     this.kvStore = kvStore;
+    this.schemaStore = schemaStore;
   }
 
   @Override
@@ -60,6 +64,16 @@ public class SecondaryIndexBruteForceImpl implements SecondaryIndexStore {
   public <T> KeyValueIterable<Key> queryWithoutPagination(final String type, final Class<T> clazz,
       final String indexName, final List<QueryTerm> query, final SortDirection sortDirection,
       final Long offset, final Long limit) {
+    Schema schema = null;
+    try {
+      schema = schemaStore.retrieveSchema(type);
+    } catch (KazukiException e) {
+      throw Throwables.propagate(e);
+    }
+
+    Preconditions.checkNotNull(schema, "schema");
+    SecondaryIndexQueryValidation.validateQuery(indexName, query, schema);
+
     final QueryEvaluator eval = new QueryEvaluator();
 
     return new FilteredKeyValueIterable<Key>(kvStore.iterators().entries(type, LinkedHashMap.class,
@@ -94,33 +108,31 @@ public class SecondaryIndexBruteForceImpl implements SecondaryIndexStore {
     throw new UnsupportedOperationException("not supported - yet");
 
     /*
-    if (loadResults != null && loadResults) {
-      final QueryEvaluator eval = new QueryEvaluator();
-
-      return new QueryResultsPageImpl<T>(new FilteredKeyValueIterable<T>(kvStore.iterators()
-          .entries(type, LinkedHashMap.class, sortDirection), new Predicate<Object>() {
-        @SuppressWarnings("unchecked")
-        @Override
-        public boolean apply(Object instance) {
-          return eval.matches((LinkedHashMap<String, Object>) instance, query);
-        }
-      }, new Function<KeyValuePair<?>, T>() {
-        @SuppressWarnings("unchecked")
-        @Override
-        public T apply(KeyValuePair<?> instance) {
-          try {
-            return (T) EncodingHelper.asValue((LinkedHashMap<String, Object>) instance.getValue(),
-                clazz);
-          } catch (Exception e) {
-            throw Throwables.propagate(e);
-          }
-        }
-      }, 0L, limit), limit, true);
-    }
-
-    return new QueryResultsPageImpl<T>(queryWithoutPagination(type, clazz, indexName, query,
-        sortDirection, 0L, limit), limit, false);
-    */
+     * Schema schema = null; try { schema = schemaStore.retrieveSchema(type); } catch
+     * (KazukiException e) { throw Throwables.propagate(e); }
+     * 
+     * Preconditions.checkNotNull(schema, "schema");
+     * SecondaryIndexQueryValidation.validateQuery(indexName, query, schema);
+     * 
+     * if (loadResults != null && loadResults) { final QueryEvaluator eval = new QueryEvaluator();
+     * 
+     * return new QueryResultsPageImpl<T>(new FilteredKeyValueIterable<T>(kvStore.iterators()
+     * .entries(type, LinkedHashMap.class, sortDirection), new Predicate<Object>() {
+     * 
+     * @SuppressWarnings("unchecked")
+     * 
+     * @Override public boolean apply(Object instance) { return eval.matches((LinkedHashMap<String,
+     * Object>) instance, query); } }, new Function<KeyValuePair<?>, T>() {
+     * 
+     * @SuppressWarnings("unchecked")
+     * 
+     * @Override public T apply(KeyValuePair<?> instance) { try { return (T)
+     * EncodingHelper.asValue((LinkedHashMap<String, Object>) instance.getValue(), clazz); } catch
+     * (Exception e) { throw Throwables.propagate(e); } } }, 0L, limit), limit, true); }
+     * 
+     * return new QueryResultsPageImpl<T>(queryWithoutPagination(type, clazz, indexName, query,
+     * sortDirection, 0L, limit), limit, false);
+     */
   }
 
   @Override
@@ -129,8 +141,8 @@ public class SecondaryIndexBruteForceImpl implements SecondaryIndexStore {
       Long limit) {
     throw new UnsupportedOperationException("not supported - yet");
     /*
-    return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
-        sortDirection, loadResults, token, limit);
-    */
+     * return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
+     * sortDirection, loadResults, token, limit);
+     */
   }
 }
