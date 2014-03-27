@@ -19,11 +19,16 @@ import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.schema.model.TransformException;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 import io.kazuki.v0.store.sequence.SequenceService;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 
 import javax.inject.Inject;
 
@@ -32,24 +37,29 @@ import org.slf4j.Logger;
 import com.google.common.base.Throwables;
 
 
-public class SchemaStoreImpl implements SchemaStore {
+public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
   public static final String SCHEMA_PREFIX = "$schema";
 
   private final Logger log = LogTranslation.getLogger(getClass());
 
   private final SequenceService sequences;
+  private final List<SchemaStoreListener> ssListeners;
   private KeyValueStore store;
 
   @Inject
   public SchemaStoreImpl(SequenceService sequences) {
     this.sequences = sequences;
+    this.ssListeners = new ArrayList<SchemaStoreListener>();
   }
 
   @Inject
   public synchronized void setKeyValueStorage(KeyValueStore store) {
-    log.debug("Setting schema KeyValueStore for {}", this);
-
     this.store = store;
+  }
+
+  @Override
+  public void addListener(SchemaStoreListener listener) {
+    this.ssListeners.add(listener);
   }
 
   public synchronized Key createSchema(String type, Schema value) throws KazukiException {
@@ -74,6 +84,10 @@ public class SchemaStoreImpl implements SchemaStore {
       SchemaValidator.validate(value);
     } catch (TransformException e) {
       throw new KazukiException("invalid schema definition for type: " + type, e);
+    }
+
+    for (SchemaStoreListener ssListener : ssListeners) {
+      ssListener.onSchemaCreate(type, value);
     }
 
     ResolvedKey resolvedKey = sequences.resolveKey(realKey);
@@ -123,6 +137,11 @@ public class SchemaStoreImpl implements SchemaStore {
       throw new KazukiException("invalid Schema update for type: " + type, e);
     }
 
+    for (SchemaStoreListener ssListener : ssListeners) {
+      ssListener.onSchemaUpdate(type, value, original,
+          this.store.iterators().entries(type, LinkedHashMap.class, SortDirection.ASCENDING));
+    }
+
     return store.update(theKey, Schema.class, value);
   }
 
@@ -135,6 +154,13 @@ public class SchemaStoreImpl implements SchemaStore {
 
     if (typeId == null) {
       return false;
+    }
+
+    Schema original =
+        store.retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, Long.valueOf(typeId)), Schema.class);
+
+    for (SchemaStoreListener ssListener : ssListeners) {
+      ssListener.onSchemaDelete(type, original);
     }
 
     Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());

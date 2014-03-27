@@ -28,13 +28,15 @@ public class KeyValueStoreConfiguration {
   private final String partitionName;
   private final boolean strictTypeCreation;
   private final Long partitionSize;
+  private final boolean secondaryIndex;
 
   public KeyValueStoreConfiguration(@JsonProperty("dbType") String dbType,
       @JsonProperty("dataType") String dataType, @JsonProperty("groupName") String groupName,
       @JsonProperty("storeName") String storeName,
       @JsonProperty("partitionName") String partitionName,
       @JsonProperty("partitionSize") Long partitionSize,
-      @JsonProperty("strictTypeCreation") boolean strictTypeCreation) {
+      @JsonProperty("strictTypeCreation") boolean strictTypeCreation,
+      @JsonProperty("secondaryIndex") boolean secondaryIndex) {
     Preconditions.checkNotNull(dbType, "dbType");
     Preconditions.checkArgument(!dbType.contains("_") && !dbType.contains(":"), "invalid dbType");
     Preconditions.checkNotNull(groupName, "groupName");
@@ -52,6 +54,7 @@ public class KeyValueStoreConfiguration {
     this.partitionName = partitionName != null ? partitionName : String.format("%016x", 0L);
     this.partitionSize = partitionSize;
     this.strictTypeCreation = strictTypeCreation;
+    this.secondaryIndex = secondaryIndex;
   }
 
   public String getDbType() {
@@ -86,6 +89,10 @@ public class KeyValueStoreConfiguration {
     return strictTypeCreation;
   }
 
+  public boolean isSecondaryIndex() {
+    return secondaryIndex;
+  }
+
   public static class Builder implements ConfigurationBuilder<KeyValueStoreConfiguration> {
     private String dbType;
     private String dataType;
@@ -94,6 +101,7 @@ public class KeyValueStoreConfiguration {
     private String partitionName;
     private Long partitionSize;
     private boolean strictTypeCreation = true;
+    private boolean secondaryIndex = false;
 
     public Builder withDbType(String dbType) {
       this.dbType = dbType;
@@ -137,9 +145,15 @@ public class KeyValueStoreConfiguration {
       return this;
     }
 
+    public Builder withSecondaryIndex(boolean secondaryIndex) {
+      this.secondaryIndex = secondaryIndex;
+
+      return this;
+    }
+
     public KeyValueStoreConfiguration build() {
       return new KeyValueStoreConfiguration(dbType, dataType, groupName, storeName, partitionName,
-          partitionSize, strictTypeCreation);
+          partitionSize, strictTypeCreation, secondaryIndex);
     }
   }
 }

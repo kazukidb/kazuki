@@ -18,10 +18,14 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.H2TypeHelper;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
+import io.kazuki.v0.store.index.SecondaryIndexStore;
+import io.kazuki.v0.store.index.SecondaryIndexStoreProvider;
+import io.kazuki.v0.store.index.SecondaryIndexTableHelper;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.SchemaStoreImpl;
+import io.kazuki.v0.store.schema.SchemaStoreRegistration;
 import io.kazuki.v0.store.sequence.SequenceService;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,17 +93,29 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
 
     bind(SequenceService.class).toProvider(seqProvider).in(Scopes.SINGLETON);
 
+    bind(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);
     bind(KeyValueStore.class).to(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);
+    bind(KeyValueStoreRegistration.class).to(Key.get(KeyValueStoreJdbiH2Impl.class)).in(
+        Scopes.SINGLETON);;
     bind(KeyValueStore.class).annotatedWith(Names.named(name))
         .toProvider(binder().getProvider(Key.get(KeyValueStore.class))).in(Scopes.SINGLETON);
 
+    bind(SchemaStoreImpl.class).in(Scopes.SINGLETON);
     bind(SchemaStore.class).to(SchemaStoreImpl.class).in(Scopes.SINGLETON);
+    bind(SchemaStoreRegistration.class).to(Key.get(SchemaStoreImpl.class)).in(Scopes.SINGLETON);
     bind(SchemaStore.class).annotatedWith(Names.named(name)).to(Key.get(SchemaStore.class));
+
+    bind(SecondaryIndexTableHelper.class).in(Scopes.SINGLETON);
+    bind(SecondaryIndexStore.class).toProvider(SecondaryIndexStoreProvider.class).in(
+        Scopes.SINGLETON);
+    bind(SecondaryIndexStore.class).annotatedWith(Names.named(name)).to(
+        Key.get(SecondaryIndexStore.class));
 
     includeInternal();
 
     expose(Key.get(SchemaStore.class, Names.named(name)));
     expose(Key.get(KeyValueStore.class, Names.named(name)));
+    expose(Key.get(SecondaryIndexStore.class, Names.named(name)));
 
     includeExposures();
   }

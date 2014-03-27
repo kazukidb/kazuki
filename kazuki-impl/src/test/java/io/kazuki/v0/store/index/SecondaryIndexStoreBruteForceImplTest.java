@@ -44,7 +44,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class SecondaryIndexBruteForceImplTest extends TestSupport {
+public class SecondaryIndexStoreBruteForceImplTest extends TestSupport {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
       new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
           .withJdbiConfig(Configurations.getJdbi().build()));
@@ -60,7 +60,9 @@ public class SecondaryIndexBruteForceImplTest extends TestSupport {
     SchemaStore manager =
         inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));
 
-    SecondaryIndexStore index = new SecondaryIndexBruteForceImpl(store, manager);
+    SecondaryIndexStore index =
+        inject
+            .getInstance(com.google.inject.Key.get(SecondaryIndexStore.class, Names.named("foo")));
 
     lifecycle.init();
     lifecycle.start();

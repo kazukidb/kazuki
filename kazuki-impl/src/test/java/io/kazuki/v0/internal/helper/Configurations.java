@@ -35,6 +35,6 @@ public class Configurations {
   public static KeyValueStoreConfiguration.Builder getKeyValue(String groupName, String storeName) {
     return new KeyValueStoreConfiguration.Builder().withDbType("h2").withGroupName(groupName)
         .withStoreName(storeName).withPartitionName("default").withPartitionSize(1000L)
-        .withStrictTypeCreation(true);
+        .withStrictTypeCreation(true).withSecondaryIndex(false);
   }
 }

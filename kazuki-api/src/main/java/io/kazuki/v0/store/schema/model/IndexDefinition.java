@@ -64,6 +64,10 @@ public class IndexDefinition {
       newIndexAttributeMap.put(attrName, attr);
     }
 
+    if (newIndexAttributeMap.containsKey("id")) {
+      throw new IllegalArgumentException("index definition must not contain 'id' attribute");
+    }
+
     this.indexColumns = Collections.unmodifiableList(cols);
     this.attributeNames = Collections.unmodifiableList(newAttributeNames);
     this.indexAttributeMap = Collections.unmodifiableMap(newIndexAttributeMap);

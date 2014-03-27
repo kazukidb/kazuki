@@ -25,6 +25,7 @@ import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.model.Schema;
+import io.kazuki.v0.store.sequence.ResolvedKey;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -33,20 +34,47 @@ import java.util.Map;
 
 import javax.inject.Inject;
 
+import org.skife.jdbi.v2.Handle;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
 
-public class SecondaryIndexBruteForceImpl implements SecondaryIndexStore {
+public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport {
   private final KeyValueStore kvStore;
   private final SchemaStore schemaStore;
 
   @Inject
-  public SecondaryIndexBruteForceImpl(KeyValueStore kvStore, SchemaStore schemaStore) {
+  public SecondaryIndexStoreBruteForceImpl(KeyValueStore kvStore, SchemaStore schemaStore) {
     this.kvStore = kvStore;
     this.schemaStore = schemaStore;
   }
+
+  @Override
+  public void onSchemaCreate(String type, Schema schema) {}
+
+  @Override
+  public void onSchemaUpdate(String type, Schema newSchema, Schema oldSchema,
+      KeyValueIterable<KeyValuePair<LinkedHashMap>> entityCollection) {}
+
+  @Override
+  public void onSchemaDelete(String type, Schema oldSchema) {}
+
+  @Override
+  public <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> instance) {}
+
+  @Override
+  public <T> void onUpdate(Handle handle, String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance) {}
+
+  @Override
+  public <T> void onDelete(Handle handle, String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> oldInstance) {}
+
+  @Override
+  public void clear(Handle handle, Map<String, Schema> typeToSchemaMap, boolean preserveSchema) {}
 
   @Override
   public Map<UniqueEntityDescription<?>, ?> multiRetrieveUniqueEntities(

@@ -103,3 +103,7 @@ h2_kv_reset(kv_table_name) ::=<<
 h2_kv_destroy(kv_table_name) ::=<< 
   drop table "<kv_table_name>"
 >>
+
+h2_drop_index(table_name, index_name) ::=<< 
+  drop index <index_name>
+>>
