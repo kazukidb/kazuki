@@ -18,6 +18,7 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.IoHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
 import io.kazuki.v0.internal.helper.LogTranslation;
+import io.kazuki.v0.internal.helper.OpaquePaginationHelper;
 import io.kazuki.v0.internal.helper.SqlParamBindings;
 import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
 import io.kazuki.v0.store.KazukiException;
@@ -40,6 +41,7 @@ import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 import io.kazuki.v0.store.sequence.SequenceService;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,6 +59,7 @@ import org.skife.jdbi.v2.exceptions.UnableToExecuteStatementException;
 import org.slf4j.Logger;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
@@ -103,8 +106,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       String indexName, List<QueryTerm> query, SortDirection sortDirection, @Nullable Long offset,
       @Nullable Long limit) {
     try {
-      return this.doIndexQuery(database, type, indexName, query, sortDirection, null, null, false,
-          schema.retrieveSchema(type));
+      return this.doIndexQuery(database, type, indexName, query, sortDirection, offset, limit,
+          false, schema.retrieveSchema(type));
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -123,14 +126,39 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   public <T> QueryResultsPage<T> queryWithPagination(String type, Class<T> clazz, String indexName,
       List<QueryTerm> query, SortDirection sortDirection, Boolean loadResults, PageToken token,
       Long limit) {
-    throw new UnsupportedOperationException("not supported - yet");
+    try {
+      KeyValueIterable<Key> kvIter =
+          queryWithoutPagination(type, clazz, indexName, query, sortDirection,
+              OpaquePaginationHelper.decodeOpaqueCursor(token.getToken()), limit);
+      List<KeyValuePair<T>> kvPairs = new ArrayList<KeyValuePair<T>>();
+
+      if (loadResults) {
+        List<Key> toRetrieve = new ArrayList<Key>();
+        Iterables.addAll(toRetrieve, kvIter);
+
+        Map<Key, T> resultMap = kvStore.multiRetrieve(toRetrieve, clazz);
+
+        for (Map.Entry<Key, T> entry : resultMap.entrySet()) {
+          kvPairs.add(new KeyValuePair<T>(entry.getKey(), entry.getValue()));
+        }
+      } else {
+        for (Key key : kvIter) {
+          kvPairs.add(new KeyValuePair<T>(key, null));
+        }
+      }
+
+      return new QueryResultsPageImpl<T>(kvPairs, loadResults);
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
   }
 
   @Override
   public <T> QueryResultsPage<T> queryWithPagination(String type, Class<T> clazz, String indexName,
       String queryString, SortDirection sortDirection, Boolean loadResults, PageToken token,
       Long limit) {
-    throw new UnsupportedOperationException("not supported - yet");
+    return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
+        sortDirection, loadResults, token, limit);
   }
 
   @Override
@@ -143,13 +171,6 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   public Map<UniqueEntityDescription<?>, Key> multiRetrieveUniqueKeys(
       Collection<UniqueEntityDescription<?>> entityDefinitions) {
     throw new UnsupportedOperationException("not supported - yet");
-  }
-
-  public void createTable(IDBI database, final String type, final String indexName,
-      final Schema schema) {
-    JDBIHelper.createTable(database, tableHelper.getTableDrop(type, indexName, groupName,
-        storeName, partitionName), tableHelper.getTableDefinition(type, indexName, schema,
-        groupName, storeName, partitionName));
   }
 
   @Override
@@ -268,7 +289,14 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     }
   }
 
-  public void createIndex(IDBI database, final String type, final String indexName,
+  private void createTable(IDBI database, final String type, final String indexName,
+      final Schema schema) {
+    JDBIHelper.createTable(database, tableHelper.getTableDrop(type, indexName, groupName,
+        storeName, partitionName), tableHelper.getTableDefinition(type, indexName, schema,
+        groupName, storeName, partitionName));
+  }
+
+  private void createIndex(IDBI database, final String type, final String indexName,
       final Schema schemaDefinition) {
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
@@ -294,7 +322,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     });
   }
 
-  public void dropTableAndIndex(Handle handle, final String type, final String indexName) {
+  private void dropTableAndIndex(Handle handle, final String type, final String indexName) {
     handle.createStatement(
         tableHelper.getTableDrop(type, indexName, groupName, storeName, partitionName)).execute();
 
@@ -311,18 +339,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     }
   }
 
-  public void dropTable(IDBI database, final String type, final String indexName) {
-    database.inTransaction(new TransactionCallback<Void>() {
-      @Override
-      public Void inTransaction(Handle handle, TransactionStatus arg1) throws Exception {
-        dropTableAndIndex(handle, type, indexName);
-
-        return null;
-      }
-    });
-  }
-
-  public void insertEntity(Handle handle, final Long id, final Map<String, Object> value,
+  private void insertEntity(Handle handle, final Long id, final Map<String, Object> value,
       final String type, final String indexName, final Schema schema) throws KazukiException {
     SqlParamBindings bindings = new SqlParamBindings(true);
 
@@ -358,7 +375,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     }
   }
 
-  public void updateEntity(Handle handle, final Long id, final Map<String, Object> value,
+  private void updateEntity(Handle handle, final Long id, final Map<String, Object> value,
       final Map<String, Object> prev, final String type, final String indexName, final Schema schema)
       throws KazukiException {
     IndexDefinition indexDefinition = schema.getIndex(indexName);
@@ -403,7 +420,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     }
   }
 
-  public void deleteEntity(Handle handle, final Long id, final String type,
+  private void deleteEntity(Handle handle, final Long id, final String type,
       final Map<String, Object> value, final String indexName, final Schema schema)
       throws KazukiException {
     IndexDefinition indexDefinition = schema.getIndex(indexName);
@@ -423,23 +440,21 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     delete.execute();
   }
 
-  public void setEntityQuarantine(Handle handle, final Long id, final String type,
-      final String indexName, boolean isQuarantined, final Map<String, Object> original,
-      final Schema schema) {
-    SqlParamBindings bindings = new SqlParamBindings(true);
+  /*
+   * private void setEntityQuarantine(Handle handle, final Long id, final String type, final String
+   * indexName, boolean isQuarantined, final Map<String, Object> original, final Schema schema) {
+   * SqlParamBindings bindings = new SqlParamBindings(true);
+   * 
+   * Update quarantine = handle.createStatement(tableHelper.getQuarantineStatement(type, indexName,
+   * bindings, isQuarantined, groupName, storeName, partitionName));
+   * 
+   * bindings.bind("id", id, Attribute.Type.U64); bindings.bindToStatement(quarantine);
+   * 
+   * quarantine.execute(); }
+   */
 
-    Update quarantine =
-        handle.createStatement(tableHelper.getQuarantineStatement(type, indexName, bindings,
-            isQuarantined, groupName, storeName, partitionName));
-
-    bindings.bind("id", id, Attribute.Type.U64);
-    bindings.bindToStatement(quarantine);
-
-    quarantine.execute();
-  }
-
-  public KeyValueIterable<Key> doIndexQuery(IDBI database, final String type, String indexName,
-      List<QueryTerm> queryTerms, final SortDirection sortDirection, String token, Long pageSize,
+  private KeyValueIterable<Key> doIndexQuery(IDBI database, final String type, String indexName,
+      List<QueryTerm> queryTerms, final SortDirection sortDirection, Long offset, Long pageSize,
       boolean includeQuarantine, final Schema schema) throws Exception {
     SecondaryIndexQueryValidation.validateQuery(indexName, queryTerms, schema);
 
@@ -458,7 +473,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     final SqlParamBindings bindings = new SqlParamBindings(true);
 
     final String querySql =
-        tableHelper.getIndexQuery(type, indexName, termMap, sortDirection, token, pageSize,
+        tableHelper.getIndexQuery(type, indexName, termMap, sortDirection, offset, pageSize,
             includeQuarantine, indexDefinition, schema, transform, bindings, groupName, storeName,
             partitionName);
 
@@ -516,14 +531,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     };
   }
 
-  public boolean tableExists(IDBI database, final String type, final String indexName) {
-    String tablename =
-        tableHelper.getTableName(type, indexName, groupName, storeName, partitionName);
-
-    return JDBIHelper.tableExists(database, tableHelper.getPrefix(), tablename);
-  }
-
-  public void truncateTable(Handle handle, final String type, final String indexName,
+  private void truncateTable(Handle handle, final String type, final String indexName,
       final String groupName, String storeName, String partitionName) {
     String indexTableName =
         tableHelper.getTableName(type, indexName, groupName, storeName, partitionName);

@@ -30,6 +30,27 @@ public class QueryResultsPageImpl<T> implements QueryResultsPage<T> {
   private final PageToken prevToken;
   private final PageToken nextToken;
 
+  public QueryResultsPageImpl(List<KeyValuePair<T>> results, boolean includesResults) {
+    List<Key> newResultKeys = new ArrayList<Key>();
+    for (KeyValuePair<T> kv : results) {
+      newResultKeys.add(kv.getKey());
+    }
+
+    if (includesResults) {
+      List<KeyValuePair<T>> newResults = new ArrayList<KeyValuePair<T>>();
+      newResults.addAll(results);
+      this.results = Collections.unmodifiableList(newResults);
+    } else {
+      this.results = null;
+    }
+
+    this.resultKeys = Collections.unmodifiableList(newResultKeys);
+
+    this.currToken = null;
+    this.nextToken = null;
+    this.prevToken = null;
+  }
+
   public QueryResultsPageImpl(KeyValueIterable<?> iterable, Long limit, boolean includeResults) {
     List<Key> newResultKeys = new ArrayList<Key>();
     List<KeyValuePair<T>> newResults = new ArrayList<KeyValuePair<T>>();

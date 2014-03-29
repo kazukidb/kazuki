@@ -111,10 +111,40 @@ public class SecondaryIndexStoreBruteForceImplTest extends TestSupport {
             "fooKey",
             new QueryBuilder()
                 .andMatchesSingle("fooKey", QueryOperator.EQ, ValueType.STRING, "k00").build(),
+            SortDirection.ASCENDING, 1L, null).iterator()) {
+
+      Assert.assertTrue(iter.hasNext());
+      Assert.assertEquals(k5, iter.next());
+
+      Assert.assertFalse(iter.hasNext());
+    }
+
+    try (KeyValueIterator<Key> iter =
+        index.queryWithoutPagination(
+            "foo",
+            Foo.class,
+            "fooKey",
+            new QueryBuilder()
+                .andMatchesSingle("fooKey", QueryOperator.EQ, ValueType.STRING, "k00").build(),
             SortDirection.DESCENDING, null, null).iterator()) {
 
       Assert.assertTrue(iter.hasNext());
       Assert.assertEquals(k5, iter.next());
+
+      Assert.assertTrue(iter.hasNext());
+      Assert.assertEquals(k0, iter.next());
+
+      Assert.assertFalse(iter.hasNext());
+    }
+
+    try (KeyValueIterator<Key> iter =
+        index.queryWithoutPagination(
+            "foo",
+            Foo.class,
+            "fooKey",
+            new QueryBuilder()
+                .andMatchesSingle("fooKey", QueryOperator.EQ, ValueType.STRING, "k00").build(),
+            SortDirection.DESCENDING, 1L, null).iterator()) {
 
       Assert.assertTrue(iter.hasNext());
       Assert.assertEquals(k0, iter.next());

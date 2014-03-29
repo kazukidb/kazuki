@@ -447,7 +447,7 @@ public class SecondaryIndexTableHelper {
   }
 
   public String getIndexQuery(String type, String indexName, SortDirection sortDirection,
-      List<QueryTerm> queryTerms, String token, Long pageSize, boolean includeQuarantine,
+      List<QueryTerm> queryTerms, Long offset, Long pageSize, boolean includeQuarantine,
       Schema schema, SqlParamBindings bindings, String groupName, String storeName,
       String partitionName) throws Exception {
     IndexDefinition indexDef = schema.getIndex(indexName);
@@ -456,14 +456,14 @@ public class SecondaryIndexTableHelper {
       throw new IllegalArgumentException("schema or index not found " + type + "." + indexName);
     }
 
-    return getIndexQuery(type, indexName, sortTerms(indexDef, queryTerms), sortDirection, token,
+    return getIndexQuery(type, indexName, sortTerms(indexDef, queryTerms), sortDirection, offset,
         pageSize, includeQuarantine, indexDef, schema, new FieldTransform(schema), bindings,
         groupName, storeName, partitionName);
 
   }
 
   public String getIndexQuery(String type, String indexName, Map<String, List<QueryTerm>> termMap,
-      SortDirection sortDirection, String token, Long pageSize, boolean includeQuarantine,
+      SortDirection sortDirection, Long offset, Long pageSize, boolean includeQuarantine,
       IndexDefinition indexDefinition, Schema schema, FieldTransform transform,
       SqlParamBindings bindings, String groupName, String storeName, String partitionName)
       throws Exception {
@@ -542,7 +542,7 @@ public class SecondaryIndexTableHelper {
     sortOrders.add(getColumnName("id") + " "
         + (sortDirection.equals(SortDirection.ASCENDING) ? "ASC" : "DESC"));
 
-    Long offset = token != null ? OpaquePaginationHelper.decodeOpaqueCursor(token) : 0L;
+    offset = offset != null ? offset : 0L;
     Long limit = pageSize != null ? pageSize + 1L : -1;
 
     StringBuilder sqlBuilder = new StringBuilder();
@@ -598,13 +598,9 @@ public class SecondaryIndexTableHelper {
   }
 
   public List<Map<String, Object>> doUniqueIndexQuery(IDBI database, String type, String indexName,
-      Map<String, List<QueryTerm>> termMap, String token, IndexDefinition indexDefinition,
-      Schema schema, FieldTransform transform, String groupName, String storeName,
-      String partitionName) throws Exception {
-    if (token != null) {
-      return null;
-    }
-
+      Map<String, List<QueryTerm>> termMap, IndexDefinition indexDefinition, Schema schema,
+      FieldTransform transform, String groupName, String storeName, String partitionName)
+      throws Exception {
     Set<String> foundAttrs = new HashSet<String>();
     for (Map.Entry<String, List<QueryTerm>> entry : termMap.entrySet()) {
       if (entry.getValue().size() != 1) {
@@ -637,7 +633,7 @@ public class SecondaryIndexTableHelper {
     final SqlParamBindings bindings = new SqlParamBindings(true);
 
     final String querySql =
-        getIndexQuery(type, indexName, termMap, null, token, 10L, false, indexDefinition, schema,
+        getIndexQuery(type, indexName, termMap, null, 0L, 1L, false, indexDefinition, schema,
             transform, bindings, groupName, storeName, partitionName);
 
     database.inTransaction(new TransactionCallback<Void>() {
