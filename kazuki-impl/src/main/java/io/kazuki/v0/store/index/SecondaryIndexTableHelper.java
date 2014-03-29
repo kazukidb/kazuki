@@ -72,44 +72,56 @@ public class SecondaryIndexTableHelper {
   }
 
   public void createIndex(IDBI database, final String type, final String indexName,
-      final Schema schema) {
+      final Schema schema, final String groupName, final String storeName,
+      final String partitionName) {
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
       public Void inTransaction(Handle handle, TransactionStatus arg1) throws Exception {
         try {
-          handle.createStatement(prefix + "drop_index")
-              .define("table_name", getTableName(type, indexName))
-              .define("index_name", getIndexName(type, indexName)).execute();
+          handle
+              .createStatement(prefix + "drop_index")
+              .define("table_name",
+                  getTableName(type, indexName, groupName, storeName, partitionName))
+              .define("index_name",
+                  getIndexName(type, indexName, groupName, storeName, partitionName)).execute();
         } catch (UnableToExecuteStatementException ok) {
           // expected case in mysql - this is just best-effort anyway
         }
 
-        handle.createStatement(getTableDefinition(type, indexName, schema)).execute();
+        handle.createStatement(
+            getTableDefinition(type, indexName, schema, groupName, storeName, partitionName))
+            .execute();
 
-        handle.createStatement(getIndexDefinition(type, indexName, schema)).execute();
+        handle.createStatement(
+            getIndexDefinition(type, indexName, schema, groupName, storeName, partitionName))
+            .execute();
 
         return null;
       }
     });
   }
 
-  public void dropTableAndIndex(Handle handle, final String type, final String indexName) {
-    handle.createStatement(getTableDrop(type, indexName)).execute();
+  public void dropTableAndIndex(Handle handle, final String type, final String indexName,
+      String groupName, String storeName, String partitionName) {
+    handle.createStatement(getTableDrop(type, indexName, groupName, storeName, partitionName))
+        .execute();
 
     try {
       handle.createStatement(prefix + "drop_index")
-          .define("table_name", getTableName(type, indexName))
-          .define("index_name", getIndexName(type, indexName)).execute();
+          .define("table_name", getTableName(type, indexName, groupName, storeName, partitionName))
+          .define("index_name", getIndexName(type, indexName, groupName, storeName, partitionName))
+          .execute();
     } catch (UnableToExecuteStatementException ok) {
       // expected case in mysql - this is just best-effort anyway
     }
   }
 
-  public void dropTableAndIndex(IDBI database, final String type, final String indexName) {
+  public void dropTableAndIndex(IDBI database, final String type, final String indexName,
+      final String groupName, final String storeName, final String partitionName) {
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
       public Void inTransaction(Handle handle, TransactionStatus arg1) throws Exception {
-        dropTableAndIndex(handle, type, indexName);
+        dropTableAndIndex(handle, type, indexName, groupName, storeName, partitionName);
 
         return null;
       }
@@ -117,7 +129,7 @@ public class SecondaryIndexTableHelper {
   }
 
   public String getInsertStatement(String type, String indexName, Schema schema,
-      SqlParamBindings bindings) {
+      SqlParamBindings bindings, String groupName, String storeName, String partitionName) {
     IndexDefinition indexDefinition = schema.getIndexMap().get(indexName);
 
     List<String> cols = new ArrayList<String>();
@@ -142,7 +154,7 @@ public class SecondaryIndexTableHelper {
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("insert into ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" (");
     sqlBuilder.append(StringHelper.join(", ", cols));
     sqlBuilder.append(") values (");
@@ -153,7 +165,7 @@ public class SecondaryIndexTableHelper {
   }
 
   public String getUpdateStatement(String type, String indexName, Schema schema,
-      SqlParamBindings bindings) {
+      SqlParamBindings bindings, String groupName, String storeName, String partitionName) {
     IndexDefinition indexDefinition = schema.getIndexMap().get(indexName);
 
     List<String> sets = new ArrayList<String>();
@@ -169,7 +181,7 @@ public class SecondaryIndexTableHelper {
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("update ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" set ");
     sqlBuilder.append(StringHelper.join(", ", sets));
     sqlBuilder.append(" where ");
@@ -180,10 +192,11 @@ public class SecondaryIndexTableHelper {
     return sqlBuilder.toString();
   }
 
-  public String getDeleteStatement(String type, String indexName, SqlParamBindings bindings) {
+  public String getDeleteStatement(String type, String indexName, SqlParamBindings bindings,
+      String groupName, String storeName, String partitionName) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("delete from ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" where ");
     sqlBuilder.append(typeHelper.quote("_id"));
     sqlBuilder.append(" = ");
@@ -193,10 +206,10 @@ public class SecondaryIndexTableHelper {
   }
 
   public String getQuarantineStatement(String type, String indexName, SqlParamBindings bindings,
-      boolean isQuarantined) {
+      boolean isQuarantined, String groupName, String storeName, String partitionName) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("update ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" set ");
     sqlBuilder.append(typeHelper.quote("quarantined"));
     sqlBuilder.append(" = ");
@@ -210,8 +223,10 @@ public class SecondaryIndexTableHelper {
     return sqlBuilder.toString();
   }
 
-  public void truncateIndexTable(Handle handle, final String type, final String indexName) {
-    String indexTableName = getTableName(type, indexName);
+  public void truncateIndexTable(Handle handle, final String type, final String indexName,
+      String groupName, String storeName, String partitionName) {
+    String indexTableName = getTableName(type, indexName, groupName, storeName, partitionName);
+
     handle.createStatement(prefix + "truncate_table").define("table_name", indexTableName)
         .execute();
   }
@@ -275,22 +290,39 @@ public class SecondaryIndexTableHelper {
     return typeHelper.quote("_" + attributeName + "");
   }
 
-  public String getTableName(String type, String index) {
+  public String getTableName(String type, String index, String groupName, String storeName,
+      String partitionName) {
     try {
       Integer typeId = sequences.getTypeId(type, false);
       if (typeId == null) {
         return null;
       }
 
-      return typeHelper.quote("_i_" + String.format("%04d", typeId) + "__" + getIndexHexId(index));
+      String truncType = truncateString(type, 4);
+      String truncIndex = truncateString(index, 10);
+
+      return typeHelper.quote("_" + groupName + "_" + storeName + "__idxtbl__" + partitionName
+          + "_" + String.format("%04d", typeId) + "__" + getIndexHexId(index) + "_" + truncType
+          + "_" + truncIndex);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  public String getIndexName(String type, String index) {
+  public String getIndexName(String type, String index, String groupName, String storeName,
+      String partitionName) {
     try {
-      return typeHelper.quote("_idx_" + getUniqueIndexIdentifier(type, index));
+      Integer typeId = sequences.getTypeId(type, false);
+      if (typeId == null) {
+        return null;
+      }
+
+      String truncType = truncateString(type, 4);
+      String truncIndex = truncateString(index, 10);
+
+      return typeHelper.quote("_" + groupName + "_" + storeName + "__idxidx__" + partitionName
+          + "_" + String.format("%04d", typeId) + "__" + getIndexHexId(index) + "_" + truncType
+          + "_" + truncIndex);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -300,25 +332,28 @@ public class SecondaryIndexTableHelper {
     return String.format("%016x", longHash.getLongHashCode(index));
   }
 
-  public String getTableDrop(String type, String indexName) {
+  public String getTableDrop(String type, String indexName, String groupName, String storeName,
+      String partitionName) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("drop table if exists ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
 
     return sqlBuilder.toString();
   }
 
-  public String getIndexDrop(String type, String indexName) {
+  public String getIndexDrop(String type, String indexName, String groupName, String storeName,
+      String partitionName) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("drop index ");
-    sqlBuilder.append(getIndexName(type, indexName));
+    sqlBuilder.append(getIndexName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" on ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
 
     return sqlBuilder.toString();
   }
 
-  public String getTableDefinition(String type, String indexName, Schema schema) {
+  public String getTableDefinition(String type, String indexName, Schema schema, String groupName,
+      String storeName, String partitionName) {
     IndexDefinition indexDefinition = schema.getIndexMap().get(indexName);
 
     if (indexDefinition == null) {
@@ -327,7 +362,7 @@ public class SecondaryIndexTableHelper {
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("create table if not exists ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" (");
     sqlBuilder.append(typeHelper.quote("_id"));
     sqlBuilder.append(" ");
@@ -361,7 +396,8 @@ public class SecondaryIndexTableHelper {
     return sqlBuilder.toString();
   }
 
-  public String getIndexDefinition(String type, String indexName, Schema schema) {
+  public String getIndexDefinition(String type, String indexName, Schema schema, String groupName,
+      String storeName, String partitionName) {
     IndexDefinition indexDefinition = schema.getIndexMap().get(indexName);
 
     if (indexDefinition == null) {
@@ -400,9 +436,9 @@ public class SecondaryIndexTableHelper {
     }
 
     sqlBuilder.append("index ");
-    sqlBuilder.append(getIndexName(type, indexName));
+    sqlBuilder.append(getIndexName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" on ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" (");
     sqlBuilder.append(StringHelper.join(", ", colDefs));
     sqlBuilder.append(")");
@@ -412,7 +448,8 @@ public class SecondaryIndexTableHelper {
 
   public String getIndexQuery(String type, String indexName, SortDirection sortDirection,
       List<QueryTerm> queryTerms, String token, Long pageSize, boolean includeQuarantine,
-      Schema schema, SqlParamBindings bindings) throws Exception {
+      Schema schema, SqlParamBindings bindings, String groupName, String storeName,
+      String partitionName) throws Exception {
     IndexDefinition indexDef = schema.getIndex(indexName);
 
     if (indexDef == null) {
@@ -420,14 +457,16 @@ public class SecondaryIndexTableHelper {
     }
 
     return getIndexQuery(type, indexName, sortTerms(indexDef, queryTerms), sortDirection, token,
-        pageSize, includeQuarantine, indexDef, schema, new FieldTransform(schema), bindings);
+        pageSize, includeQuarantine, indexDef, schema, new FieldTransform(schema), bindings,
+        groupName, storeName, partitionName);
 
   }
 
   public String getIndexQuery(String type, String indexName, Map<String, List<QueryTerm>> termMap,
       SortDirection sortDirection, String token, Long pageSize, boolean includeQuarantine,
       IndexDefinition indexDefinition, Schema schema, FieldTransform transform,
-      SqlParamBindings bindings) throws Exception {
+      SqlParamBindings bindings, String groupName, String storeName, String partitionName)
+      throws Exception {
     List<QueryTerm> firstTerm = termMap.get(indexDefinition.getIndexAttributes().get(0).getName());
     if (firstTerm == null || firstTerm.isEmpty()) {
       throw new IllegalArgumentException("missing query term for first attribute of index");
@@ -510,7 +549,7 @@ public class SecondaryIndexTableHelper {
     sqlBuilder.append("select ");
     sqlBuilder.append(typeHelper.quote("_id"));
     sqlBuilder.append(" from ");
-    sqlBuilder.append(getTableName(type, indexName));
+    sqlBuilder.append(getTableName(type, indexName, groupName, storeName, partitionName));
     sqlBuilder.append(" where ");
     if (!includeQuarantine) {
       sqlBuilder.append(typeHelper.quote("quarantined"));
@@ -560,7 +599,8 @@ public class SecondaryIndexTableHelper {
 
   public List<Map<String, Object>> doUniqueIndexQuery(IDBI database, String type, String indexName,
       Map<String, List<QueryTerm>> termMap, String token, IndexDefinition indexDefinition,
-      Schema schema, FieldTransform transform) throws Exception {
+      Schema schema, FieldTransform transform, String groupName, String storeName,
+      String partitionName) throws Exception {
     if (token != null) {
       return null;
     }
@@ -598,7 +638,7 @@ public class SecondaryIndexTableHelper {
 
     final String querySql =
         getIndexQuery(type, indexName, termMap, null, token, 10L, false, indexDefinition, schema,
-            transform, bindings);
+            transform, bindings, groupName, storeName, partitionName);
 
     database.inTransaction(new TransactionCallback<Void>() {
       @Override
@@ -730,5 +770,11 @@ public class SecondaryIndexTableHelper {
 
   private String getUniqueIndexIdentifier(String type, String index) throws Exception {
     return String.format("%04d", sequences.getTypeId(type, false)) + "__" + getIndexHexId(index);
+  }
+
+  private String truncateString(String value, int desired) {
+    int len = value.length();
+
+    return len >= desired ? value.substring(0, desired) : value;
   }
 }

@@ -68,17 +68,24 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final SchemaStore schema;
   private final KeyValueStore kvStore;
   private final SecondaryIndexTableHelper tableHelper;
+  private final String groupName;
+  private final String storeName;
+  private final String partitionName;
 
   @Inject
   public SecondaryIndexStoreJdbiImpl(AvailabilityManager availability, IDBI database,
       SequenceService sequence, SchemaStore schema, KeyValueStore kvStore,
-      SecondaryIndexTableHelper tableHelper) {
+      SecondaryIndexTableHelper tableHelper, String groupName, String storeName,
+      String partitionName) {
     this.availability = availability;
     this.database = database;
     this.sequence = sequence;
     this.schema = schema;
     this.kvStore = kvStore;
     this.tableHelper = tableHelper;
+    this.groupName = groupName;
+    this.storeName = storeName;
+    this.partitionName = partitionName;
   }
 
   @Inject
@@ -140,8 +147,9 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
   public void createTable(IDBI database, final String type, final String indexName,
       final Schema schema) {
-    JDBIHelper.createTable(database, tableHelper.getTableDrop(type, indexName),
-        tableHelper.getTableDefinition(type, indexName, schema));
+    JDBIHelper.createTable(database, tableHelper.getTableDrop(type, indexName, groupName,
+        storeName, partitionName), tableHelper.getTableDefinition(type, indexName, schema,
+        groupName, storeName, partitionName));
   }
 
   @Override
@@ -191,7 +199,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
       for (IndexDefinition indexDef : schema.getIndexes()) {
         if (preserveSchema) {
-          this.truncateTable(handle, type, indexDef.getName());
+          this.truncateTable(handle, type, indexDef.getName(), groupName, storeName, partitionName);
         } else {
           this.dropTableAndIndex(handle, type, indexDef.getName());
         }
@@ -266,15 +274,20 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       @Override
       public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
         try {
-          handle.createStatement(tableHelper.getPrefix() + "drop_index")
-              .define("table_name", tableHelper.getTableName(type, indexName))
-              .define("index_name", tableHelper.getIndexName(type, indexName)).execute();
+          handle
+              .createStatement(tableHelper.getPrefix() + "drop_index")
+              .define("table_name",
+                  tableHelper.getTableName(type, indexName, groupName, storeName, partitionName))
+              .define("index_name",
+                  tableHelper.getIndexName(type, indexName, groupName, storeName, partitionName))
+              .execute();
         } catch (UnableToExecuteStatementException ok) {
           // expected case in mysql - this is just best-effort anyway
         }
 
-        handle.createStatement(tableHelper.getIndexDefinition(type, indexName, schemaDefinition))
-            .execute();
+        handle.createStatement(
+            tableHelper.getIndexDefinition(type, indexName, schemaDefinition, groupName, storeName,
+                partitionName)).execute();
 
         return null;
       }
@@ -282,12 +295,17 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   }
 
   public void dropTableAndIndex(Handle handle, final String type, final String indexName) {
-    handle.createStatement(tableHelper.getTableDrop(type, indexName)).execute();
+    handle.createStatement(
+        tableHelper.getTableDrop(type, indexName, groupName, storeName, partitionName)).execute();
 
     try {
-      handle.createStatement(tableHelper.getPrefix() + "drop_index")
-          .define("table_name", tableHelper.getTableName(type, indexName))
-          .define("index_name", tableHelper.getIndexName(type, indexName)).execute();
+      handle
+          .createStatement(tableHelper.getPrefix() + "drop_index")
+          .define("table_name",
+              tableHelper.getTableName(type, indexName, groupName, storeName, partitionName))
+          .define("index_name",
+              tableHelper.getIndexName(type, indexName, groupName, storeName, partitionName))
+          .execute();
     } catch (UnableToExecuteStatementException ok) {
       // expected case in mysql - this is just best-effort anyway
     }
@@ -309,7 +327,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     SqlParamBindings bindings = new SqlParamBindings(true);
 
     Update insert =
-        handle.createStatement(tableHelper.getInsertStatement(type, indexName, schema, bindings));
+        handle.createStatement(tableHelper.getInsertStatement(type, indexName, schema, bindings,
+            groupName, storeName, partitionName));
 
     IndexDefinition indexDefinition = schema.getIndex(indexName);
     bindings.bind("id", id, Attribute.Type.U64);
@@ -354,7 +373,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     SqlParamBindings bindings = new SqlParamBindings(true);
 
     Update update =
-        handle.createStatement(tableHelper.getUpdateStatement(type, indexName, schema, bindings));
+        handle.createStatement(tableHelper.getUpdateStatement(type, indexName, schema, bindings,
+            groupName, storeName, partitionName));
 
     for (IndexAttribute attr : indexDefinition.getIndexAttributes()) {
       String attrName = attr.getName();
@@ -394,7 +414,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     SqlParamBindings bindings = new SqlParamBindings(true);
 
     Update delete =
-        handle.createStatement(tableHelper.getDeleteStatement(type, indexName, bindings));
+        handle.createStatement(tableHelper.getDeleteStatement(type, indexName, bindings, groupName,
+            storeName, partitionName));
 
     bindings.bind("id", id, Attribute.Type.U64);
     bindings.bindToStatement(delete);
@@ -409,7 +430,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
     Update quarantine =
         handle.createStatement(tableHelper.getQuarantineStatement(type, indexName, bindings,
-            isQuarantined));
+            isQuarantined, groupName, storeName, partitionName));
 
     bindings.bind("id", id, Attribute.Type.U64);
     bindings.bindToStatement(quarantine);
@@ -438,7 +459,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
     final String querySql =
         tableHelper.getIndexQuery(type, indexName, termMap, sortDirection, token, pageSize,
-            includeQuarantine, indexDefinition, schema, transform, bindings);
+            includeQuarantine, indexDefinition, schema, transform, bindings, groupName, storeName,
+            partitionName);
 
     log.debug("non-unique index query : {} : bindings : {}", querySql, bindings.asMap());
 
@@ -495,13 +517,16 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   }
 
   public boolean tableExists(IDBI database, final String type, final String indexName) {
-    String tablename = tableHelper.getTableName(type, indexName);
+    String tablename =
+        tableHelper.getTableName(type, indexName, groupName, storeName, partitionName);
 
     return JDBIHelper.tableExists(database, tableHelper.getPrefix(), tablename);
   }
 
-  public void truncateTable(Handle handle, final String type, final String indexName) {
-    String indexTableName = tableHelper.getTableName(type, indexName);
+  public void truncateTable(Handle handle, final String type, final String indexName,
+      final String groupName, String storeName, String partitionName) {
+    String indexTableName =
+        tableHelper.getTableName(type, indexName, groupName, storeName, partitionName);
     handle.createStatement(tableHelper.getPrefix() + "truncate_table")
         .define("table_name", indexTableName).execute();
   }

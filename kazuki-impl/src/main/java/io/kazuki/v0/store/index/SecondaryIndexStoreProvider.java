@@ -43,7 +43,8 @@ public class SecondaryIndexStoreProvider implements Provider<SecondaryIndexSuppo
     if (kvConfig.isSecondaryIndex()) {
       this.instance =
           new SecondaryIndexStoreJdbiImpl(availability, database, sequences, schemaStore, kvStore,
-              tableHelper);
+              tableHelper, kvConfig.getGroupName(), kvConfig.getStoreName(),
+              kvConfig.getPartitionName());
     } else {
       this.instance = new SecondaryIndexStoreBruteForceImpl(kvStore, schemaStore);
     }
