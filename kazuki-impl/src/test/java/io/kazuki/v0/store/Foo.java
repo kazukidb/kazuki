@@ -14,10 +14,25 @@
  */
 package io.kazuki.v0.store;
 
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
+import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.AttributeTransform;
+import io.kazuki.v0.store.schema.model.IndexAttribute;
+import io.kazuki.v0.store.schema.model.IndexDefinition;
+import io.kazuki.v0.store.schema.model.Schema;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
 
 public class Foo {
+  public static final Schema FOO_SCHEMA = new Schema(ImmutableList.of(new Attribute("fooKey",
+      Attribute.Type.UTF8_SMALLSTRING, null, true), new Attribute("fooValue",
+      Attribute.Type.UTF8_SMALLSTRING, null, true)),
+      ImmutableList.<IndexDefinition>of(new IndexDefinition("fooKey", ImmutableList
+          .of(new IndexAttribute("fooKey", SortDirection.ASCENDING, AttributeTransform.NONE)),
+          false)));
+
   private final String fooKey;
   private final String fooValue;
 

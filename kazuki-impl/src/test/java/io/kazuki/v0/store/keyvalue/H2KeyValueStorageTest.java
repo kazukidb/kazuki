@@ -25,8 +25,6 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-import io.kazuki.v0.store.schema.model.Attribute;
-import io.kazuki.v0.store.schema.model.IndexDefinition;
 import io.kazuki.v0.store.schema.model.Schema;
 
 import java.util.Map;
@@ -70,12 +68,8 @@ public class H2KeyValueStorageTest extends TestSupport {
     Assert.assertFalse(store.iterators().iterator("$schema", Schema.class, SortDirection.ASCENDING)
         .hasNext());
 
-    Schema schema =
-        new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
-            true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)),
-            ImmutableList.<IndexDefinition>of());
+    manager.createSchema("foo", Foo.FOO_SCHEMA);
 
-    manager.createSchema("foo", schema);
     try (KeyValueIterator<Schema> sIter =
         store.iterators().iterator("$schema", Schema.class, SortDirection.ASCENDING)) {
       Assert.assertTrue(sIter.hasNext());

@@ -34,9 +34,6 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-import io.kazuki.v0.store.schema.model.Attribute;
-import io.kazuki.v0.store.schema.model.IndexDefinition;
-import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.KeyImpl;
 
 import java.io.File;
@@ -46,7 +43,6 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.google.common.collect.ImmutableList;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
@@ -98,12 +94,7 @@ public class PartitionedJournalStoreClearTest extends TestSupport {
   public void testClear() throws Exception {
     assertThat(manager.retrieveSchema("foo"), Matchers.nullValue());
 
-    Schema schema =
-        new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
-            true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)),
-            ImmutableList.<IndexDefinition>of());
-
-    assertThat(manager.createSchema("foo", schema), is(KeyImpl.valueOf("$schema:3")));
+    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA), is(KeyImpl.valueOf("$schema:3")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     assertThat(journal.getActivePartition(), nullValue());
@@ -139,7 +130,7 @@ public class PartitionedJournalStoreClearTest extends TestSupport {
 
     journal.clear();
 
-    assertThat(manager.createSchema("foo", schema), is(KeyImpl.valueOf("$schema:3")));
+    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA), is(KeyImpl.valueOf("$schema:3")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     for (int i = 0; i < 100; i++) {

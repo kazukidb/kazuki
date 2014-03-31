@@ -14,6 +14,8 @@
  */
 package io.kazuki.v0.store.index;
 
+import io.kazuki.v0.internal.helper.EncodingHelper;
+import io.kazuki.v0.internal.helper.OpaquePaginationHelper;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryEvaluator;
@@ -27,6 +29,7 @@ import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +43,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 
 public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport {
   private final KeyValueStore kvStore;
@@ -133,44 +137,38 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
   public <T> QueryResultsPage<T> queryWithPagination(final String type, final Class<T> clazz,
       final String indexName, final List<QueryTerm> query, final SortDirection sortDirection,
       final Boolean loadResults, final PageToken token, final Long limit) {
-    throw new UnsupportedOperationException("not supported - yet");
+    try {
+      KeyValueIterable<Key> kvIter =
+          queryWithoutPagination(type, clazz, indexName, query, sortDirection,
+              OpaquePaginationHelper.decodeOpaqueCursor(token.getToken()), limit);
+      List<KeyValuePair<T>> kvPairs = new ArrayList<KeyValuePair<T>>();
 
-    /*
-     * Schema schema = null; try { schema = schemaStore.retrieveSchema(type); } catch
-     * (KazukiException e) { throw Throwables.propagate(e); }
-     * 
-     * Preconditions.checkNotNull(schema, "schema");
-     * SecondaryIndexQueryValidation.validateQuery(indexName, query, schema);
-     * 
-     * if (loadResults != null && loadResults) { final QueryEvaluator eval = new QueryEvaluator();
-     * 
-     * return new QueryResultsPageImpl<T>(new FilteredKeyValueIterable<T>(kvStore.iterators()
-     * .entries(type, LinkedHashMap.class, sortDirection), new Predicate<Object>() {
-     * 
-     * @SuppressWarnings("unchecked")
-     * 
-     * @Override public boolean apply(Object instance) { return eval.matches((LinkedHashMap<String,
-     * Object>) instance, query); } }, new Function<KeyValuePair<?>, T>() {
-     * 
-     * @SuppressWarnings("unchecked")
-     * 
-     * @Override public T apply(KeyValuePair<?> instance) { try { return (T)
-     * EncodingHelper.asValue((LinkedHashMap<String, Object>) instance.getValue(), clazz); } catch
-     * (Exception e) { throw Throwables.propagate(e); } } }, 0L, limit), limit, true); }
-     * 
-     * return new QueryResultsPageImpl<T>(queryWithoutPagination(type, clazz, indexName, query,
-     * sortDirection, 0L, limit), limit, false);
-     */
+      if (loadResults) {
+        List<Key> toRetrieve = new ArrayList<Key>();
+        Iterables.addAll(toRetrieve, kvIter);
+
+        Map<Key, T> resultMap = kvStore.multiRetrieve(toRetrieve, clazz);
+
+        for (Map.Entry<Key, T> entry : resultMap.entrySet()) {
+          kvPairs.add(new KeyValuePair<T>(entry.getKey(), entry.getValue()));
+        }
+      } else {
+        for (Key key : kvIter) {
+          kvPairs.add(new KeyValuePair<T>(key, null));
+        }
+      }
+
+      return new QueryResultsPageImpl<T>(kvPairs, loadResults);
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
   }
 
   @Override
   public <T> QueryResultsPage<T> queryWithPagination(String type, Class<T> clazz, String indexName,
       String queryString, SortDirection sortDirection, Boolean loadResults, PageToken token,
       Long limit) {
-    throw new UnsupportedOperationException("not supported - yet");
-    /*
-     * return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
-     * sortDirection, loadResults, token, limit);
-     */
+    return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
+        sortDirection, loadResults, token, limit);
   }
 }

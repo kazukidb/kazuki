@@ -28,9 +28,6 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-import io.kazuki.v0.store.schema.model.Attribute;
-import io.kazuki.v0.store.schema.model.IndexDefinition;
-import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.KeyImpl;
 
 import javax.sql.DataSource;
@@ -39,7 +36,6 @@ import junit.framework.Assert;
 
 import org.testng.annotations.Test;
 
-import com.google.common.collect.ImmutableList;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
@@ -72,12 +68,7 @@ public class SimpleJournalStoreTest extends TestSupport {
     lifecycle.init();
     lifecycle.start();
 
-    Schema schema =
-        new Schema(ImmutableList.of(new Attribute("fooKey", Attribute.Type.UTF8_SMALLSTRING, null,
-            true), new Attribute("fooValue", Attribute.Type.UTF8_SMALLSTRING, null, true)),
-            ImmutableList.<IndexDefinition>of());
-
-    Assert.assertEquals(manager.createSchema("foo", schema), KeyImpl.valueOf("$schema:2"));
+    Assert.assertEquals(manager.createSchema("foo", Foo.FOO_SCHEMA), KeyImpl.valueOf("$schema:2"));
     Assert.assertNotNull(manager.retrieveSchema("foo"));
 
     for (int i = 0; i < 100; i++) {
