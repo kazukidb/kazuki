@@ -47,6 +47,7 @@ Persistence Interfaces:
 
 Upcoming Backends:
 
+* ElasticSearch: KV Store, Journal Store, Full-Text indexes
 * LevelDB: Sequence, KV Store, Journal Store
 * Java Chronicle: Journal Store
 * Sqlite3 (via jdbi): Sequence, KV Store, Journal Store
