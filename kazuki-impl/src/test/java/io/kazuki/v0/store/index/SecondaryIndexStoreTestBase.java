@@ -5,6 +5,7 @@ import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryBuilder;
 import io.kazuki.v0.store.index.query.QueryOperator;
+import io.kazuki.v0.store.index.query.ValueHolder;
 import io.kazuki.v0.store.index.query.ValueType;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
@@ -14,10 +15,15 @@ import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Schema;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+
 import org.junit.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
@@ -165,6 +171,37 @@ public abstract class SecondaryIndexStoreTestBase extends TestSupport {
         Assert.assertFalse(iter.hasNext());
       }
     }
+
+    Map<UniqueEntityDescription, Key> map =
+        index.multiRetrieveUniqueKeys((Collection<UniqueEntityDescription>) ImmutableList.of(
+            new UniqueEntityDescription("foo", Foo.class, "uniqueFooKeyValue", Foo.FOO_SCHEMA,
+                ImmutableMap.of("fooKey", new ValueHolder(ValueType.STRING, "k00"), "fooValue",
+                    new ValueHolder(ValueType.STRING, "v99"))),
+            new UniqueEntityDescription("foo", Foo.class, "uniqueFooKeyValue", Foo.FOO_SCHEMA,
+                ImmutableMap.of("fooKey", new ValueHolder(ValueType.STRING, "k33"), "fooValue",
+                    new ValueHolder(ValueType.STRING, "v66"))),
+            new UniqueEntityDescription("foo", Foo.class, "uniqueFooKeyValue", Foo.FOO_SCHEMA,
+                ImmutableMap.of("fooKey", new ValueHolder(ValueType.STRING, "k00"), "fooValue",
+                    new ValueHolder(ValueType.STRING, "v55"))),
+            new UniqueEntityDescription("foo", Foo.class, "uniqueFooKeyValue", Foo.FOO_SCHEMA,
+                ImmutableMap.of("fooKey", new ValueHolder(ValueType.STRING, "k00"), "fooValue",
+                    new ValueHolder(ValueType.STRING, "v59")))));
+
+    Iterator<Key> iter = map.values().iterator();
+
+    Assert.assertTrue(iter.hasNext());
+    Assert.assertEquals(k0, iter.next());
+
+    Assert.assertTrue(iter.hasNext());
+    Assert.assertEquals(k3, iter.next());
+
+    Assert.assertTrue(iter.hasNext());
+    Assert.assertEquals(k5, iter.next());
+
+    Assert.assertTrue(iter.hasNext());
+    Assert.assertEquals(null, iter.next());
+
+    Assert.assertFalse(iter.hasNext());
 
     store.clear(false, false);
   }

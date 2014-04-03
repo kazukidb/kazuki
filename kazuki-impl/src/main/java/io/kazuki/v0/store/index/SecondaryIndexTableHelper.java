@@ -34,9 +34,9 @@ import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.SequenceService;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -46,11 +46,11 @@ import java.util.Set;
 
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
-import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.exceptions.UnableToExecuteStatementException;
 
+import com.google.common.base.Throwables;
 import com.google.inject.Inject;
 
 public class SecondaryIndexTableHelper {
@@ -597,68 +597,6 @@ public class SecondaryIndexTableHelper {
     return sqlBuilder.toString();
   }
 
-  public List<Map<String, Object>> doUniqueIndexQuery(IDBI database, String type, String indexName,
-      Map<String, List<QueryTerm>> termMap, IndexDefinition indexDefinition, Schema schema,
-      FieldTransform transform, String groupName, String storeName, String partitionName)
-      throws Exception {
-    Set<String> foundAttrs = new HashSet<String>();
-    for (Map.Entry<String, List<QueryTerm>> entry : termMap.entrySet()) {
-      if (entry.getValue().size() != 1) {
-        return null;
-      }
-
-      if (!QueryOperator.EQ.equals(entry.getValue().get(0).getOperator())) {
-        return null;
-      }
-
-      foundAttrs.add(entry.getKey());
-    }
-
-    for (String attrName : indexDefinition.getAttributeNames()) {
-      if (!foundAttrs.contains(attrName)) {
-        return null;
-      }
-    }
-
-    Map<String, Object> value = new LinkedHashMap<String, Object>();
-
-    for (IndexAttribute attribute : indexDefinition.getIndexAttributes()) {
-      String attrName = attribute.getName();
-      QueryTerm term = termMap.get(attrName).get(0);
-      Object termValue = term.getValue().getValue();
-      value.put(attrName, transform.transformValue(attrName, termValue));
-    }
-
-    final List<Map<String, Object>> resultIds = new ArrayList<Map<String, Object>>();
-    final SqlParamBindings bindings = new SqlParamBindings(true);
-
-    final String querySql =
-        getIndexQuery(type, indexName, termMap, null, 0L, 1L, false, indexDefinition, schema,
-            transform, bindings, groupName, storeName, partitionName);
-
-    database.inTransaction(new TransactionCallback<Void>() {
-      @Override
-      public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        Query<Map<String, Object>> query = handle.createQuery(querySql);
-
-        bindings.bindToStatement(query);
-
-        List<Map<String, Object>> qList = query.list();
-        if (qList == null || qList.size() > 1) {
-          throw new RuntimeException("Non-unique result set!");
-        }
-
-        if (qList.size() == 1) {
-          resultIds.add(query.first());
-        }
-
-        return null;
-      }
-    });
-
-    return Collections.unmodifiableList(resultIds);
-  }
-
   public String computeIndexKey(String type, String indexName, IndexDefinition indexDefinition,
       Map<String, Object> value) {
     StringBuilder theKey = new StringBuilder();
@@ -733,6 +671,28 @@ public class SecondaryIndexTableHelper {
     }
 
     return termMap;
+  }
+
+  public static String getUniqueIndexKey(String type, Schema schema, String indexName,
+      Map<String, Object> valMap) {
+    IndexDefinition indexDef = schema.getIndex(indexName);
+    StringBuilder builder = new StringBuilder();
+
+    builder.append(type);
+    builder.append(".");
+    builder.append(indexName);
+    builder.append(":");
+
+    for (IndexAttribute attr : indexDef.getIndexAttributes()) {
+      try {
+        builder.append("/");
+        builder.append(URLEncoder.encode(String.valueOf(valMap.get(attr.getName())), "UTF-8"));
+      } catch (UnsupportedEncodingException e) {
+        throw Throwables.propagate(e);
+      }
+    }
+
+    return builder.toString();
   }
 
   private String bindParam(IndexAttribute attribute, Schema schema, FieldTransform transform,

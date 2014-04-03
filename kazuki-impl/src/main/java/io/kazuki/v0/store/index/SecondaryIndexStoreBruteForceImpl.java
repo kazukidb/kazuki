@@ -14,7 +14,6 @@
  */
 package io.kazuki.v0.store.index;
 
-import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.internal.helper.OpaquePaginationHelper;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
@@ -31,9 +30,13 @@ import io.kazuki.v0.store.sequence.ResolvedKey;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.inject.Inject;
 
@@ -80,16 +83,116 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
   @Override
   public void clear(Handle handle, Map<String, Schema> typeToSchemaMap, boolean preserveSchema) {}
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  public Map<UniqueEntityDescription<?>, ?> multiRetrieveUniqueEntities(
-      Collection<UniqueEntityDescription<?>> entityDefinitions) {
-    throw new UnsupportedOperationException("not supported - yet");
+  public Map<UniqueEntityDescription, Object> multiRetrieveUniqueEntities(
+      Collection<UniqueEntityDescription> entityDefinitions) {
+    Map<UniqueEntityDescription, Key> keys = multiRetrieveUniqueKeys(entityDefinitions);
+    Map<UniqueEntityDescription, Object> resultMap = new LinkedHashMap<>();
+
+    for (Map.Entry<UniqueEntityDescription, Key> entry : keys.entrySet()) {
+      UniqueEntityDescription desc = entry.getKey();
+      Key key = entry.getValue();
+
+      try {
+        resultMap.put(desc, kvStore.retrieve(key, desc.getClazz()));
+      } catch (KazukiException e) {
+        throw Throwables.propagate(e);
+      }
+    }
+
+    return Collections.unmodifiableMap(resultMap);
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  public Map<UniqueEntityDescription<?>, Key> multiRetrieveUniqueKeys(
-      Collection<UniqueEntityDescription<?>> entityDefinitions) {
-    throw new UnsupportedOperationException("not supported - yet");
+  public Map<UniqueEntityDescription, Key> multiRetrieveUniqueKeys(
+      Collection<UniqueEntityDescription> entityDefinitions) {
+    Map<String, Schema> schemaMap = new LinkedHashMap<String, Schema>();
+    Map<String, Map<String, Set<String>>> todo = new HashMap<String, Map<String, Set<String>>>();
+    Map<String, UniqueEntityDescription> backMap = new HashMap<String, UniqueEntityDescription>();
+
+    try {
+      for (UniqueEntityDescription<?> desc : entityDefinitions) {
+        String type = desc.getType();
+        String indexName = desc.getIndexName();
+
+        Schema schema = schemaMap.get(type);
+        if (schema == null) {
+          schema = schemaStore.retrieveSchema(type);
+          schemaMap.put(type, schema);
+        }
+
+        if (!todo.containsKey(type)) {
+          todo.put(type, new HashMap<String, Set<String>>());
+        }
+
+        Map<String, Set<String>> indexDesc = todo.get(type);
+        if (!indexDesc.containsKey(indexName)) {
+          indexDesc.put(indexName, new HashSet<String>());
+        }
+
+        Set<String> toFind = indexDesc.get(indexName);
+        Map<String, Object> valMap = new LinkedHashMap<String, Object>();
+
+        for (Map.Entry<String, QueryTerm> entry : desc.getColumnDefinitions().entrySet()) {
+          valMap.put(entry.getKey(), entry.getValue().getValue());
+        }
+
+        String uKey = SecondaryIndexTableHelper.getUniqueIndexKey(type, schema, indexName, valMap);
+
+        toFind.add(uKey);
+        backMap.put(uKey, desc);
+      }
+    } catch (KazukiException e) {
+      throw Throwables.propagate(e);
+    }
+
+    Map<UniqueEntityDescription, Key> resultMap = new LinkedHashMap<UniqueEntityDescription, Key>();
+
+    TYPE: for (String type : todo.keySet()) {
+      Schema schema = schemaMap.get(type);
+
+      try (KeyValueIterable<KeyValuePair<LinkedHashMap>> iter =
+          kvStore.iterators().entries(type, LinkedHashMap.class, SortDirection.ASCENDING)) {
+
+        for (KeyValuePair<LinkedHashMap> kvPair : iter) {
+          Key key = kvPair.getKey();
+          LinkedHashMap entity = kvPair.getValue();
+
+          Map<String, Set<String>> indexDesc = todo.get(type);
+
+          for (Map.Entry<String, Set<String>> entry : indexDesc.entrySet()) {
+            String indexName = entry.getKey();
+            Set<String> toFind = entry.getValue();
+
+            String candidate =
+                SecondaryIndexTableHelper.getUniqueIndexKey(type, schema, indexName, entity);
+
+            if (toFind.contains(candidate)) {
+              resultMap.put(backMap.get(candidate), key);
+              toFind.remove(candidate);
+
+              if (toFind.isEmpty()) {
+                indexDesc.remove(type);
+
+                if (indexDesc.isEmpty()) {
+                  continue TYPE;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    LinkedHashMap<UniqueEntityDescription, Key> inOrderResultMap = new LinkedHashMap<>();
+
+    for (UniqueEntityDescription desc : entityDefinitions) {
+      inOrderResultMap.put(desc, resultMap.get(desc));
+    }
+
+    return Collections.unmodifiableMap(inOrderResultMap);
   }
 
   @Override

@@ -27,14 +27,14 @@ public class SecondaryIndexNullImpl implements SecondaryIndexStore {
   public SecondaryIndexNullImpl() {}
 
   @Override
-  public Map<UniqueEntityDescription<?>, ?> multiRetrieveUniqueEntities(
-      Collection<UniqueEntityDescription<?>> entityDefinitions) {
+  public Map<UniqueEntityDescription, Object> multiRetrieveUniqueEntities(
+      Collection<UniqueEntityDescription> entityDefinitions) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public Map<UniqueEntityDescription<?>, Key> multiRetrieveUniqueKeys(
-      Collection<UniqueEntityDescription<?>> entityDefinitions) {
+  public Map<UniqueEntityDescription, Key> multiRetrieveUniqueKeys(
+      Collection<UniqueEntityDescription> entityDefinitions) {
     throw new UnsupportedOperationException();
   }
 

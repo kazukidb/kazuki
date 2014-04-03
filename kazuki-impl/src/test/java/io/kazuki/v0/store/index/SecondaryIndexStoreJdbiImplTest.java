@@ -15,6 +15,8 @@
 package io.kazuki.v0.store.index;
 
 
+import org.testng.annotations.Test;
+
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
@@ -22,6 +24,7 @@ import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+@Test
 public class SecondaryIndexStoreJdbiImplTest extends SecondaryIndexStoreTestBase {
   @Override
   protected Injector getInjector() {

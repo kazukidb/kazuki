@@ -41,9 +41,9 @@ public interface SecondaryIndexStore {
       List<QueryTerm> query, SortDirection sortDirection, @Nullable Long offset,
       @Nullable Long limit);
 
-  Map<UniqueEntityDescription<?>, Key> multiRetrieveUniqueKeys(
-      Collection<UniqueEntityDescription<?>> entityDefinitions);
+  Map<UniqueEntityDescription, Key> multiRetrieveUniqueKeys(
+      Collection<UniqueEntityDescription> entityDefinitions);
 
-  Map<UniqueEntityDescription<?>, ?> multiRetrieveUniqueEntities(
-      Collection<UniqueEntityDescription<?>> entityDefinitions);
+  Map<UniqueEntityDescription, Object> multiRetrieveUniqueEntities(
+      Collection<UniqueEntityDescription> entityDefinitions);
 }

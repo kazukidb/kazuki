@@ -19,9 +19,12 @@ import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 
+import org.testng.annotations.Test;
+
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+@Test
 public class SecondaryIndexStoreBruteForceImplTest extends SecondaryIndexStoreTestBase {
   @Override
   protected Injector getInjector() {

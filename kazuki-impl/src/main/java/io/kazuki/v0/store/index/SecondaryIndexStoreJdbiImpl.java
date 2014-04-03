@@ -43,6 +43,7 @@ import io.kazuki.v0.store.sequence.SequenceService;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +69,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final AvailabilityManager availability;
   private final IDBI database;
   private final SequenceService sequence;
-  private final SchemaStore schema;
+  private final SchemaStore schemaStore;
   private final KeyValueStore kvStore;
   private final SecondaryIndexTableHelper tableHelper;
   private final String groupName;
@@ -77,13 +78,13 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
   @Inject
   public SecondaryIndexStoreJdbiImpl(AvailabilityManager availability, IDBI database,
-      SequenceService sequence, SchemaStore schema, KeyValueStore kvStore,
+      SequenceService sequence, SchemaStore schemaStore, KeyValueStore kvStore,
       SecondaryIndexTableHelper tableHelper, String groupName, String storeName,
       String partitionName) {
     this.availability = availability;
     this.database = database;
     this.sequence = sequence;
-    this.schema = schema;
+    this.schemaStore = schemaStore;
     this.kvStore = kvStore;
     this.tableHelper = tableHelper;
     this.groupName = groupName;
@@ -107,7 +108,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       @Nullable Long limit) {
     try {
       return this.doIndexQuery(database, type, indexName, query, sortDirection, offset, limit,
-          false, schema.retrieveSchema(type));
+          false, schemaStore.retrieveSchema(type));
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -162,15 +163,79 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   }
 
   @Override
-  public Map<UniqueEntityDescription<?>, ?> multiRetrieveUniqueEntities(
-      Collection<UniqueEntityDescription<?>> entityDefinitions) {
-    throw new UnsupportedOperationException("not supported - yet");
+  public Map<UniqueEntityDescription, Object> multiRetrieveUniqueEntities(
+      Collection<UniqueEntityDescription> entityDefinitions) {
+    Map<String, Schema> schemaMap = new LinkedHashMap<String, Schema>();
+    LinkedHashMap<UniqueEntityDescription, Object> inOrderResultMap = new LinkedHashMap<>();
+
+    try {
+      for (UniqueEntityDescription<?> desc : entityDefinitions) {
+        String type = desc.getType();
+        String indexName = desc.getIndexName();
+
+        Schema schema = schemaMap.get(type);
+        if (schema == null) {
+          schema = schemaStore.retrieveSchema(type);
+          schemaMap.put(type, schema);
+        }
+
+        List<QueryTerm> query = new ArrayList<QueryTerm>();
+        query.addAll(desc.getColumnDefinitions().values());
+
+        try (KeyValueIterator<Key> result =
+            this.queryWithoutPagination(type, desc.getClass(), indexName, query,
+                SortDirection.ASCENDING, 0L, 1L).iterator()) {
+          if (result.hasNext()) {
+            Key key = result.next();
+
+            inOrderResultMap.put(desc, kvStore.retrieve(key, desc.getClass()));
+          } else {
+            inOrderResultMap.put(desc, null);
+          }
+        }
+      }
+    } catch (KazukiException e) {
+      throw Throwables.propagate(e);
+    }
+
+    return Collections.unmodifiableMap(inOrderResultMap);
   }
 
   @Override
-  public Map<UniqueEntityDescription<?>, Key> multiRetrieveUniqueKeys(
-      Collection<UniqueEntityDescription<?>> entityDefinitions) {
-    throw new UnsupportedOperationException("not supported - yet");
+  public Map<UniqueEntityDescription, Key> multiRetrieveUniqueKeys(
+      Collection<UniqueEntityDescription> entityDefinitions) {
+    Map<String, Schema> schemaMap = new LinkedHashMap<String, Schema>();
+    LinkedHashMap<UniqueEntityDescription, Key> inOrderResultMap = new LinkedHashMap<>();
+
+    try {
+      for (UniqueEntityDescription<?> desc : entityDefinitions) {
+        String type = desc.getType();
+        String indexName = desc.getIndexName();
+
+        Schema schema = schemaMap.get(type);
+        if (schema == null) {
+          schema = schemaStore.retrieveSchema(type);
+          schemaMap.put(type, schema);
+        }
+
+        List<QueryTerm> query = new ArrayList<QueryTerm>();
+        query.addAll(desc.getColumnDefinitions().values());
+
+        try (KeyValueIterator<Key> result =
+            this.queryWithoutPagination(type, desc.getClass(), indexName, query,
+                SortDirection.ASCENDING, 0L, 1L).iterator()) {
+          if (result.hasNext()) {
+            inOrderResultMap.put(desc, result.next());
+          } else {
+            inOrderResultMap.put(desc, null);
+          }
+        }
+      }
+    } catch (KazukiException e) {
+      throw Throwables.propagate(e);
+    }
+
+    return Collections.unmodifiableMap(inOrderResultMap);
   }
 
   @Override
@@ -462,13 +527,6 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     final FieldTransform transform = new FieldTransform(schema);
 
     Map<String, List<QueryTerm>> termMap = tableHelper.sortTerms(indexDefinition, queryTerms);
-
-    if (!includeQuarantine && indexDefinition.isUnique()) {
-      throw new UnsupportedOperationException("unique indexes not supported - yet");
-
-      // return tableHelper.doUniqueIndexQuery(database, type, indexName, termMap, token,
-      // indexDefinition, schema, transform);
-    }
 
     final SqlParamBindings bindings = new SqlParamBindings(true);
 

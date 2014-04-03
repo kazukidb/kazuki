@@ -60,7 +60,7 @@ public class IndexDefinition {
             + attrName);
       }
 
-      newAttributeNames.add(attr.getName());
+      newAttributeNames.add(attrName);
       newIndexAttributeMap.put(attrName, attr);
     }
 
