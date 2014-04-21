@@ -235,6 +235,10 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
       }
     });
 
+    if (result == null) {
+      throw new KazukiException("unknown type: " + type);
+    }
+
     return result;
   }
 
