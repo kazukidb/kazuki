@@ -74,6 +74,11 @@
       <artifactId>jdbi</artifactId>
       <optional>true</optional>
     </dependency>
+    <!-- Airline (optional) -->
+    <dependency>
+      <groupId>io.airlift</groupId>
+      <artifactId>airline</artifactId>
+    </dependency>
     <!-- BoneCP (optional) -->
     <dependency>
       <groupId>com.jolbox</groupId>

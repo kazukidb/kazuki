@@ -102,6 +102,12 @@
         <version>${jdbi.version}</version>
         <optional>true</optional>
       </dependency>
+      <!-- Airline (optional) -->
+      <dependency>
+        <groupId>io.airlift</groupId>
+        <artifactId>airline</artifactId>
+        <version>0.6</version>
+      </dependency>
       <!-- BoneCP (optional) -->
       <dependency>
         <groupId>com.jolbox</groupId>
