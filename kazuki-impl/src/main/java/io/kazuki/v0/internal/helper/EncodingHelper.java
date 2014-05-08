@@ -14,6 +14,7 @@
  */
 package io.kazuki.v0.internal.helper;
 
+import io.kazuki.v0.internal.v2schema.types.UTCDateSecsTransform;
 import io.kazuki.v0.store.KazukiException;
 
 import java.io.ByteArrayInputStream;
@@ -28,19 +29,25 @@ import com.fasterxml.jackson.dataformat.smile.SmileParser;
 
 public class EncodingHelper {
   private static final SmileFactory smileFactory = new SmileFactory();
-  private static final ObjectMapper mapper = new ObjectMapper();
+  private static final ObjectMapper jsonMapper = new ObjectMapper();
+  private static final ObjectMapper beanMapper = new ObjectMapper();
 
-  public static <T> String convertToJson(T value) throws Exception {
-    return mapper.writeValueAsString(value);
+  static {
+    beanMapper.registerModule(new UTCDateSecsTransform.DateTimeModule());
+    jsonMapper.registerModule(new UTCDateSecsTransform.DateTimeModule());
   }
 
   @SuppressWarnings("unchecked")
   public static <T> Map<String, Object> asJsonMap(T value) throws Exception {
-    return mapper.convertValue(value, LinkedHashMap.class);
+    return beanMapper.convertValue(value, LinkedHashMap.class);
   }
 
   public static <T> T asValue(Map<String, Object> objectMap, Class<T> clazz) throws Exception {
-    return mapper.convertValue(objectMap, clazz);
+    return beanMapper.convertValue(objectMap, clazz);
+  }
+
+  public static <T> String convertToJson(T value) throws Exception {
+    return jsonMapper.writeValueAsString(value);
   }
 
   @SuppressWarnings("unchecked")
@@ -49,7 +56,7 @@ public class EncodingHelper {
       throw new KazukiException("Invalid entity 'value'");
     }
 
-    Object parsed = mapper.readValue(value, LinkedHashMap.class);
+    Object parsed = jsonMapper.readValue(value, LinkedHashMap.class);
 
     if (!(parsed instanceof Map)) {
       throw new KazukiException("Invalid entity 'value'");
@@ -62,7 +69,7 @@ public class EncodingHelper {
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       SmileGenerator smile = smileFactory.createGenerator(out);
-      mapper.writeValue(smile, value);
+      jsonMapper.writeValue(smile, value);
 
       byte[] smileBytes = out.toByteArray();
 
@@ -77,7 +84,7 @@ public class EncodingHelper {
       ByteArrayInputStream in = new ByteArrayInputStream(valueBytes);
       SmileParser smile = smileFactory.createParser(in);
 
-      return mapper.readValue(smile, clazz);
+      return jsonMapper.readValue(smile, clazz);
     } catch (Exception e) {
       throw new KazukiException(e);
     }
