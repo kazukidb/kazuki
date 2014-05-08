@@ -138,9 +138,10 @@ public class FieldTransform implements Transform<Map<String, Object>, Map<String
     try {
       Transform validator = (Transform) fieldCompactions.get(attrName);
 
-      return validator != null ? validator.unpack(value) : value;
+      return validator != null ? validator.pack(value) : value;
     } catch (ClassCastException e) {
-      throw new TransformException("invalid attribute value for '" + attrName + "'");
+      throw new TransformException("invalid attribute value for '" + attrName + "': "
+          + value.toString());
     }
   }
 }

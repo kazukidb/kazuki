@@ -14,7 +14,10 @@
  */
 package io.kazuki.v0.store;
 
+import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.schema.model.Attribute;
+import io.kazuki.v0.store.schema.model.AttributeTransform;
+import io.kazuki.v0.store.schema.model.IndexAttribute;
 import io.kazuki.v0.store.schema.model.IndexDefinition;
 import io.kazuki.v0.store.schema.model.Schema;
 
@@ -48,7 +51,7 @@ public class Everything {
     // that schema enum values are never removed!
     //
     attrs.add(new Attribute("theEnum", Attribute.Type.ENUM, ImmutableList.<Object>of("ZERO", "ONE",
-        "TWO", "THREE", "FOUR"), true));
+        "TWO", "THREE", "FOUR"), false));
 
     attrs.add(new Attribute("theU8", Attribute.Type.U8, null, true));
     attrs.add(new Attribute("theU16", Attribute.Type.U16, null, true));
@@ -70,8 +73,8 @@ public class Everything {
     // "fooKey", SortDirection.ASCENDING, AttributeTransform.NONE), new IndexAttribute("fooValue",
     // SortDirection.ASCENDING, AttributeTransform.NONE)), true));
 
-    // indexDefs.add(new IndexDefinition("fooKey", ImmutableList.of(new IndexAttribute("fooKey",
-    // SortDirection.ASCENDING, AttributeTransform.NONE)), false));
+    indexDefs.add(new IndexDefinition("theEnum", ImmutableList.of(new IndexAttribute("theEnum",
+        SortDirection.ASCENDING, AttributeTransform.NONE)), false));
 
     EVERYTHING_SCHEMA =
         new Schema(Collections.unmodifiableList(attrs), Collections.unmodifiableList(indexDefs));
