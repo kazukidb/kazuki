@@ -122,10 +122,10 @@ public class KeyValueStoreAttributeTypesTest {
         "okokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokokok";
     e1.theUtf8Text = "this would be a big string";
 
-    io.kazuki.v0.store.Key k1 =
+    KeyValuePair<Everything> k1 =
         kvStore.create("everything", Everything.class, e1, TypeValidation.STRICT);
 
-    Everything v1 = kvStore.retrieve(k1, Everything.class);
+    Everything v1 = kvStore.retrieve(k1.getKey(), Everything.class);
 
     Assert.assertEquals(EncodingHelper.convertToJson(v1), EncodingHelper.convertToJson(e1));
   }

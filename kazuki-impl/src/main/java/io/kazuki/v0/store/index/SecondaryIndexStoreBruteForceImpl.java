@@ -250,14 +250,15 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
         List<Key> toRetrieve = new ArrayList<Key>();
         Iterables.addAll(toRetrieve, kvIter);
 
-        Map<Key, T> resultMap = kvStore.multiRetrieve(toRetrieve, clazz);
+        Map<Key, KeyValuePair<T>> resultMap = kvStore.multiRetrieveVersioned(toRetrieve, clazz);
 
-        for (Map.Entry<Key, T> entry : resultMap.entrySet()) {
-          kvPairs.add(new KeyValuePair<T>(entry.getKey(), entry.getValue()));
+        for (Map.Entry<Key, KeyValuePair<T>> entry : resultMap.entrySet()) {
+          kvPairs.add(new KeyValuePair<T>(entry.getKey(), entry.getValue().getVersion(), entry
+              .getValue().getValue()));
         }
       } else {
         for (Key key : kvIter) {
-          kvPairs.add(new KeyValuePair<T>(key, null));
+          kvPairs.add(new KeyValuePair<T>(key, null, null));
         }
       }
 

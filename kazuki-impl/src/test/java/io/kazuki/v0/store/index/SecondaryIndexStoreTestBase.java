@@ -55,12 +55,12 @@ public abstract class SecondaryIndexStoreTestBase extends TestSupport {
 
     manager.createSchema("foo", Foo.FOO_SCHEMA);
 
-    Key k0 = store.create("foo", Foo.class, new Foo("k00", "v99"), TypeValidation.STRICT);
-    Key k1 = store.create("foo", Foo.class, new Foo("k11", "v88"), TypeValidation.STRICT);
-    Key k2 = store.create("foo", Foo.class, new Foo("k22", "v77"), TypeValidation.STRICT);
-    Key k3 = store.create("foo", Foo.class, new Foo("k33", "v66"), TypeValidation.STRICT);
-    Key k4 = store.create("foo", Foo.class, new Foo("k44", "v55"), TypeValidation.STRICT);
-    Key k5 = store.create("foo", Foo.class, new Foo("k00", "v55"), TypeValidation.STRICT);
+    Key k0 = store.create("foo", Foo.class, new Foo("k00", "v99"), TypeValidation.STRICT).getKey();
+    Key k1 = store.create("foo", Foo.class, new Foo("k11", "v88"), TypeValidation.STRICT).getKey();
+    Key k2 = store.create("foo", Foo.class, new Foo("k22", "v77"), TypeValidation.STRICT).getKey();
+    Key k3 = store.create("foo", Foo.class, new Foo("k33", "v66"), TypeValidation.STRICT).getKey();
+    Key k4 = store.create("foo", Foo.class, new Foo("k44", "v55"), TypeValidation.STRICT).getKey();
+    Key k5 = store.create("foo", Foo.class, new Foo("k00", "v55"), TypeValidation.STRICT).getKey();
 
     try (KeyValueIterator<Key> iter =
         index.queryWithoutPagination(

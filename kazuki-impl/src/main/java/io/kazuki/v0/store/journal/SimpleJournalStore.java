@@ -46,7 +46,7 @@ public class SimpleJournalStore implements JournalStore {
   @Override
   public <T> Key append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException {
-    return store.create(type, clazz, inValue, typeSafety);
+    return store.create(type, clazz, inValue, typeSafety).getKey();
   }
 
   @Override

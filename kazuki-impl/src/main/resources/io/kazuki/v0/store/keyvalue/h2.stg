@@ -40,6 +40,20 @@ h2_kv_update(kv_table_name) ::=<<
         "_key_id_hi"   = :key_id_hi,
         "_key_id_lo"   = :key_id_lo,
         "_updated_dt"  = :updated_dt,
+        "_version"     = "_version" + 1,
+        "_value"       = :value
+   where "_key_type"   = :key_type
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
+     and "_is_deleted" = 'N'
+>>
+
+h2_kv_update_versioned(kv_table_name) ::=<< 
+  update "<kv_table_name>"
+    set "_key_type"    = :key_type,
+        "_key_id_hi"   = :key_id_hi,
+        "_key_id_lo"   = :key_id_lo,
+        "_updated_dt"  = :updated_dt,
         "_version"     = :new_version,
         "_value"       = :value
    where "_key_type"   = :key_type
@@ -67,7 +81,7 @@ h2_kv_delete_hard(kv_table_name) ::=<<
 >>
 
 h2_kv_key_ids_of_type(kv_table_name, order) ::=<< 
-   select "_key_id_lo"
+   select "_key_id_lo", "_version"
      from "<kv_table_name>"
     where "_key_type" = :key_type
       and "_is_deleted" = 'N'
@@ -77,7 +91,7 @@ h2_kv_key_ids_of_type(kv_table_name, order) ::=<<
 >>
 
 h2_kv_key_values_of_type(kv_table_name, order) ::=<< 
-   select "_key_id_lo", "_value"
+   select "_key_id_lo", "_version", "_value"
      from "<kv_table_name>"
     where "_key_type" = :key_type
       and "_is_deleted" = 'N'

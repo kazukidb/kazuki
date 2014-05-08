@@ -16,6 +16,7 @@ package io.kazuki.v0.store.keyvalue;
 
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 
@@ -29,17 +30,25 @@ public interface KeyValueStore {
 
   Key toKey(String keyString);
 
-  <T> Key create(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
+  <T> KeyValuePair<T> create(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException;
 
-  <T> Key create(String type, Class<T> clazz, T inValue, @Nullable ResolvedKey keyOverride,
-      TypeValidation typeSafety) throws KazukiException;
+  <T> KeyValuePair<T> create(String type, Class<T> clazz, T inValue,
+      @Nullable ResolvedKey keyOverride, TypeValidation typeSafety) throws KazukiException;
 
   <T> T retrieve(Key key, Class<T> clazz) throws KazukiException;
 
+  <T> KeyValuePair<T> retrieveVersioned(Key key, Class<T> clazz) throws KazukiException;
+
   <T> Map<Key, T> multiRetrieve(Collection<Key> keys, Class<T> clazz) throws KazukiException;
 
+  <T> Map<Key, KeyValuePair<T>> multiRetrieveVersioned(Collection<Key> keys, Class<T> clazz)
+      throws KazukiException;
+
   <T> boolean update(Key key, Class<T> clazz, T inValue) throws KazukiException;
+
+  <T> Version updateVersioned(Key key, Version version, Class<T> clazz, T inValue)
+      throws KazukiException;
 
   boolean delete(Key key) throws KazukiException;
 

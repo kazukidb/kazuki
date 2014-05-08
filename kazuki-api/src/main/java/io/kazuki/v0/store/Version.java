@@ -12,31 +12,14 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.keyvalue;
+package io.kazuki.v0.store;
 
-import io.kazuki.v0.store.Key;
-import io.kazuki.v0.store.Version;
 
-public class KeyValuePair<T> {
-  private final Key key;
-  private final Version version;
-  private final T value;
+/**
+ * Opaque Version Identifier
+ */
+public interface Version {
+  String getVersionPart();
 
-  public KeyValuePair(Key key, Version version, T value) {
-    this.key = key;
-    this.version = version;
-    this.value = value;
-  }
-
-  public Key getKey() {
-    return this.key;
-  }
-
-  public Version getVersion() {
-    return version;
-  }
-
-  public T getValue() {
-    return this.value;
-  }
+  String getIdentifier();
 }

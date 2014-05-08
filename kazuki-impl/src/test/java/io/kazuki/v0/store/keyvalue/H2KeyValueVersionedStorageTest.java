@@ -19,6 +19,7 @@ import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -38,7 +39,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
-public class H2KeyValueStorageTest extends TestSupport {
+public class H2KeyValueVersionedStorageTest extends TestSupport {
   private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
       new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
           .withJdbiConfig(Configurations.getJdbi().build()));
@@ -99,30 +100,38 @@ public class H2KeyValueStorageTest extends TestSupport {
       }
     }
 
-    Foo foo1Found = store.retrieve(foo1Key, Foo.class);
+    KeyValuePair<Foo> foo1Found = store.retrieveVersioned(foo1Key, Foo.class);
     log.info("retrieved value 1 = " + dump(foo1Found));
-    Foo foo2Found = store.retrieve(foo2Key, Foo.class);
+    KeyValuePair<Foo> foo2Found = store.retrieveVersioned(foo2Key, Foo.class);
     log.info("retrieved value 2 = " + dump(foo2Found));
 
-    Map<Key, Foo> multiFound = store.multiRetrieve(ImmutableList.of(foo1Key, foo2Key), Foo.class);
+    Map<Key, KeyValuePair<Foo>> multiFound =
+        store.multiRetrieveVersioned(ImmutableList.of(foo1Key, foo2Key), Foo.class);
     log.info("multi-retrieved values = " + dump(multiFound));
     Assert.assertEquals(multiFound.size(), 2);
-    Assert.assertEquals(multiFound.get(foo1Key), foo1Found);
-    Assert.assertEquals(multiFound.get(foo2Key), foo2Found);
+    Assert.assertEquals(multiFound.get(foo1Key).getValue(), foo1Found.getValue());
+    Assert.assertEquals(multiFound.get(foo2Key).getValue(), foo2Found.getValue());
 
-    boolean updated = store.update(foo1Key, Foo.class, new Foo("x", "y"));
-    log.info("updated? " + updated);
-    Assert.assertTrue(updated);
+    Version version =
+        store.updateVersioned(foo1Key, foo1Found.getVersion(), Foo.class, new Foo("x", "y"));
+    log.info("updated? " + (version != null));
+    Assert.assertNotNull(version);
 
-    Foo foo1FoundAgain = store.retrieve(foo1Key, Foo.class);
+    Version versionBad =
+        store.updateVersioned(foo1Key, foo1Found.getVersion(), Foo.class, new Foo("x", "y"));
+
+    log.info("updated? " + (versionBad != null));
+    Assert.assertNull(versionBad);
+
+    KeyValuePair<Foo> foo1FoundAgain = store.retrieveVersioned(foo1Key, Foo.class);
     log.info("retrieved value = " + dump(foo1FoundAgain));
-    Assert.assertNotSame(foo1FoundAgain, foo1Found);
+    Assert.assertNotSame(foo1FoundAgain.getVersion(), foo1Found.getVersion());
 
     boolean deleted = store.delete(foo1Key);
     log.info("deleted? " + deleted);
     Assert.assertTrue(deleted);
 
-    foo1Found = store.retrieve(foo1Key, Foo.class);
+    foo1Found = store.retrieveVersioned(foo1Key, Foo.class);
     log.info("retrieved value = " + dump(foo1Found));
     Assert.assertNull(foo1Found);
 
@@ -131,11 +140,11 @@ public class H2KeyValueStorageTest extends TestSupport {
     lifecycle.init();
     lifecycle.start();
 
-    foo1Found = store.retrieve(foo1Key, Foo.class);
+    foo1Found = store.retrieveVersioned(foo1Key, Foo.class);
     log.info("retrieved value = " + dump(foo1Found));
     Assert.assertNull(foo1Found);
 
-    foo1Found = store.retrieve(foo2Key, Foo.class);
+    foo1Found = store.retrieveVersioned(foo2Key, Foo.class);
     log.info("retrieved value = " + dump(foo2Found));
     Assert.assertNotNull(foo2Found);
 

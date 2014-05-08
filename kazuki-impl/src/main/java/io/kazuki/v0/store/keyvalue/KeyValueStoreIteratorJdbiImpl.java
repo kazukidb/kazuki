@@ -22,10 +22,12 @@ import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
 import io.kazuki.v0.internal.v2schema.compact.StructureTransform;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.SequenceService;
+import io.kazuki.v0.store.sequence.VersionImpl;
 
 import java.util.Iterator;
 import java.util.List;
@@ -101,6 +103,7 @@ public class KeyValueStoreIteratorJdbiImpl {
 
           Map<String, Object> record = null;
           Key key = null;
+          Version version = null;
           T value = null;
 
           while (key == null && inner.hasNext()) {
@@ -121,6 +124,9 @@ public class KeyValueStoreIteratorJdbiImpl {
 
           try {
             if (includeValues) {
+              version =
+                  VersionImpl.createInternal(key, ((Number) record.get("_version")).longValue());
+
               byte[] resultBytes = (byte[]) record.get("_value");
               Object result = EncodingHelper.parseSmile(resultBytes, Object.class);
 
@@ -136,7 +142,7 @@ public class KeyValueStoreIteratorJdbiImpl {
             throw Throwables.propagate(e);
           }
 
-          return new KeyValuePair<T>(key, value);
+          return new KeyValuePair<T>(key, version, value);
         }
 
         @Override
