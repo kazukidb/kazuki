@@ -175,7 +175,7 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
   private Integer getTypeIdPossiblyNull(String type, boolean val) {
     try {
       return sequences.getTypeId(type, val);
-    } catch (IllegalArgumentException e) {
+    } catch (KazukiException e) {
       return null;
     } catch (Exception e) {
       throw Throwables.propagate(e);
