@@ -432,10 +432,13 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
             FieldTransform fieldTransform = null;
             StructureTransform structureTransform = null;
+            Map<String, Object> fieldTransformed = null;
 
             if (schema != null) {
               fieldTransform = new FieldTransform(schema);
               structureTransform = new StructureTransform(schema);
+
+              fieldTransformed = fieldTransform.pack((Map<String, Object>) storeValue);
 
               storeValue =
                   structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
@@ -453,7 +456,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
                       getObjectBytes(objectMap), Object.class));
 
               for (KeyValueStoreListener kvListener : kvListeners) {
-                kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, storeValueMap,
+                kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, fieldTransformed,
                     oldInstance);
               }
             }
@@ -569,6 +572,51 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
+  public boolean deleteVersioned(final Key realKey, final Version version) throws KazukiException {
+    availability.assertAvailable();
+
+    try (LockManager toRelease = lockManager.acquire()) {
+      final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      final String type = realKey.getTypePart();
+      final Schema schema = schemaService.retrieveSchema(type);
+
+      return database.inTransaction(new TransactionCallback<Boolean>() {
+        @Override
+        public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          if (schema != null && !kvListeners.isEmpty()) {
+            StructureTransform structureTransform = new StructureTransform(schema);
+
+            Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
+
+            Map<String, Object> oldInstance =
+                structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                    getObjectBytes(objectMap), Object.class));
+
+            for (KeyValueStoreListener kvListener : kvListeners) {
+              kvListener.onDelete(handle, type, LinkedHashMap.class, schema, resolvedKey,
+                  oldInstance);
+            }
+          }
+
+          Update delete =
+              JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                  "kv_delete_versioned");
+
+          delete.bind("updated_dt", getEpochSecondsNow());
+          delete.bind("key_type", resolvedKey.getTypeTag());
+          delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
+          delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
+          delete.bind("old_version", ((VersionImpl) version).getInternalIdentifier());
+
+          int deletedCount = delete.execute();
+
+          return (deletedCount == 1);
+        }
+      });
+    }
+  }
+
+  @Override
   public boolean deleteHard(final Key realKey) throws KazukiException {
     availability.assertAvailable();
 
@@ -603,6 +651,52 @@ public abstract class KeyValueStoreJdbiBaseImpl
           delete.bind("key_type", resolvedKey.getTypeTag());
           delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
           delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
+
+          int deletedCount = delete.execute();
+
+          return (deletedCount == 1);
+        }
+      });
+    }
+  }
+
+  @Override
+  public boolean deleteHardVersioned(final Key realKey, final Version version)
+      throws KazukiException {
+    availability.assertAvailable();
+
+    try (LockManager toRelease = lockManager.acquire()) {
+      final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      final String type = realKey.getTypePart();
+      final Schema schema = schemaService.retrieveSchema(type);
+
+      return database.inTransaction(new TransactionCallback<Boolean>() {
+        @Override
+        public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          if (schema != null && !kvListeners.isEmpty()) {
+            StructureTransform structureTransform = new StructureTransform(schema);
+
+            Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
+
+            Map<String, Object> oldInstance =
+                structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                    getObjectBytes(objectMap), Object.class));
+
+            for (KeyValueStoreListener kvListener : kvListeners) {
+              kvListener.onDelete(handle, type, LinkedHashMap.class, schema, resolvedKey,
+                  oldInstance);
+            }
+          }
+
+          Update delete =
+              JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                  "kv_delete_hard_versioned");
+
+          delete.bind("updated_dt", getEpochSecondsNow());
+          delete.bind("key_type", resolvedKey.getTypeTag());
+          delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
+          delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
+          delete.bind("old_version", ((VersionImpl) version).getInternalIdentifier());
 
           int deletedCount = delete.execute();
 

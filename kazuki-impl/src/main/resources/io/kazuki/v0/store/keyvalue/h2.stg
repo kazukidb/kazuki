@@ -72,12 +72,31 @@ h2_kv_delete(kv_table_name) ::=<<
      and "_key_id_lo"  = :key_id_lo
 >>
 
+h2_kv_delete_versioned(kv_table_name) ::=<< 
+  update "<kv_table_name>"
+    set "_updated_dt" = :updated_dt,
+        "_is_deleted" = 'Y'
+   where "_key_type" = :key_type
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
+     and "_version"    = :old_version
+>>
+
 h2_kv_delete_hard(kv_table_name) ::=<< 
   delete
     from "<kv_table_name>"
    where "_key_type" = :key_type
      and "_key_id_hi"  = :key_id_hi
      and "_key_id_lo"  = :key_id_lo
+>>
+
+h2_kv_delete_hard_versioned(kv_table_name) ::=<< 
+  delete
+    from "<kv_table_name>"
+   where "_key_type" = :key_type
+     and "_key_id_hi"  = :key_id_hi
+     and "_key_id_lo"  = :key_id_lo
+     and "_version"    = :old_version
 >>
 
 h2_kv_key_ids_of_type(kv_table_name, order) ::=<< 

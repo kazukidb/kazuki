@@ -18,6 +18,8 @@ import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.store.Everything;
 import io.kazuki.v0.store.KazukiException;
+import io.kazuki.v0.store.Everything.TestEnum;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
@@ -124,9 +126,20 @@ public class KeyValueStoreAttributeTypesTest {
 
     KeyValuePair<Everything> k1 =
         kvStore.create("everything", Everything.class, e1, TypeValidation.STRICT);
+    Assert.assertEquals(k1.getVersion().getIdentifier(),
+        "@everything:bc3ac6131dd329f3#08b57d789951b7e3");
 
     Everything v1 = kvStore.retrieve(k1.getKey(), Everything.class);
 
     Assert.assertEquals(EncodingHelper.convertToJson(v1), EncodingHelper.convertToJson(e1));
+
+    e1.theEnum = TestEnum.THREE;
+
+    Version k2 = kvStore.updateVersioned(k1.getKey(), k1.getVersion(), Everything.class, e1);
+    Assert.assertNotEquals(k1.getVersion(), k2);
+    Assert.assertEquals(k2.getIdentifier(), "@everything:bc3ac6131dd329f3#022b4a6a38daf6c5");
+
+    Assert.assertFalse(kvStore.deleteVersioned(k1.getKey(), k1.getVersion()));
+    Assert.assertTrue(kvStore.deleteVersioned(k1.getKey(), k2));
   }
 }

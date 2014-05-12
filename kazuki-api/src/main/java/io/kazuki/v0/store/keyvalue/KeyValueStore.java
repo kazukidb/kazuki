@@ -52,7 +52,11 @@ public interface KeyValueStore {
 
   boolean delete(Key key) throws KazukiException;
 
+  boolean deleteVersioned(Key key, Version version) throws KazukiException;
+
   boolean deleteHard(Key key) throws KazukiException;
+
+  boolean deleteHardVersioned(Key key, Version version) throws KazukiException;
 
   void clear(boolean preserveTypes, boolean preserveCounters) throws KazukiException;
 
