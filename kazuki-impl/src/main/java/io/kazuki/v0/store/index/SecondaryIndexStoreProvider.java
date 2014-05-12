@@ -15,6 +15,7 @@
 package io.kazuki.v0.store.index;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.schema.SchemaStore;
@@ -35,15 +36,15 @@ public class SecondaryIndexStoreProvider implements Provider<SecondaryIndexSuppo
 
   @Inject
   public SecondaryIndexStoreProvider(KeyValueStoreConfiguration kvConfig,
-      AvailabilityManager availability, IDBI database, SequenceService sequences,
-      SchemaStore schemaStore, KeyValueStore kvStore, SecondaryIndexTableHelper tableHelper,
-      Injector injector) {
+      AvailabilityManager availability, LockManager lockManager, IDBI database,
+      SequenceService sequences, SchemaStore schemaStore, KeyValueStore kvStore,
+      SecondaryIndexTableHelper tableHelper, Injector injector) {
     this.inject = injector;
 
     if (kvConfig.isSecondaryIndex()) {
       this.instance =
-          new SecondaryIndexStoreJdbiImpl(availability, database, sequences, schemaStore, kvStore,
-              tableHelper, kvConfig.getGroupName(), kvConfig.getStoreName(),
+          new SecondaryIndexStoreJdbiImpl(availability, lockManager, database, sequences,
+              schemaStore, kvStore, tableHelper, kvConfig.getGroupName(), kvConfig.getStoreName(),
               kvConfig.getPartitionName());
     } else {
       this.instance = new SecondaryIndexStoreBruteForceImpl(kvStore, schemaStore);

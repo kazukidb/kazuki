@@ -118,7 +118,7 @@ public class SequenceHelper {
     return typeId;
   }
 
-  public synchronized Long getNextId(Handle handle, Integer typeId, Long increment) {
+  public Long getNextId(Handle handle, Integer typeId, Long increment) {
     Query<Map<String, Object>> query =
         JDBIHelper.getBoundQuery(handle, dbPrefix, "sequence_table_name", sequenceTableName,
             "seq_seq_next");
@@ -136,7 +136,7 @@ public class SequenceHelper {
     return nextId;
   }
 
-  public synchronized void setNextId(Handle handle, Integer typeId, Long nextId) {
+  public void setNextId(Handle handle, Integer typeId, Long nextId) {
     Update setSeq =
         JDBIHelper.getBoundStatement(handle, dbPrefix, "sequence_table_name", sequenceTableName,
             "seq_seq_set");

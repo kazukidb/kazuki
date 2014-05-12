@@ -18,6 +18,7 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.internal.helper.IoHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.internal.v2schema.compact.FieldTransform;
@@ -80,6 +81,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
   protected final IDBI database;
 
+  protected final LockManager lockManager;
+
   protected final SchemaStore schemaService;
 
   protected final SequenceService sequences;
@@ -94,10 +97,11 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
   protected final String tableName;
 
-  public KeyValueStoreJdbiBaseImpl(AvailabilityManager availability, IDBI database,
-      SqlTypeHelper typeHelper, SchemaStore schemaService, SequenceService sequences,
-      String groupName, String storeName, String partitionName) {
+  public KeyValueStoreJdbiBaseImpl(AvailabilityManager availability, LockManager lockManager,
+      IDBI database, SqlTypeHelper typeHelper, SchemaStore schemaService,
+      SequenceService sequences, String groupName, String storeName, String partitionName) {
     this.availability = availability;
+    this.lockManager = lockManager;
     this.database = database;
     this.schemaService = schemaService;
     this.sequences = sequences;
@@ -149,15 +153,14 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
-  public synchronized <T> KeyValuePair<T> create(final String type, Class<T> clazz,
-      final T inValue, TypeValidation typeSafety) throws KazukiException {
+  public <T> KeyValuePair<T> create(final String type, Class<T> clazz, final T inValue,
+      TypeValidation typeSafety) throws KazukiException {
     return create(type, clazz, inValue, null, typeSafety);
   }
 
   @Override
-  public synchronized <T> KeyValuePair<T> create(final String type, final Class<T> clazz,
-      final T inValue, final ResolvedKey idOverride, TypeValidation typeSafety)
-      throws KazukiException {
+  public <T> KeyValuePair<T> create(final String type, final Class<T> clazz, final T inValue,
+      final ResolvedKey idOverride, TypeValidation typeSafety) throws KazukiException {
     availability.assertAvailable();
 
     if (type == null
@@ -165,56 +168,57 @@ public abstract class KeyValueStoreJdbiBaseImpl
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
-    final Key newKey;
-    final ResolvedKey resolvedKey;
+    try (LockManager toRelease = lockManager.acquire()) {
+      final Key newKey;
+      final ResolvedKey resolvedKey;
 
-    if (idOverride != null) {
-      newKey = sequences.unresolveKey(idOverride);
-      resolvedKey = idOverride;
-    } else {
-      newKey = sequences.nextKey(type);
-      resolvedKey = sequences.resolveKey(newKey);
-    }
+      if (idOverride != null) {
+        newKey = sequences.unresolveKey(idOverride);
+        resolvedKey = idOverride;
+      } else {
+        newKey = sequences.nextKey(type);
+        resolvedKey = sequences.resolveKey(newKey);
+      }
 
-    final Schema schema = schemaService.retrieveSchema(type);
+      final Schema schema = schemaService.retrieveSchema(type);
 
-    return database.inTransaction(new TransactionCallback<KeyValuePair<T>>() {
-      @Override
-      public KeyValuePair<T> inTransaction(Handle handle, TransactionStatus status)
-          throws Exception {
-        Object storeValue = EncodingHelper.asJsonMap(inValue);
+      return database.inTransaction(new TransactionCallback<KeyValuePair<T>>() {
+        @Override
+        public KeyValuePair<T> inTransaction(Handle handle, TransactionStatus status)
+            throws Exception {
+          Object storeValue = EncodingHelper.asJsonMap(inValue);
 
-        if (schema != null) {
-          FieldTransform fieldTransform = new FieldTransform(schema);
-          StructureTransform structureTransform = new StructureTransform(schema);
+          if (schema != null) {
+            FieldTransform fieldTransform = new FieldTransform(schema);
+            StructureTransform structureTransform = new StructureTransform(schema);
 
-          Map<String, Object> fieldTransformed =
-              fieldTransform.pack((Map<String, Object>) storeValue);
+            Map<String, Object> fieldTransformed =
+                fieldTransform.pack((Map<String, Object>) storeValue);
 
-          for (KeyValueStoreListener kvListener : kvListeners) {
-            kvListener.onCreate(handle, type, clazz, schema, resolvedKey, fieldTransformed);
+            for (KeyValueStoreListener kvListener : kvListeners) {
+              kvListener.onCreate(handle, type, clazz, schema, resolvedKey, fieldTransformed);
+            }
+
+            storeValue = structureTransform.pack(fieldTransformed);
           }
 
-          storeValue = structureTransform.pack(fieldTransformed);
+          byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
+
+          DateTime createdDate = new DateTime();
+          int inserted = doInsert(handle, resolvedKey, storeValueBytes, createdDate);
+
+          if (inserted < 1) {
+            throw new KazukiException("Entity not created!");
+          }
+
+          return new KeyValuePair<T>(newKey, VersionImpl.createInternal(newKey, 1L), inValue);
         }
-
-        byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
-
-        DateTime createdDate = new DateTime();
-        int inserted = doInsert(handle, resolvedKey, storeValueBytes, createdDate);
-
-        if (inserted < 1) {
-          throw new KazukiException("Entity not created!");
-        }
-
-        return new KeyValuePair<T>(newKey, VersionImpl.createInternal(newKey, 1L), inValue);
-      }
-    });
+      });
+    }
   }
 
   @Override
-  public synchronized <T> T retrieve(final Key realKey, final Class<T> clazz)
-      throws KazukiException {
+  public <T> T retrieve(final Key realKey, final Class<T> clazz) throws KazukiException {
     KeyValuePair<T> result = retrieveVersioned(realKey, clazz);
 
     return (result == null) ? null : result.getValue();
@@ -263,7 +267,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
-  public synchronized <T> Map<Key, T> multiRetrieve(final Collection<Key> keys, final Class<T> clazz)
+  public <T> Map<Key, T> multiRetrieve(final Collection<Key> keys, final Class<T> clazz)
       throws KazukiException {
     availability.assertAvailable();
 
@@ -333,8 +337,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
-  public synchronized <T> Map<Key, KeyValuePair<T>> multiRetrieveVersioned(
-      final Collection<Key> keys, final Class<T> clazz) throws KazukiException {
+  public <T> Map<Key, KeyValuePair<T>> multiRetrieveVersioned(final Collection<Key> keys,
+      final Class<T> clazz) throws KazukiException {
     availability.assertAvailable();
 
     if (keys == null || keys.isEmpty()) {
@@ -410,54 +414,56 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
-  public synchronized <T> boolean update(final Key realKey, final Class<T> clazz, final T inValue)
+  public <T> boolean update(final Key realKey, final Class<T> clazz, final T inValue)
       throws KazukiException {
     availability.assertAvailable();
 
-    final String type = realKey.getTypePart();
-    final Schema schema = schemaService.retrieveSchema(type);
-    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+    try (LockManager toRelease = lockManager.acquire()) {
+      final String type = realKey.getTypePart();
+      final Schema schema = schemaService.retrieveSchema(type);
+      final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
-    try {
-      return database.inTransaction(new TransactionCallback<Boolean>() {
-        @Override
-        public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          Map<String, Object> storeValueMap = EncodingHelper.asJsonMap(inValue);
-          Object storeValue = storeValueMap;
+      try {
+        return database.inTransaction(new TransactionCallback<Boolean>() {
+          @Override
+          public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
+            Map<String, Object> storeValueMap = EncodingHelper.asJsonMap(inValue);
+            Object storeValue = storeValueMap;
 
-          FieldTransform fieldTransform = null;
-          StructureTransform structureTransform = null;
+            FieldTransform fieldTransform = null;
+            StructureTransform structureTransform = null;
 
-          if (schema != null) {
-            fieldTransform = new FieldTransform(schema);
-            structureTransform = new StructureTransform(schema);
+            if (schema != null) {
+              fieldTransform = new FieldTransform(schema);
+              structureTransform = new StructureTransform(schema);
 
-            storeValue =
-                structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
-          }
-
-          int updatedCount =
-              doUpdate(handle, resolvedKey, EncodingHelper.convertToSmile(storeValue));
-          boolean updated = (updatedCount == 1);
-
-          if (updated && schema != null) {
-            Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
-
-            Map<String, Object> oldInstance =
-                structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
-                    getObjectBytes(objectMap), Object.class));
-
-            for (KeyValueStoreListener kvListener : kvListeners) {
-              kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, storeValueMap,
-                  oldInstance);
+              storeValue =
+                  structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
             }
-          }
 
-          return updatedCount == 1;
-        }
-      });
-    } catch (Exception e) {
-      throw new KazukiException(e);
+            int updatedCount =
+                doUpdate(handle, resolvedKey, EncodingHelper.convertToSmile(storeValue));
+            boolean updated = (updatedCount == 1);
+
+            if (updated && schema != null) {
+              Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
+
+              Map<String, Object> oldInstance =
+                  structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                      getObjectBytes(objectMap), Object.class));
+
+              for (KeyValueStoreListener kvListener : kvListeners) {
+                kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, storeValueMap,
+                    oldInstance);
+              }
+            }
+
+            return updatedCount == 1;
+          }
+        });
+      } catch (Exception e) {
+        throw new KazukiException(e);
+      }
     }
   }
 
@@ -466,35 +472,73 @@ public abstract class KeyValueStoreJdbiBaseImpl
       final Class<T> clazz, final T inValue) throws KazukiException {
     availability.assertAvailable();
 
-    final String type = realKey.getTypePart();
-    final Schema schema = schemaService.retrieveSchema(type);
-    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+    try (LockManager toRelease = lockManager.acquire()) {
+      final String type = realKey.getTypePart();
+      final Schema schema = schemaService.retrieveSchema(type);
+      final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
-    try {
-      return database.inTransaction(new TransactionCallback<Version>() {
-        @Override
-        public Version inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          Map<String, Object> storeValueMap = EncodingHelper.asJsonMap(inValue);
-          Object storeValue = storeValueMap;
+      try {
+        return database.inTransaction(new TransactionCallback<Version>() {
+          @Override
+          public Version inTransaction(Handle handle, TransactionStatus status) throws Exception {
+            Map<String, Object> storeValueMap = EncodingHelper.asJsonMap(inValue);
+            Object storeValue = storeValueMap;
 
-          FieldTransform fieldTransform = null;
-          StructureTransform structureTransform = null;
+            FieldTransform fieldTransform = null;
+            StructureTransform structureTransform = null;
 
-          if (schema != null) {
-            fieldTransform = new FieldTransform(schema);
-            structureTransform = new StructureTransform(schema);
+            if (schema != null) {
+              fieldTransform = new FieldTransform(schema);
+              structureTransform = new StructureTransform(schema);
 
-            storeValue =
-                structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
+              storeValue =
+                  structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
+            }
+
+            int updatedCount =
+                doUpdateVersioned(handle, resolvedKey, (VersionImpl) version,
+                    EncodingHelper.convertToSmile(storeValue));
+
+            boolean updated = (updatedCount == 1);
+
+            if (updated && schema != null) {
+              Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
+
+              Map<String, Object> oldInstance =
+                  structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                      getObjectBytes(objectMap), Object.class));
+
+              for (KeyValueStoreListener kvListener : kvListeners) {
+                kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, storeValueMap,
+                    oldInstance);
+              }
+            }
+
+            return updated ? VersionImpl.createInternal(realKey,
+                ((VersionImpl) version).getInternalIdentifier() + 1L) : null;
           }
+        });
+      } catch (Exception e) {
+        throw new KazukiException(e);
+      }
+    }
+  }
 
-          int updatedCount =
-              doUpdateVersioned(handle, resolvedKey, (VersionImpl) version,
-                  EncodingHelper.convertToSmile(storeValue));
+  @Override
+  public boolean delete(final Key realKey) throws KazukiException {
+    availability.assertAvailable();
 
-          boolean updated = (updatedCount == 1);
+    try (LockManager toRelease = lockManager.acquire()) {
+      final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      final String type = realKey.getTypePart();
+      final Schema schema = schemaService.retrieveSchema(type);
 
-          if (updated && schema != null) {
+      return database.inTransaction(new TransactionCallback<Boolean>() {
+        @Override
+        public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          if (schema != null && !kvListeners.isEmpty()) {
+            StructureTransform structureTransform = new StructureTransform(schema);
+
             Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
 
             Map<String, Object> oldInstance =
@@ -502,102 +546,70 @@ public abstract class KeyValueStoreJdbiBaseImpl
                     getObjectBytes(objectMap), Object.class));
 
             for (KeyValueStoreListener kvListener : kvListeners) {
-              kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, storeValueMap,
+              kvListener.onDelete(handle, type, LinkedHashMap.class, schema, resolvedKey,
                   oldInstance);
             }
           }
 
-          return updated ? VersionImpl.createInternal(realKey,
-              ((VersionImpl) version).getInternalIdentifier() + 1L) : null;
+          Update delete =
+              JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                  "kv_delete");
+
+          delete.bind("updated_dt", getEpochSecondsNow());
+          delete.bind("key_type", resolvedKey.getTypeTag());
+          delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
+          delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
+
+          int deletedCount = delete.execute();
+
+          return (deletedCount == 1);
         }
       });
-    } catch (Exception e) {
-      throw new KazukiException(e);
     }
   }
 
   @Override
-  public synchronized boolean delete(final Key realKey) throws KazukiException {
+  public boolean deleteHard(final Key realKey) throws KazukiException {
     availability.assertAvailable();
 
-    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-    final String type = realKey.getTypePart();
-    final Schema schema = schemaService.retrieveSchema(type);
+    try (LockManager toRelease = lockManager.acquire()) {
+      final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      final String type = realKey.getTypePart();
+      final Schema schema = schemaService.retrieveSchema(type);
 
-    return database.inTransaction(new TransactionCallback<Boolean>() {
-      @Override
-      public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        if (schema != null && !kvListeners.isEmpty()) {
-          StructureTransform structureTransform = new StructureTransform(schema);
+      return database.inTransaction(new TransactionCallback<Boolean>() {
+        @Override
+        public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          if (schema != null && !kvListeners.isEmpty()) {
+            StructureTransform structureTransform = new StructureTransform(schema);
 
-          Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
+            Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
 
-          Map<String, Object> oldInstance =
-              structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
-                  getObjectBytes(objectMap), Object.class));
+            Map<String, Object> oldInstance =
+                structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                    getObjectBytes(objectMap), Object.class));
 
-          for (KeyValueStoreListener kvListener : kvListeners) {
-            kvListener
-                .onDelete(handle, type, LinkedHashMap.class, schema, resolvedKey, oldInstance);
+            for (KeyValueStoreListener kvListener : kvListeners) {
+              kvListener.onDelete(handle, type, LinkedHashMap.class, schema, resolvedKey,
+                  oldInstance);
+            }
           }
+
+          Update delete =
+              JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
+                  "kv_delete_hard");
+
+          delete.bind("updated_dt", getEpochSecondsNow());
+          delete.bind("key_type", resolvedKey.getTypeTag());
+          delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
+          delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
+
+          int deletedCount = delete.execute();
+
+          return (deletedCount == 1);
         }
-
-        Update delete =
-            JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
-                "kv_delete");
-
-        delete.bind("updated_dt", getEpochSecondsNow());
-        delete.bind("key_type", resolvedKey.getTypeTag());
-        delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
-        delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
-
-        int deletedCount = delete.execute();
-
-        return (deletedCount == 1);
-      }
-    });
-  }
-
-  @Override
-  public synchronized boolean deleteHard(final Key realKey) throws KazukiException {
-    availability.assertAvailable();
-
-    final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-    final String type = realKey.getTypePart();
-    final Schema schema = schemaService.retrieveSchema(type);
-
-    return database.inTransaction(new TransactionCallback<Boolean>() {
-      @Override
-      public Boolean inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        if (schema != null && !kvListeners.isEmpty()) {
-          StructureTransform structureTransform = new StructureTransform(schema);
-
-          Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
-
-          Map<String, Object> oldInstance =
-              structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
-                  getObjectBytes(objectMap), Object.class));
-
-          for (KeyValueStoreListener kvListener : kvListeners) {
-            kvListener
-                .onDelete(handle, type, LinkedHashMap.class, schema, resolvedKey, oldInstance);
-          }
-        }
-
-        Update delete =
-            JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
-                "kv_delete_hard");
-
-        delete.bind("updated_dt", getEpochSecondsNow());
-        delete.bind("key_type", resolvedKey.getTypeTag());
-        delete.bind("key_id_hi", resolvedKey.getIdentifierHi());
-        delete.bind("key_id_lo", resolvedKey.getIdentifierLo());
-
-        int deletedCount = delete.execute();
-
-        return (deletedCount == 1);
-      }
-    });
+      });
+    }
   }
 
   @Override

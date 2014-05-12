@@ -17,6 +17,7 @@ package io.kazuki.v0.store.index;
 import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.IoHelper;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.OpaquePaginationHelper;
 import io.kazuki.v0.internal.helper.SqlParamBindings;
@@ -67,6 +68,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final Logger log = LogTranslation.getLogger(getClass());
 
   private final AvailabilityManager availability;
+  private final LockManager lockManager;
   private final IDBI database;
   private final SequenceService sequence;
   private final SchemaStore schemaStore;
@@ -77,11 +79,12 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final String partitionName;
 
   @Inject
-  public SecondaryIndexStoreJdbiImpl(AvailabilityManager availability, IDBI database,
-      SequenceService sequence, SchemaStore schemaStore, KeyValueStore kvStore,
+  public SecondaryIndexStoreJdbiImpl(AvailabilityManager availability, LockManager lockManager,
+      IDBI database, SequenceService sequence, SchemaStore schemaStore, KeyValueStore kvStore,
       SecondaryIndexTableHelper tableHelper, String groupName, String storeName,
       String partitionName) {
     this.availability = availability;
+    this.lockManager = lockManager;
     this.database = database;
     this.sequence = sequence;
     this.schemaStore = schemaStore;
@@ -242,53 +245,62 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   @Override
   public <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> instance) {
-    try {
-      for (IndexDefinition indexDef : schema.getIndexes()) {
-        this.insertEntity(handle, resolvedKey.getIdentifierLo(), instance, type,
-            indexDef.getName(), schema);
+    try (LockManager toRelease = lockManager.acquire()) {
+      try {
+        for (IndexDefinition indexDef : schema.getIndexes()) {
+          this.insertEntity(handle, resolvedKey.getIdentifierLo(), instance, type,
+              indexDef.getName(), schema);
+        }
+      } catch (KazukiException e) {
+        throw Throwables.propagate(e);
       }
-    } catch (KazukiException e) {
-      throw Throwables.propagate(e);
     }
   }
 
   @Override
   public <T> void onUpdate(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance) {
-    try {
-      for (IndexDefinition indexDef : schema.getIndexes()) {
-        this.updateEntity(handle, resolvedKey.getIdentifierLo(), newInstance, oldInstance, type,
-            indexDef.getName(), schema);
+    try (LockManager toRelease = lockManager.acquire()) {
+      try {
+        for (IndexDefinition indexDef : schema.getIndexes()) {
+          this.updateEntity(handle, resolvedKey.getIdentifierLo(), newInstance, oldInstance, type,
+              indexDef.getName(), schema);
+        }
+      } catch (KazukiException e) {
+        throw Throwables.propagate(e);
       }
-    } catch (KazukiException e) {
-      throw Throwables.propagate(e);
     }
   }
 
   @Override
   public <T> void onDelete(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> oldInstance) {
-    try {
-      for (IndexDefinition indexDef : schema.getIndexes()) {
-        this.deleteEntity(handle, resolvedKey.getIdentifierLo(), type, oldInstance,
-            indexDef.getName(), schema);
+    try (LockManager toRelease = lockManager.acquire()) {
+      try {
+        for (IndexDefinition indexDef : schema.getIndexes()) {
+          this.deleteEntity(handle, resolvedKey.getIdentifierLo(), type, oldInstance,
+              indexDef.getName(), schema);
+        }
+      } catch (KazukiException e) {
+        throw Throwables.propagate(e);
       }
-    } catch (KazukiException e) {
-      throw Throwables.propagate(e);
     }
   }
 
   @Override
   public void clear(Handle handle, Map<String, Schema> typeToSchemaMap, boolean preserveSchema) {
-    for (Map.Entry<String, Schema> entry : typeToSchemaMap.entrySet()) {
-      String type = entry.getKey();
-      Schema schema = entry.getValue();
+    try (LockManager toRelease = lockManager.acquire()) {
+      for (Map.Entry<String, Schema> entry : typeToSchemaMap.entrySet()) {
+        String type = entry.getKey();
+        Schema schema = entry.getValue();
 
-      for (IndexDefinition indexDef : schema.getIndexes()) {
-        if (preserveSchema) {
-          this.truncateTable(handle, type, indexDef.getName(), groupName, storeName, partitionName);
-        } else {
-          this.dropTableAndIndex(handle, type, indexDef.getName());
+        for (IndexDefinition indexDef : schema.getIndexes()) {
+          if (preserveSchema) {
+            this.truncateTable(handle, type, indexDef.getName(), groupName, storeName,
+                partitionName);
+          } else {
+            this.dropTableAndIndex(handle, type, indexDef.getName());
+          }
         }
       }
     }
@@ -296,9 +308,11 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
   @Override
   public void onSchemaCreate(String type, Schema schema) {
-    for (IndexDefinition indexDef : schema.getIndexes()) {
-      createTable(database, type, indexDef.getName(), schema);
-      createIndex(database, type, indexDef.getName(), schema);
+    try (LockManager toRelease = lockManager.acquire()) {
+      for (IndexDefinition indexDef : schema.getIndexes()) {
+        createTable(database, type, indexDef.getName(), schema);
+        createIndex(database, type, indexDef.getName(), schema);
+      }
     }
   }
 
@@ -306,7 +320,47 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   @Override
   public void onSchemaUpdate(final String type, final Schema newSchema, final Schema oldSchema,
       final KeyValueIterable<KeyValuePair<LinkedHashMap>> entityCollection) {
-    try {
+    try (LockManager toRelease = lockManager.acquire()) {
+      try {
+        for (final IndexDefinition indexDef : oldSchema.getIndexes()) {
+          database.inTransaction(new TransactionCallback<Void>() {
+            public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+              dropTableAndIndex(handle, type, indexDef.getName());
+
+              return null;
+            };
+          });
+        }
+
+        for (final IndexDefinition indexDef : oldSchema.getIndexes()) {
+          createTable(database, type, indexDef.getName(), newSchema);
+          createIndex(database, type, indexDef.getName(), newSchema);
+        }
+
+        final FieldTransform fieldTransform = new FieldTransform(oldSchema);
+
+        database.inTransaction(new TransactionCallback<Void>() {
+          @Override
+          public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+            for (KeyValuePair<LinkedHashMap> entity : entityCollection) {
+              Map<String, Object> fieldTransformed = fieldTransform.pack(entity.getValue());
+
+              SecondaryIndexStoreJdbiImpl.this.onCreate(handle, type, LinkedHashMap.class,
+                  newSchema, sequence.resolveKey(entity.getKey()), entity.getValue());
+            }
+
+            return null;
+          }
+        });
+      } finally {
+        entityCollection.close();
+      }
+    }
+  }
+
+  @Override
+  public void onSchemaDelete(final String type, final Schema oldSchema) {
+    try (LockManager toRelease = lockManager.acquire()) {
       for (final IndexDefinition indexDef : oldSchema.getIndexes()) {
         database.inTransaction(new TransactionCallback<Void>() {
           public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
@@ -316,42 +370,6 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
           };
         });
       }
-
-      for (final IndexDefinition indexDef : oldSchema.getIndexes()) {
-        createTable(database, type, indexDef.getName(), newSchema);
-        createIndex(database, type, indexDef.getName(), newSchema);
-      }
-
-      final FieldTransform fieldTransform = new FieldTransform(oldSchema);
-
-      database.inTransaction(new TransactionCallback<Void>() {
-        @Override
-        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          for (KeyValuePair<LinkedHashMap> entity : entityCollection) {
-            Map<String, Object> fieldTransformed = fieldTransform.pack(entity.getValue());
-
-            SecondaryIndexStoreJdbiImpl.this.onCreate(handle, type, LinkedHashMap.class, newSchema,
-                sequence.resolveKey(entity.getKey()), entity.getValue());
-          }
-
-          return null;
-        }
-      });
-    } finally {
-      entityCollection.close();
-    }
-  }
-
-  @Override
-  public void onSchemaDelete(final String type, final Schema oldSchema) {
-    for (final IndexDefinition indexDef : oldSchema.getIndexes()) {
-      database.inTransaction(new TransactionCallback<Void>() {
-        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-          dropTableAndIndex(handle, type, indexDef.getName());
-
-          return null;
-        };
-      });
     }
   }
 

@@ -14,6 +14,7 @@
  */
 package io.kazuki.v0.store.jdbi;
 
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.MaskProxy;
 import io.kazuki.v0.internal.helper.ResourceHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;

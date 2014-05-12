@@ -14,6 +14,7 @@
  */
 package io.kazuki.v0.store.schema;
 
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.store.KazukiException;
@@ -42,12 +43,14 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
 
   private final Logger log = LogTranslation.getLogger(getClass());
 
+  private final LockManager lockManager;
   private final SequenceService sequences;
   private final List<SchemaStoreListener> ssListeners;
   private KeyValueStore store;
 
   @Inject
-  public SchemaStoreImpl(SequenceService sequences) {
+  public SchemaStoreImpl(LockManager lockManager, SequenceService sequences) {
+    this.lockManager = lockManager;
     this.sequences = sequences;
     this.ssListeners = new ArrayList<SchemaStoreListener>();
   }
@@ -62,114 +65,124 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
     this.ssListeners.add(listener);
   }
 
-  public synchronized Key createSchema(String type, Schema value) throws KazukiException {
+  public Key createSchema(String type, Schema value) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
 
-    Integer typeId = getTypeIdPossiblyNull(type, true);
+    try (LockManager toRelease = lockManager.acquire()) {
+      Integer typeId = getTypeIdPossiblyNull(type, true);
 
-    if (typeId == null) {
-      throw new KazukiException("unable to allocate new type id for Schema type: " + type);
-    }
+      if (typeId == null) {
+        throw new KazukiException("unable to allocate new type id for Schema type: " + type);
+      }
 
-    Key realKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
+      Key realKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
 
-    Schema existing = this.store.retrieve(realKey, Schema.class);
-    if (existing != null) {
+      Schema existing = this.store.retrieve(realKey, Schema.class);
+      if (existing != null) {
+        return realKey;
+      }
+
+      try {
+        SchemaValidator.validate(value);
+      } catch (TransformException e) {
+        throw new KazukiException("invalid schema definition for type: " + type, e);
+      }
+
+      for (SchemaStoreListener ssListener : ssListeners) {
+        ssListener.onSchemaCreate(type, value);
+      }
+
+      ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      store.create(SCHEMA_PREFIX, Schema.class, value, resolvedKey, TypeValidation.LAX);
+
       return realKey;
     }
-
-    try {
-      SchemaValidator.validate(value);
-    } catch (TransformException e) {
-      throw new KazukiException("invalid schema definition for type: " + type, e);
-    }
-
-    for (SchemaStoreListener ssListener : ssListeners) {
-      ssListener.onSchemaCreate(type, value);
-    }
-
-    ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-    store.create(SCHEMA_PREFIX, Schema.class, value, resolvedKey, TypeValidation.LAX);
-
-    return realKey;
   }
 
-  public synchronized Schema retrieveSchema(String type) throws KazukiException {
+  public Schema retrieveSchema(String type) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
 
-    Integer typeId = getTypeIdPossiblyNull(type, false);
+    try (LockManager toRelease = lockManager.acquire()) {
+      Integer typeId = getTypeIdPossiblyNull(type, false);
 
-    if (typeId == null || type.equals(SCHEMA_PREFIX)) {
-      return null;
+      if (typeId == null || type.equals(SCHEMA_PREFIX)) {
+        return null;
+      }
+
+      return store
+          .retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue()), Schema.class);
     }
-
-    return store.retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue()), Schema.class);
   }
 
-  public synchronized boolean updateSchema(final String type, final Schema value)
-      throws KazukiException {
+  public boolean updateSchema(final String type, final Schema value) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
 
-    final Integer typeId = getTypeIdPossiblyNull(type, false);
+    try (LockManager toRelease = lockManager.acquire()) {
+      final Integer typeId = getTypeIdPossiblyNull(type, false);
 
-    if (typeId == null) {
-      return false;
+      if (typeId == null) {
+        return false;
+      }
+
+      Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
+
+      final Schema original = store.retrieve(theKey, Schema.class);
+
+      if (original == null) {
+        return false;
+      }
+
+      try {
+        SchemaValidator.validate(value);
+        SchemaValidator.validateUpgrade(original, value);
+      } catch (TransformException e) {
+        throw new KazukiException("invalid Schema update for type: " + type, e);
+      }
+
+      for (SchemaStoreListener ssListener : ssListeners) {
+        ssListener.onSchemaUpdate(type, value, original,
+            this.store.iterators().entries(type, LinkedHashMap.class, SortDirection.ASCENDING));
+      }
+
+      return store.update(theKey, Schema.class, value);
     }
-
-    Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
-
-    final Schema original = store.retrieve(theKey, Schema.class);
-
-    if (original == null) {
-      return false;
-    }
-
-    try {
-      SchemaValidator.validate(value);
-      SchemaValidator.validateUpgrade(original, value);
-    } catch (TransformException e) {
-      throw new KazukiException("invalid Schema update for type: " + type, e);
-    }
-
-    for (SchemaStoreListener ssListener : ssListeners) {
-      ssListener.onSchemaUpdate(type, value, original,
-          this.store.iterators().entries(type, LinkedHashMap.class, SortDirection.ASCENDING));
-    }
-
-    return store.update(theKey, Schema.class, value);
   }
 
-  public synchronized boolean deleteSchema(final String type) throws KazukiException {
+  public boolean deleteSchema(final String type) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
 
-    Integer typeId = getTypeIdPossiblyNull(type, true);
+    try (LockManager toRelease = lockManager.acquire()) {
+      Integer typeId = getTypeIdPossiblyNull(type, true);
 
-    if (typeId == null) {
-      return false;
+      if (typeId == null) {
+        return false;
+      }
+
+      Schema original =
+          store.retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, Long.valueOf(typeId)), Schema.class);
+
+      for (SchemaStoreListener ssListener : ssListeners) {
+        ssListener.onSchemaDelete(type, original);
+      }
+
+      Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
+
+      return store.deleteHard(theKey);
     }
-
-    Schema original =
-        store.retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, Long.valueOf(typeId)), Schema.class);
-
-    for (SchemaStoreListener ssListener : ssListeners) {
-      ssListener.onSchemaDelete(type, original);
-    }
-
-    Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
-
-    return store.deleteHard(theKey);
   }
 
-  public synchronized void clear() throws KazukiException {
-    this.store.clear(SCHEMA_PREFIX);
+  public void clear() throws KazukiException {
+    try (LockManager toRelease = lockManager.acquire()) {
+      this.store.clear(SCHEMA_PREFIX);
+    }
   }
 
   private Integer getTypeIdPossiblyNull(String type, boolean val) {

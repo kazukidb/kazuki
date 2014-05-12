@@ -18,6 +18,7 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.availability.AvailabilityManager.ProtectedCommand;
 import io.kazuki.v0.internal.availability.Releasable;
 import io.kazuki.v0.internal.helper.JDBIHelper;
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.KazukiException;
@@ -54,23 +55,25 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   protected final SequenceHelper sequenceHelper;
   protected final SqlTypeHelper typeHelper;
   protected final AvailabilityManager availabilityManager;
+  protected final LockManager lockManager;
   protected final IDBI dataSource;
   protected final long incrementBlockSize;
 
   @Inject
   public SequenceServiceJdbiImpl(SequenceServiceConfiguration sequenceConfiguration,
-      AvailabilityManager availabilityManager, SequenceHelper sequenceHelper, IDBI dataSource,
-      SqlTypeHelper typeHelper) {
-    this(sequenceHelper, availabilityManager, dataSource, typeHelper, sequenceConfiguration
-        .getGroupName(), sequenceConfiguration.getStoreName(), sequenceConfiguration
-        .getIncrementBlockSize());
+      AvailabilityManager availabilityManager, LockManager lockManager,
+      SequenceHelper sequenceHelper, IDBI dataSource, SqlTypeHelper typeHelper) {
+    this(sequenceHelper, availabilityManager, lockManager, dataSource, typeHelper,
+        sequenceConfiguration.getGroupName(), sequenceConfiguration.getStoreName(),
+        sequenceConfiguration.getIncrementBlockSize());
   }
 
   public SequenceServiceJdbiImpl(SequenceHelper sequenceHelper,
-      AvailabilityManager availabilityManager, IDBI dataSource, SqlTypeHelper typeHelper,
-      String groupName, String storeName, Long incrementBlockSize) {
+      AvailabilityManager availabilityManager, LockManager lockManager, IDBI dataSource,
+      SqlTypeHelper typeHelper, String groupName, String storeName, Long incrementBlockSize) {
     this.sequenceHelper = sequenceHelper;
     this.availabilityManager = availabilityManager;
+    this.lockManager = lockManager;
     this.dataSource = dataSource;
     this.typeHelper = typeHelper;
     this.incrementBlockSize =
@@ -92,219 +95,240 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     });
   }
 
-  public synchronized void initialize() {
+  public void initialize() {
     log.debug("Initializing Sequence Service {}", this);
 
     availabilityManager.setAvailable(false);
 
-    dataSource.inTransaction(new TransactionCallback<Void>() {
-      @Override
-      public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "key_types_table_name",
-            sequenceHelper.getKeyTypesTableName(), "seq_types_create_table").execute();
-
-        JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
-            sequenceHelper.getSequenceTableName(), "seq_seq_create_table").execute();
-
-        try {
+    try (LockManager toRelease = lockManager.acquire()) {
+      dataSource.inTransaction(new TransactionCallback<Void>() {
+        @Override
+        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
           JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
-              "key_types_table_name", sequenceHelper.getKeyTypesTableName(), "seq_types_init")
-              .execute();
-        } catch (Throwable t) {
-          if (!typeHelper.isDuplicateKeyException(t)) {
-            throw Throwables.propagate(t);
-          }
-        }
+              "key_types_table_name", sequenceHelper.getKeyTypesTableName(),
+              "seq_types_create_table").execute();
 
-        try {
           JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(), "sequence_table_name",
-              sequenceHelper.getSequenceTableName(), "seq_seq_init").execute();
-        } catch (Throwable t) {
-          if (!typeHelper.isDuplicateKeyException(t)) {
-            throw Throwables.propagate(t);
-          }
-        }
+              sequenceHelper.getSequenceTableName(), "seq_seq_create_table").execute();
 
-        return null;
-      }
-    });
+          try {
+            JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
+                "key_types_table_name", sequenceHelper.getKeyTypesTableName(), "seq_types_init")
+                .execute();
+          } catch (Throwable t) {
+            if (!typeHelper.isDuplicateKeyException(t)) {
+              throw Throwables.propagate(t);
+            }
+          }
+
+          try {
+            JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
+                "sequence_table_name", sequenceHelper.getSequenceTableName(), "seq_seq_init")
+                .execute();
+          } catch (Throwable t) {
+            if (!typeHelper.isDuplicateKeyException(t)) {
+              throw Throwables.propagate(t);
+            }
+          }
+
+          return null;
+        }
+      });
+    }
 
     availabilityManager.setAvailable(true);
     log.debug("Initialized Sequence Service {}", this);
   }
 
-  public synchronized void shutdown() {
+  public void shutdown() {
     log.debug("Shutting down Sequence Service {}", this);
 
     availabilityManager.assertAvailable();
     availabilityManager.setAvailable(false);
 
-    dataSource.inTransaction(new TransactionCallback<Void>() {
-      @Override
-      public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        for (Counter counter : SequenceServiceJdbiImpl.this.counters.values()) {
-          sequenceHelper.setNextId(handle, counter.typeId,
-              Long.valueOf(counter.base + counter.offset.get()));
-        }
+    try (LockManager toRelease = lockManager.acquire()) {
+      dataSource.inTransaction(new TransactionCallback<Void>() {
+        @Override
+        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          for (Counter counter : SequenceServiceJdbiImpl.this.counters.values()) {
+            sequenceHelper.setNextId(handle, counter.typeId,
+                Long.valueOf(counter.base + counter.offset.get()));
+          }
 
-        return null;
-      }
-    });
+          return null;
+        }
+      });
+    }
 
     log.debug("Shut down Sequence Service {}", this);
   }
 
-  public synchronized void bumpKey(final String type, long id) throws Exception {
-    Counter counter = this.counters.get(type);
-    if (counter == null) {
-      this.nextKey(type);
-    }
+  public void bumpKey(final String type, long id) throws Exception {
+    try (LockManager toRelease = lockManager.acquire()) {
+      Counter counter = this.counters.get(type);
+      if (counter == null) {
+        this.nextKey(type);
+      }
 
-    this.counters.get(type).bumpKey(id);
+      this.counters.get(type).bumpKey(id);
+    }
   }
 
-  public synchronized Key nextKey(final String type) throws KazukiException {
+  public Key nextKey(final String type) throws KazukiException {
     if (type == null) {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
-    Counter counter = counters.get(type);
+    try (LockManager toRelease = lockManager.acquire()) {
+      Counter counter = counters.get(type);
 
-    if (counter == null) {
-      counter = createCounter(type);
-      counters.put(type, counter);
+      if (counter == null) {
+        counter = createCounter(type);
+        counters.put(type, counter);
+      }
+
+      Key nextKey = counter.getNext();
+
+      if (nextKey == null) {
+        counter = createCounter(type);
+        counters.put(type, counter);
+
+        nextKey = counter.getNext();
+      }
+
+      return nextKey;
     }
-
-    Key nextKey = counter.getNext();
-
-    if (nextKey == null) {
-      counter = createCounter(type);
-      counters.put(type, counter);
-
-      nextKey = counter.getNext();
-    }
-
-    return nextKey;
   }
 
   @Override
-  public synchronized ResolvedKey resolveKey(Key key) throws KazukiException {
-    Integer typeId = this.getTypeId(key.getTypePart(), false);
+  public ResolvedKey resolveKey(Key key) throws KazukiException {
+    try (LockManager toRelease = lockManager.acquire()) {
+      Integer typeId = this.getTypeId(key.getTypePart(), false);
 
-    if (typeId == null) {
-      throw new IllegalArgumentException("Invalid entity 'type'");
+      if (typeId == null) {
+        throw new IllegalArgumentException("Invalid entity 'type'");
+      }
+
+      KeyImpl keyImpl = (KeyImpl) key;
+
+      return new ResolvedKeyImpl(typeId, 0L, keyImpl.getInternalId());
     }
-
-    KeyImpl keyImpl = (KeyImpl) key;
-
-    return new ResolvedKeyImpl(typeId, 0L, keyImpl.getInternalId());
   }
 
   @Override
-  public synchronized Key unresolveKey(ResolvedKey key) throws KazukiException {
-    return KeyImpl.createInternal(this.getTypeName(key.getTypeTag()), key.getIdentifierLo());
+  public Key unresolveKey(ResolvedKey key) throws KazukiException {
+    try (LockManager toRelease = lockManager.acquire()) {
+      return KeyImpl.createInternal(this.getTypeName(key.getTypeTag()), key.getIdentifierLo());
+    }
   }
 
   @Nullable
-  public synchronized Key peekKey(final String type) throws KazukiException {
-    Counter counter = counters.get(type);
+  public Key peekKey(final String type) throws KazukiException {
+    try (LockManager toRelease = lockManager.acquire()) {
+      Counter counter = counters.get(type);
 
-    if (counter == null) {
-      return null;
+      if (counter == null) {
+        return null;
+      }
+
+      return counter.peekNext();
     }
-
-    return counter.peekNext();
   }
 
-  public synchronized Integer getTypeId(final String type, final boolean create)
-      throws KazukiException {
+  public Integer getTypeId(final String type, final boolean create) throws KazukiException {
     if (type == null) {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
 
-    if (typeCodes.containsKey(type)) {
-      return typeCodes.get(type);
-    }
-
-    availabilityManager.assertAvailable();
-
-    Integer result = dataSource.inTransaction(new TransactionCallback<Integer>() {
-      @Override
-      public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        return sequenceHelper.validateType(handle, typeCodes, typeNames, type, create);
+    try (LockManager toRelease = lockManager.acquire()) {
+      if (typeCodes.containsKey(type)) {
+        return typeCodes.get(type);
       }
-    });
 
-    if (result == null) {
-      throw new KazukiException("unknown type: " + type);
+      availabilityManager.assertAvailable();
+
+      Integer result = dataSource.inTransaction(new TransactionCallback<Integer>() {
+        @Override
+        public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          return sequenceHelper.validateType(handle, typeCodes, typeNames, type, create);
+        }
+      });
+
+      if (result == null) {
+        throw new KazukiException("unknown type: " + type);
+      }
+
+      return result;
     }
-
-    return result;
   }
 
-  public synchronized String getTypeName(final Integer id) throws KazukiException {
+  public String getTypeName(final Integer id) throws KazukiException {
     if (typeNames.containsKey(id)) {
       return typeNames.get(id);
     }
 
     availabilityManager.assertAvailable();
 
-    return dataSource.inTransaction(new TransactionCallback<String>() {
-      @Override
-      public String inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        try {
-          return sequenceHelper.getTypeName(handle, typeNames, id);
-        } catch (KazukiException e) {
-          return null;
+    try (LockManager toRelease = lockManager.acquire()) {
+      return dataSource.inTransaction(new TransactionCallback<String>() {
+        @Override
+        public String inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          try {
+            return sequenceHelper.getTypeName(handle, typeNames, id);
+          } catch (KazukiException e) {
+            return null;
+          }
         }
-      }
-    });
+      });
+    }
   }
 
-  public synchronized void clear(final boolean preserveTypes, final boolean preserveCounters) {
+  public void clear(final boolean preserveTypes, final boolean preserveCounters) {
     log.debug("Clearing SequenceService {}", this);
 
     availabilityManager.doProtected(new ProtectedCommand<Void>() {
       @Override
       public Void execute(Releasable resource) throws Exception {
         try {
-          if (!preserveTypes) {
-            SequenceServiceJdbiImpl.this.typeCodes.clear();
-            SequenceServiceJdbiImpl.this.typeNames.clear();
-          }
-
-          if (!preserveCounters) {
-            SequenceServiceJdbiImpl.this.counters.clear();
-          }
-
-          dataSource.inTransaction(new TransactionCallback<Void>() {
-            @Override
-            public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-              if (!preserveCounters) {
-                log.debug("Truncating SequenceService {} table {}", this,
-                    sequenceHelper.getSequenceTableName());
-
-                JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
-                    "sequence_table_name", sequenceHelper.getSequenceTableName(),
-                    "seq_seq_truncate").execute();
-              }
-
-              if (!preserveTypes) {
-                log.debug("Truncating SequenceService {} table {}", this,
-                    sequenceHelper.getKeyTypesTableName());
-
-                JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
-                    "key_types_table_name", sequenceHelper.getKeyTypesTableName(),
-                    "seq_types_truncate").execute();
-              }
-
-              return null;
+          try (LockManager toRelease = lockManager.acquire()) {
+            if (!preserveTypes) {
+              SequenceServiceJdbiImpl.this.typeCodes.clear();
+              SequenceServiceJdbiImpl.this.typeNames.clear();
             }
-          });
 
-          SequenceServiceJdbiImpl.this.initialize();
+            if (!preserveCounters) {
+              SequenceServiceJdbiImpl.this.counters.clear();
+            }
 
-          return null;
+            dataSource.inTransaction(new TransactionCallback<Void>() {
+              @Override
+              public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+                if (!preserveCounters) {
+                  log.debug("Truncating SequenceService {} table {}", this,
+                      sequenceHelper.getSequenceTableName());
+
+                  JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
+                      "sequence_table_name", sequenceHelper.getSequenceTableName(),
+                      "seq_seq_truncate").execute();
+                }
+
+                if (!preserveTypes) {
+                  log.debug("Truncating SequenceService {} table {}", this,
+                      sequenceHelper.getKeyTypesTableName());
+
+                  JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
+                      "key_types_table_name", sequenceHelper.getKeyTypesTableName(),
+                      "seq_types_truncate").execute();
+                }
+
+                return null;
+              }
+            });
+
+            SequenceServiceJdbiImpl.this.initialize();
+
+            return null;
+          }
         } finally {
           resource.release();
         }
@@ -315,18 +339,20 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   @Override
-  public synchronized void resetCounter(final String type) throws KazukiException {
-    final Integer typeId = SequenceServiceJdbiImpl.this.getTypeId(type, false);
+  public void resetCounter(final String type) throws KazukiException {
+    try (LockManager toRelease = lockManager.acquire()) {
+      final Integer typeId = SequenceServiceJdbiImpl.this.getTypeId(type, false);
 
-    dataSource.inTransaction(new TransactionCallback<Void>() {
-      @Override
-      public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        SequenceServiceJdbiImpl.this.sequenceHelper.setNextId(handle, typeId, 0L);
-        SequenceServiceJdbiImpl.this.counters.remove(type);
+      dataSource.inTransaction(new TransactionCallback<Void>() {
+        @Override
+        public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          SequenceServiceJdbiImpl.this.sequenceHelper.setNextId(handle, typeId, 0L);
+          SequenceServiceJdbiImpl.this.counters.remove(type);
 
-        return null;
-      }
-    });
+          return null;
+        }
+      });
+    }
   }
 
   public Map<String, Counter> getCurrentCounters() {
@@ -334,21 +360,23 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   }
 
   private Counter createCounter(final String type) {
-    final int typeId = this.dataSource.inTransaction(new TransactionCallback<Integer>() {
-      @Override
-      public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        return sequenceHelper.validateType(handle, typeCodes, typeNames, type, true);
-      }
-    });
+    try (LockManager toRelease = lockManager.acquire()) {
+      final int typeId = this.dataSource.inTransaction(new TransactionCallback<Integer>() {
+        @Override
+        public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          return sequenceHelper.validateType(handle, typeCodes, typeNames, type, true);
+        }
+      });
 
-    long nextBase = this.dataSource.inTransaction(new TransactionCallback<Long>() {
-      @Override
-      public Long inTransaction(Handle handle, TransactionStatus status) throws Exception {
-        return sequenceHelper.getNextId(handle, typeId, incrementBlockSize);
-      }
-    });
+      long nextBase = this.dataSource.inTransaction(new TransactionCallback<Long>() {
+        @Override
+        public Long inTransaction(Handle handle, TransactionStatus status) throws Exception {
+          return sequenceHelper.getNextId(handle, typeId, incrementBlockSize);
+        }
+      });
 
-    return new Counter(typeId, type, nextBase, nextBase + incrementBlockSize);
+      return new Counter(typeId, type, nextBase, nextBase + incrementBlockSize);
+    }
   }
 
   public class Counter {

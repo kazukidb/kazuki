@@ -15,6 +15,7 @@
 package io.kazuki.v0.store.journal;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.KazukiException;
@@ -61,6 +62,7 @@ import com.google.inject.Provider;
 public class PartitionedJournalStore implements JournalStore, LifecycleRegistration {
   private final Logger log = LogTranslation.getLogger(getClass());
   private final AvailabilityManager availability;
+  private final LockManager lockManager;
   private final IDBI database;
   private final SqlTypeHelper typeHelper;
   private final SequenceService sequence;
@@ -77,13 +79,14 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   private final AtomicReference<KeyValueStore> activePartitionStore;
   private final AtomicReference<PartitionInfoImpl> activePartitionInfo;
 
-  public PartitionedJournalStore(AvailabilityManager availability, IDBI database,
-      SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence, String dbType,
-      String groupName, String storeName, Long partitionSize, String dataType,
+  public PartitionedJournalStore(AvailabilityManager availability, LockManager lockManager,
+      IDBI database, SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
+      String dbType, String groupName, String storeName, Long partitionSize, String dataType,
       boolean strictTypeCreation) {
     Preconditions.checkNotNull(dataType, "dataType");
 
     this.availability = availability;
+    this.lockManager = lockManager;
     this.database = database;
     this.typeHelper = typeHelper;
     this.schema = schema;
@@ -100,12 +103,12 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Inject
-  public PartitionedJournalStore(AvailabilityManager availability, IDBI database,
-      SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
+  public PartitionedJournalStore(AvailabilityManager availability, LockManager lockManager,
+      IDBI database, SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
       KeyValueStoreConfiguration config) {
-    this(availability, database, typeHelper, schema, sequence, config.getDbType(), config
-        .getGroupName(), config.getStoreName(), config.getPartitionSize(), config.getDataType(),
-        config.isStrictTypeCreation());
+    this(availability, lockManager, database, typeHelper, schema, sequence, config.getDbType(),
+        config.getGroupName(), config.getStoreName(), config.getPartitionSize(), config
+            .getDataType(), config.isStrictTypeCreation());
   }
 
   @Inject
@@ -119,34 +122,37 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Override
-  public synchronized void initialize() {
+  public void initialize() {
     log.debug("Intitializing PartitionedJournalStore {}", this);
-    this.metaStore = getKeyValueStore("META", true);
 
-    try {
-      if (this.schema.retrieveSchema(this.typeName) == null) {
-        this.schema.createSchema(this.typeName, new Schema(Collections.<Attribute>emptyList(),
-            Collections.<IndexDefinition>emptyList()));
-      }
+    try (LockManager toRelease = lockManager.acquire()) {
+      this.metaStore = getKeyValueStore("META", true);
 
-      try (KeyValueIterable<PartitionInfoSnapshot> parts = this.getAllPartitions()) {
-        for (PartitionInfoSnapshot partition : parts) {
-          if (!partition.isClosed()) {
-            log.debug("Found active partition: {}", partition.getPartitionId());
+      try {
+        if (this.schema.retrieveSchema(this.typeName) == null) {
+          this.schema.createSchema(this.typeName, new Schema(Collections.<Attribute>emptyList(),
+              Collections.<IndexDefinition>emptyList()));
+        }
 
-            this.activePartitionInfo.set(new PartitionInfoImpl(partition.getPartitionId(),
-                partition.getMinId(), partition.getMaxId(), partition.getSize(), partition
-                    .isClosed()));
-            this.activePartitionStore.set(getKeyValueStore(
-                getPartitionName(sequence.resolveKey(KeyImpl.valueOf(partition.getPartitionId()))),
-                false));
+        try (KeyValueIterable<PartitionInfoSnapshot> parts = this.getAllPartitions()) {
+          for (PartitionInfoSnapshot partition : parts) {
+            if (!partition.isClosed()) {
+              log.debug("Found active partition: {}", partition.getPartitionId());
 
-            break;
+              this.activePartitionInfo.set(new PartitionInfoImpl(partition.getPartitionId(),
+                  partition.getMinId(), partition.getMaxId(), partition.getSize(), partition
+                      .isClosed()));
+              this.activePartitionStore
+                  .set(getKeyValueStore(getPartitionName(sequence.resolveKey(KeyImpl
+                      .valueOf(partition.getPartitionId()))), false));
+
+              break;
+            }
           }
         }
+      } catch (KazukiException e) {
+        throw Throwables.propagate(e);
       }
-    } catch (KazukiException e) {
-      throw Throwables.propagate(e);
     }
 
     availability.setAvailable(true);
@@ -154,8 +160,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Override
-  public synchronized <T> Key append(String type, Class<T> clazz, T inValue,
-      TypeValidation typeSafety) throws KazukiException {
+  public <T> Key append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
+      throws KazukiException {
     availability.assertAvailable();
 
     if (!this.dataType.equals(type)) {
@@ -163,58 +169,60 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
           + type);
     }
 
-    Key theKey = sequence.nextKey(type);
-    ResolvedKey resolvedKey = sequence.resolveKey(theKey);
+    try (LockManager toRelease = lockManager.acquire()) {
+      Key theKey = sequence.nextKey(type);
+      ResolvedKey resolvedKey = sequence.resolveKey(theKey);
 
-    if (theKey == null) {
-      throw new IllegalStateException("unable to allocate new key of type: " + type);
-    }
-
-    PartitionInfoImpl theActivePartitionInfo = activePartitionInfo.get();
-    KeyValueStore targetStore = activePartitionStore.get();
-
-    if (theActivePartitionInfo == null) {
-      KeyImpl partitionKey = (KeyImpl) sequence.nextKey(this.typeName);
-
-      if (partitionKey == null) {
-        throw new IllegalStateException("unable to allocate new partition key of type: "
-            + this.typeName);
+      if (theKey == null) {
+        throw new IllegalStateException("unable to allocate new key of type: " + type);
       }
 
-      ResolvedKey resolvedPartitionKey = sequence.resolveKey(partitionKey);
-      String partitionName = getPartitionName(resolvedPartitionKey);
+      PartitionInfoImpl theActivePartitionInfo = activePartitionInfo.get();
+      KeyValueStore targetStore = activePartitionStore.get();
 
-      theActivePartitionInfo =
-          new PartitionInfoImpl(partitionKey.getInternalIdentifier(),
-              resolvedKey.getIdentifierLo(), resolvedKey.getIdentifierLo(), 0L, false);
+      if (theActivePartitionInfo == null) {
+        KeyImpl partitionKey = (KeyImpl) sequence.nextKey(this.typeName);
 
-      this.activePartitionInfo.set(theActivePartitionInfo);
+        if (partitionKey == null) {
+          throw new IllegalStateException("unable to allocate new partition key of type: "
+              + this.typeName);
+        }
 
-      this.metaStore.create(this.typeName, PartitionInfo.class, theActivePartitionInfo.snapshot(),
-          resolvedPartitionKey, TypeValidation.STRICT);
+        ResolvedKey resolvedPartitionKey = sequence.resolveKey(partitionKey);
+        String partitionName = getPartitionName(resolvedPartitionKey);
 
-      targetStore = getKeyValueStore(partitionName, true);
-      this.activePartitionStore.set(targetStore);
+        theActivePartitionInfo =
+            new PartitionInfoImpl(partitionKey.getInternalIdentifier(),
+                resolvedKey.getIdentifierLo(), resolvedKey.getIdentifierLo(), 0L, false);
+
+        this.activePartitionInfo.set(theActivePartitionInfo);
+
+        this.metaStore.create(this.typeName, PartitionInfo.class,
+            theActivePartitionInfo.snapshot(), resolvedPartitionKey, TypeValidation.STRICT);
+
+        targetStore = getKeyValueStore(partitionName, true);
+        this.activePartitionStore.set(targetStore);
+      }
+
+      targetStore.create(type, clazz, inValue, resolvedKey, typeSafety);
+
+      theActivePartitionInfo.setMaxId(resolvedKey.getIdentifierLo());
+      theActivePartitionInfo.setSize(theActivePartitionInfo.getSize() + 1L);
+
+      boolean success =
+          this.metaStore.update(KeyImpl.valueOf(theActivePartitionInfo.getPartitionId()),
+              PartitionInfo.class, theActivePartitionInfo.snapshot());
+
+      if (!success) {
+        throw new KazukiException("unable to update partition info");
+      }
+
+      if (theActivePartitionInfo.getSize() >= this.partitionSize) {
+        this.closeActivePartition();
+      }
+
+      return theKey;
     }
-
-    targetStore.create(type, clazz, inValue, resolvedKey, typeSafety);
-
-    theActivePartitionInfo.setMaxId(resolvedKey.getIdentifierLo());
-    theActivePartitionInfo.setSize(theActivePartitionInfo.getSize() + 1L);
-
-    boolean success =
-        this.metaStore.update(KeyImpl.valueOf(theActivePartitionInfo.getPartitionId()),
-            PartitionInfo.class, theActivePartitionInfo.snapshot());
-
-    if (!success) {
-      throw new KazukiException("unable to update partition info");
-    }
-
-    if (theActivePartitionInfo.getSize() >= this.partitionSize) {
-      this.closeActivePartition();
-    }
-
-    return theKey;
   }
 
   @Override
@@ -341,96 +349,102 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   }
 
   @Override
-  public synchronized void clear() throws KazukiException {
+  public void clear() throws KazukiException {
     log.debug("Clearing PartitionedJournalStore {}", this);
 
     availability.assertAvailable();
 
-    nukeLock.lock();
+    try (LockManager toRelease = lockManager.acquire()) {
+      nukeLock.lock();
 
-    try {
-      this.closeActivePartition();
+      try {
+        this.closeActivePartition();
 
-      try (KeyValueIterable<PartitionInfoSnapshot> parts = this.getAllPartitions()) {
-        for (PartitionInfo partition : parts) {
-          if (!this.dropPartition(partition.getPartitionId())) {
-            throw new KazukiException("unable to delete partition");
+        try (KeyValueIterable<PartitionInfoSnapshot> parts = this.getAllPartitions()) {
+          for (PartitionInfo partition : parts) {
+            if (!this.dropPartition(partition.getPartitionId())) {
+              throw new KazukiException("unable to delete partition");
+            }
           }
         }
+
+        sequence.resetCounter(this.dataType);
+        sequence.resetCounter(this.typeName);
+        metaStore.destroy();
+
+        this.activePartitionInfo.set(null);
+        this.activePartitionStore.set(null);
+
+        this.initialize();
+      } finally {
+        nukeLock.unlock();
       }
-
-      sequence.resetCounter(this.dataType);
-      sequence.resetCounter(this.typeName);
-      metaStore.destroy();
-
-      this.activePartitionInfo.set(null);
-      this.activePartitionStore.set(null);
-
-      this.initialize();
-    } finally {
-      nukeLock.unlock();
     }
 
     log.debug("Cleared PartitionedJournalStore {}", this);
   }
 
   @Override
-  public synchronized boolean closeActivePartition() throws KazukiException {
+  public boolean closeActivePartition() throws KazukiException {
     log.debug("Closing Active Partition for PartitionedJournalStore {}", this);
 
     availability.assertAvailable();
 
-    PartitionInfoImpl partition = activePartitionInfo.get();
+    try (LockManager toRelease = lockManager.acquire()) {
+      PartitionInfoImpl partition = activePartitionInfo.get();
 
-    if (partition == null || partition.isClosed()) {
-      return false;
+      if (partition == null || partition.isClosed()) {
+        return false;
+      }
+
+      this.activePartitionInfo.set(null);
+      this.activePartitionStore.set(null);
+
+      partition.setClosed(true);
+
+      boolean result =
+          metaStore.update(KeyImpl.valueOf(partition.getPartitionId()), PartitionInfo.class,
+              partition);
+
+      if (result) {
+        log.debug("Closed Active Partition for PartitionedJournalStore {}", this);
+      }
+
+      return result;
     }
-
-    this.activePartitionInfo.set(null);
-    this.activePartitionStore.set(null);
-
-    partition.setClosed(true);
-
-    boolean result =
-        metaStore.update(KeyImpl.valueOf(partition.getPartitionId()), PartitionInfo.class,
-            partition);
-
-    if (result) {
-      log.debug("Closed Active Partition for PartitionedJournalStore {}", this);
-    }
-
-    return result;
   }
 
   @Override
-  public synchronized boolean dropPartition(String partitionId) throws KazukiException {
+  public boolean dropPartition(String partitionId) throws KazukiException {
     log.debug("Dropping Partition {} of PartitionedJournalStore {}", partitionId, this);
 
     availability.assertAvailable();
 
-    Key partitionKey = KeyImpl.valueOf(partitionId);
-    PartitionInfo partition = metaStore.retrieve(partitionKey, PartitionInfoSnapshot.class);
+    try (LockManager toRelease = lockManager.acquire()) {
+      Key partitionKey = KeyImpl.valueOf(partitionId);
+      PartitionInfo partition = metaStore.retrieve(partitionKey, PartitionInfoSnapshot.class);
 
-    if (partition == null) {
-      return false;
+      if (partition == null) {
+        return false;
+      }
+
+      if (!partition.isClosed()) {
+        throw new IllegalStateException("drop() applies to closed partitions only");
+      }
+
+      ResolvedKey resolvedKey = sequence.resolveKey(partitionKey);
+      KeyValueStore keyValue = getKeyValueStore(getPartitionName(resolvedKey), false);
+
+      keyValue.destroy();
+
+      boolean result = metaStore.delete(partitionKey);
+
+      if (result) {
+        log.debug("Dropped Partition {} of PartitionedJournalStore {}", partitionId, this);
+      }
+
+      return result;
     }
-
-    if (!partition.isClosed()) {
-      throw new IllegalStateException("drop() applies to closed partitions only");
-    }
-
-    ResolvedKey resolvedKey = sequence.resolveKey(partitionKey);
-    KeyValueStore keyValue = getKeyValueStore(getPartitionName(resolvedKey), false);
-
-    keyValue.destroy();
-
-    boolean result = metaStore.delete(partitionKey);
-
-    if (result) {
-      log.debug("Dropped Partition {} of PartitionedJournalStore {}", partitionId, this);
-    }
-
-    return result;
   }
 
   @Override
@@ -467,8 +481,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     config.withStrictTypeCreation(this.strictTypeCreation);
 
     KeyValueStore keyValueStore =
-        new KeyValueStoreJdbiH2Impl(availability, database, typeHelper, schema, sequence,
-            config.build());
+        new KeyValueStoreJdbiH2Impl(availability, lockManager, database, typeHelper, schema,
+            sequence, config.build());
 
     if (initialize) {
       keyValueStore.initialize();
