@@ -14,20 +14,10 @@
  */
 package io.kazuki.v0.internal.helper;
 
-import java.util.concurrent.locks.ReentrantLock;
 
 
-public class LockManager implements AutoCloseable {
-  private final ReentrantLock lock = new ReentrantLock();
+public interface LockManager extends AutoCloseable {
+  LockManager acquire();
 
-  public LockManager acquire() {
-    lock.lock();
-
-    return this;
-  }
-
-  @Override
-  public void close() {
-    lock.unlock();
-  }
+  void close();
 }

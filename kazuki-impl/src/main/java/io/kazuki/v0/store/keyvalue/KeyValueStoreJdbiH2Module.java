@@ -16,6 +16,7 @@ package io.kazuki.v0.store.keyvalue;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.H2TypeHelper;
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.index.SecondaryIndexStore;
@@ -92,6 +93,7 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
         Scopes.SINGLETON);
 
     bind(SequenceService.class).toProvider(seqProvider).in(Scopes.SINGLETON);
+    bind(LockManager.class).to(Key.get(LockManager.class, Names.named(name)));
 
     bind(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);
     bind(KeyValueStore.class).to(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);

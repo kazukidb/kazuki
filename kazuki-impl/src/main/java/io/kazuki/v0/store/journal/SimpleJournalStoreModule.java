@@ -14,6 +14,7 @@
  */
 package io.kazuki.v0.store.journal;
 
+import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Module;
 
 import com.google.inject.Key;
@@ -29,6 +30,7 @@ public class SimpleJournalStoreModule extends KeyValueStoreJdbiH2Module {
   protected void includeInternal() {
     bind(JournalStore.class).annotatedWith(Names.named(name)).to(SimpleJournalStore.class)
         .in(Scopes.SINGLETON);
+    bind(LockManager.class).to(Key.get(LockManager.class, Names.named(name)));
   }
 
   @Override

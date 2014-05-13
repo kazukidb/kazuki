@@ -12,29 +12,23 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.journal;
+package io.kazuki.v0.internal.helper;
 
-import io.kazuki.v0.internal.helper.LockManager;
-import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Module;
-
-import com.google.inject.Key;
-import com.google.inject.Scopes;
-import com.google.inject.name.Names;
+import java.util.concurrent.locks.ReentrantLock;
 
 
-public class PartitionedJournalStoreModule extends KeyValueStoreJdbiH2Module {
-  public PartitionedJournalStoreModule(String name, String propertiesPath) {
-    super(name, propertiesPath);
-  }
+public class LockManagerImpl implements LockManager {
+  private final ReentrantLock lock = new ReentrantLock();
 
-  protected void includeInternal() {
-    bind(JournalStore.class).annotatedWith(Names.named(name)).to(PartitionedJournalStore.class)
-        .in(Scopes.SINGLETON);
-    bind(LockManager.class).to(Key.get(LockManager.class, Names.named(name)));
+  @Override
+  public LockManagerImpl acquire() {
+    lock.lock();
+
+    return this;
   }
 
   @Override
-  protected void includeExposures() {
-    expose(Key.get(JournalStore.class, Names.named(name)));
+  public void close() {
+    lock.unlock();
   }
 }

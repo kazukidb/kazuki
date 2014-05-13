@@ -17,6 +17,7 @@ package io.kazuki.v0.store.sequence;
 import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.H2TypeHelper;
 import io.kazuki.v0.internal.helper.LockManager;
+import io.kazuki.v0.internal.helper.LockManagerImpl;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
@@ -82,9 +83,10 @@ public class H2SequenceServiceModule extends PrivateModule {
     bind(SequenceHelper.class).in(Scopes.SINGLETON);
     bind(AvailabilityManager.class).in(Scopes.SINGLETON);
 
-    bind(LockManager.class).annotatedWith(Names.named(name)).to(LockManager.class)
+    bind(LockManager.class).annotatedWith(Names.named(name)).to(LockManagerImpl.class)
         .in(Scopes.SINGLETON);
-    expose(Key.get(LockManager.class, Names.named(name)));
+    bind(LockManager.class).to(Key.get(LockManager.class, Names.named(name)));
+    expose(LockManager.class).annotatedWith(Names.named(name));
 
     bind(SequenceService.class).annotatedWith(Names.named(name)).to(SequenceServiceJdbiImpl.class)
         .in(Scopes.SINGLETON);
