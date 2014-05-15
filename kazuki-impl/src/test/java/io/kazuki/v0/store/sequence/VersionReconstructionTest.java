@@ -23,7 +23,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.*;
 
-public class KeyReconstructionTest
+public class VersionReconstructionTest
     extends TestSupport
 {
   @Test
