@@ -97,7 +97,7 @@ public class VersionObfuscator {
 
       Long id = ByteBuffer.allocate(8).put(decrypted).getLong(0);
 
-      return VersionImpl.createInternal(KeyImpl.valueOf(keyString), id);
+      return VersionImpl.createInternal(realKey, id);
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
