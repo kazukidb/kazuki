@@ -433,15 +433,21 @@ public abstract class KeyValueStoreJdbiBaseImpl
             FieldTransform fieldTransform = null;
             StructureTransform structureTransform = null;
             Map<String, Object> fieldTransformed = null;
+            Map<String, Object> objectMap = null;
+            Map<String, Object> oldInstance = null;
 
             if (schema != null) {
               fieldTransform = new FieldTransform(schema);
               structureTransform = new StructureTransform(schema);
 
               fieldTransformed = fieldTransform.pack((Map<String, Object>) storeValue);
+              storeValue = structureTransform.pack(fieldTransformed);
 
-              storeValue =
-                  structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
+              objectMap = loadObjectMap(handle, resolvedKey);
+
+              oldInstance =
+                  structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                      getObjectBytes(objectMap), Object.class));
             }
 
             int updatedCount =
@@ -449,12 +455,6 @@ public abstract class KeyValueStoreJdbiBaseImpl
             boolean updated = (updatedCount == 1);
 
             if (updated && schema != null) {
-              Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
-
-              Map<String, Object> oldInstance =
-                  structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
-                      getObjectBytes(objectMap), Object.class));
-
               for (KeyValueStoreListener kvListener : kvListeners) {
                 kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, fieldTransformed,
                     oldInstance);
@@ -489,13 +489,22 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
             FieldTransform fieldTransform = null;
             StructureTransform structureTransform = null;
+            Map<String, Object> fieldTransformed = null;
+            Map<String, Object> objectMap = null;
+            Map<String, Object> oldInstance = null;
 
             if (schema != null) {
               fieldTransform = new FieldTransform(schema);
               structureTransform = new StructureTransform(schema);
 
-              storeValue =
-                  structureTransform.pack(fieldTransform.pack((Map<String, Object>) storeValue));
+              fieldTransformed = fieldTransform.pack((Map<String, Object>) storeValue);
+              storeValue = structureTransform.pack(fieldTransformed);
+
+              objectMap = loadObjectMap(handle, resolvedKey);
+
+              oldInstance =
+                  structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
+                      getObjectBytes(objectMap), Object.class));
             }
 
             int updatedCount =
@@ -505,14 +514,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
             boolean updated = (updatedCount == 1);
 
             if (updated && schema != null) {
-              Map<String, Object> objectMap = loadObjectMap(handle, resolvedKey);
-
-              Map<String, Object> oldInstance =
-                  structureTransform.unpack((List<Object>) EncodingHelper.parseSmile(
-                      getObjectBytes(objectMap), Object.class));
-
               for (KeyValueStoreListener kvListener : kvListeners) {
-                kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, storeValueMap,
+                kvListener.onUpdate(handle, type, clazz, schema, resolvedKey, fieldTransformed,
                     oldInstance);
               }
             }
