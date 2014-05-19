@@ -16,6 +16,7 @@ package io.kazuki.v0.store.keyvalue;
 
 import static java.util.Arrays.asList;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
 import io.kazuki.v0.store.index.SecondaryIndexStore;
 import io.kazuki.v0.store.index.query.QueryOperator;
@@ -92,7 +93,7 @@ public class KazukiEnumTest {
   public void enumSmokeTest() throws Exception {
 
     final String powerIndex = "powerIndex";
-    final Key schema =
+    final Version schema =
         schemaStore.createSchema(
             MyEntity.TYPE_NAME,
             new Builder()

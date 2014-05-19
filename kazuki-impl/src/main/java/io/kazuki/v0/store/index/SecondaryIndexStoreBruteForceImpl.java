@@ -119,7 +119,7 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
 
         Schema schema = schemaMap.get(type);
         if (schema == null) {
-          schema = schemaStore.retrieveSchema(type);
+          schema = schemaStore.retrieveSchema(type).getValue();
           schemaMap.put(type, schema);
         }
 
@@ -201,7 +201,7 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
       final Long offset, final Long limit) {
     Schema schema = null;
     try {
-      schema = schemaStore.retrieveSchema(type);
+      schema = schemaStore.retrieveSchema(type).getValue();
     } catch (KazukiException e) {
       throw Throwables.propagate(e);
     }
@@ -254,11 +254,11 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
 
         for (Map.Entry<Key, KeyValuePair<T>> entry : resultMap.entrySet()) {
           kvPairs.add(new KeyValuePair<T>(entry.getKey(), entry.getValue().getVersion(), entry
-              .getValue().getValue()));
+              .getValue().getSchemaVersion(), entry.getValue().getValue()));
         }
       } else {
         for (Key key : kvIter) {
-          kvPairs.add(new KeyValuePair<T>(key, null, null));
+          kvPairs.add(new KeyValuePair<T>(key, null, null, null));
         }
       }
 

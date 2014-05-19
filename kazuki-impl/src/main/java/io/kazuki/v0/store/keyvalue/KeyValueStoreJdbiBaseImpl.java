@@ -180,7 +180,9 @@ public abstract class KeyValueStoreJdbiBaseImpl
         resolvedKey = sequences.resolveKey(newKey);
       }
 
-      final Schema schema = schemaService.retrieveSchema(type);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = (schemaKv == null) ? null : schemaKv.getValue();
+      final Version schemaVersion = schemaKv == null ? null : schemaKv.getVersion();
 
       return database.inTransaction(new TransactionCallback<KeyValuePair<T>>() {
         @Override
@@ -205,13 +207,17 @@ public abstract class KeyValueStoreJdbiBaseImpl
           byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
 
           DateTime createdDate = new DateTime();
-          int inserted = doInsert(handle, resolvedKey, storeValueBytes, createdDate);
+          int inserted =
+              doInsert(handle, resolvedKey, schemaKv != null
+                  ? (VersionImpl) schemaKv.getVersion()
+                  : (VersionImpl) null, storeValueBytes, createdDate);
 
           if (inserted < 1) {
             throw new KazukiException("Entity not created!");
           }
 
-          return new KeyValuePair<T>(newKey, VersionImpl.createInternal(newKey, 1L), inValue);
+          return new KeyValuePair<T>(newKey, VersionImpl.createInternal(newKey, 1L), schemaVersion,
+              inValue);
         }
       });
     }
@@ -229,7 +235,9 @@ public abstract class KeyValueStoreJdbiBaseImpl
       throws KazukiException {
     availability.assertAvailable();
 
-    final Schema schema = schemaService.retrieveSchema(realKey.getTypePart());
+    final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(realKey.getTypePart());
+    final Schema schema = schemaKv == null ? null : schemaKv.getValue();
+    final Version schemaVersion = schemaKv == null ? null : schemaKv.getVersion();
     final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
 
     return database.inTransaction(new TransactionCallback<KeyValuePair<T>>() {
@@ -257,7 +265,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
                 fieldTransform.unpack(structureTransform.unpack((List<Object>) storedValue));
           }
 
-          return new KeyValuePair<T>(realKey, version, EncodingHelper.asValue(
+          return new KeyValuePair<T>(realKey, version, schemaVersion, EncodingHelper.asValue(
               (Map<String, Object>) storedValue, clazz));
         } catch (Exception e) {
           throw new KazukiException(e);
@@ -287,7 +295,10 @@ public abstract class KeyValueStoreJdbiBaseImpl
         continue;
       }
 
-      schemaMap.put(type, schemaService.retrieveSchema(realKey.getTypePart()));
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
+
+      schemaMap.put(type, schema);
     }
 
     return database.inTransaction(new TransactionCallback<Map<Key, T>>() {
@@ -348,7 +359,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
     Preconditions.checkArgument(keys.size() <= MULTIGET_MAX_KEYS, "Multiget max is %s keys",
         MULTIGET_MAX_KEYS);
 
-    final Map<String, Schema> schemaMap = new HashMap<>(keys.size());
+    final Map<String, KeyValuePair<Schema>> schemaMap = new HashMap<>(keys.size());
 
     for (Key realKey : keys) {
       String type = realKey.getTypePart();
@@ -357,7 +368,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
         continue;
       }
 
-      schemaMap.put(type, schemaService.retrieveSchema(realKey.getTypePart()));
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(realKey.getTypePart());
+      schemaMap.put(type, schemaKv);
     }
 
     return database.inTransaction(new TransactionCallback<Map<Key, KeyValuePair<T>>>() {
@@ -393,7 +405,9 @@ public abstract class KeyValueStoreJdbiBaseImpl
           Object storedValue =
               EncodingHelper.parseSmile((byte[]) first.get("_value"), Object.class);
 
-          final Schema schema = schemaMap.get(realKey.getTypePart());
+          final KeyValuePair<Schema> schemaKv = schemaMap.get(realKey.getTypePart());
+          final Schema schema = schemaKv == null ? null : schemaKv.getValue();
+          final Version schemaVersion = schemaKv == null ? null : schemaKv.getVersion();
 
           if (schema != null && storedValue instanceof List) {
             FieldTransform fieldTransform = new FieldTransform(schema);
@@ -404,7 +418,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
           dbFound.put(
               realKey,
-              new KeyValuePair<T>(realKey, version, EncodingHelper.asValue(
+              new KeyValuePair<T>(realKey, version, schemaVersion, EncodingHelper.asValue(
                   (Map<String, Object>) storedValue, clazz)));
         }
 
@@ -420,8 +434,9 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
     try (LockManager toRelease = lockManager.acquire()) {
       final String type = realKey.getTypePart();
-      final Schema schema = schemaService.retrieveSchema(type);
       final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
 
       try {
         return database.inTransaction(new TransactionCallback<Boolean>() {
@@ -451,7 +466,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
             }
 
             int updatedCount =
-                doUpdate(handle, resolvedKey, EncodingHelper.convertToSmile(storeValue));
+                doUpdate(handle, resolvedKey, (VersionImpl) schemaKv.getVersion(),
+                    EncodingHelper.convertToSmile(storeValue));
             boolean updated = (updatedCount == 1);
 
             if (updated && schema != null) {
@@ -477,8 +493,9 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
     try (LockManager toRelease = lockManager.acquire()) {
       final String type = realKey.getTypePart();
-      final Schema schema = schemaService.retrieveSchema(type);
       final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
 
       try {
         return database.inTransaction(new TransactionCallback<Version>() {
@@ -509,7 +526,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
             int updatedCount =
                 doUpdateVersioned(handle, resolvedKey, (VersionImpl) version,
-                    EncodingHelper.convertToSmile(storeValue));
+                    (VersionImpl) schemaKv.getVersion(), EncodingHelper.convertToSmile(storeValue));
 
             boolean updated = (updatedCount == 1);
 
@@ -537,7 +554,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
     try (LockManager toRelease = lockManager.acquire()) {
       final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
       final String type = realKey.getTypePart();
-      final Schema schema = schemaService.retrieveSchema(type);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
 
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
@@ -581,7 +599,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
     try (LockManager toRelease = lockManager.acquire()) {
       final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
       final String type = realKey.getTypePart();
-      final Schema schema = schemaService.retrieveSchema(type);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
 
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
@@ -626,7 +645,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
     try (LockManager toRelease = lockManager.acquire()) {
       final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
       final String type = realKey.getTypePart();
-      final Schema schema = schemaService.retrieveSchema(type);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
 
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
@@ -671,7 +691,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
     try (LockManager toRelease = lockManager.acquire()) {
       final ResolvedKey resolvedKey = sequences.resolveKey(realKey);
       final String type = realKey.getTypePart();
-      final Schema schema = schemaService.retrieveSchema(type);
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+      final Schema schema = schemaKv == null ? null : schemaKv.getValue();
 
       return database.inTransaction(new TransactionCallback<Boolean>() {
         @Override
@@ -833,8 +854,9 @@ public abstract class KeyValueStoreJdbiBaseImpl
     final Handle handle = database.open();
 
     try {
+      KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
       return new KeyValueIterableJdbiImpl<T>(availability, sequences,
-          KeyValueStoreJdbiBaseImpl.this, schemaService.retrieveSchema(type), handle,
+          KeyValueStoreJdbiBaseImpl.this, schemaKv != null ? schemaKv.getValue() : null, handle,
           typeHelper.getPrefix(), "_key_id_lo", JDBIHelper.getBoundQuery(handle,
               KeyValueStoreJdbiBaseImpl.this.typeHelper.getPrefix(), "kv_table_name", tableName,
               "kv_key_values_of_type"), type, clazz, sortDirection, offset, limit, true, true);
@@ -852,14 +874,17 @@ public abstract class KeyValueStoreJdbiBaseImpl
   public <T> KeyValueIterable<Key> keys(final String type, final Class<T> clazz,
       final SortDirection sortDirection, @Nullable final Long offset, @Nullable final Long limit) {
     try {
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+
       return new KeyValueIterable<Key>() {
         private final Handle handle = database.open();
 
         private volatile KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(
-            availability, sequences, KeyValueStoreJdbiBaseImpl.this,
-            schemaService.retrieveSchema(type), handle, typeHelper.getPrefix(), "_key_id_lo",
-            JDBIHelper.getBoundQuery(handle, typeHelper.getPrefix(), "kv_table_name", tableName,
-                "kv_key_ids_of_type"), type, clazz, sortDirection, offset, limit, false, true);
+            availability, sequences, KeyValueStoreJdbiBaseImpl.this, schemaKv != null
+                ? schemaKv.getValue()
+                : null, handle, typeHelper.getPrefix(), "_key_id_lo", JDBIHelper.getBoundQuery(
+                handle, typeHelper.getPrefix(), "kv_table_name", tableName, "kv_key_ids_of_type"),
+            type, clazz, sortDirection, offset, limit, false, true);
 
         @Override
         public KeyValueIterator<Key> iterator() {
@@ -913,15 +938,18 @@ public abstract class KeyValueStoreJdbiBaseImpl
   public <T> KeyValueIterable<T> values(final String type, final Class<T> clazz,
       final SortDirection sortDirection, @Nullable final Long offset, @Nullable final Long limit) {
     try {
+      final KeyValuePair<Schema> schemaKv = schemaService.retrieveSchema(type);
+
       return new KeyValueIterable<T>() {
         private final Handle handle = database.open();
 
         private volatile KeyValueIterableJdbiImpl<T> inner = new KeyValueIterableJdbiImpl<T>(
-            availability, sequences, KeyValueStoreJdbiBaseImpl.this,
-            schemaService.retrieveSchema(type), handle, typeHelper.getPrefix(), "_key_id_lo",
-            JDBIHelper.getBoundQuery(handle, KeyValueStoreJdbiBaseImpl.this.typeHelper.getPrefix(),
-                "kv_table_name", tableName, "kv_key_values_of_type"), type, clazz, sortDirection,
-            offset, limit, true, true);
+            availability, sequences, KeyValueStoreJdbiBaseImpl.this, schemaKv != null
+                ? schemaKv.getValue()
+                : null, handle, typeHelper.getPrefix(), "_key_id_lo", JDBIHelper.getBoundQuery(
+                handle, KeyValueStoreJdbiBaseImpl.this.typeHelper.getPrefix(), "kv_table_name",
+                tableName, "kv_key_values_of_type"), type, clazz, sortDirection, offset, limit,
+            true, true);
 
         @Override
         public KeyValueIterator<T> iterator() {
@@ -1010,8 +1038,10 @@ public abstract class KeyValueStoreJdbiBaseImpl
         "kv_create_table_index").execute();
   }
 
-  private int doInsert(Handle handle, final ResolvedKey resolvedKey, byte[] valueBytes,
-      DateTime date) {
+  private int doInsert(Handle handle, final ResolvedKey resolvedKey,
+      final VersionImpl schemaVersion, byte[] valueBytes, DateTime date) {
+    Long schemaVersionLong = schemaVersion != null ? schemaVersion.getInternalIdentifier() : 0L;
+
     Update update =
         JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_create");
     update.bind("key_type", resolvedKey.getTypeTag());
@@ -1019,18 +1049,21 @@ public abstract class KeyValueStoreJdbiBaseImpl
     update.bind("key_id_lo", resolvedKey.getIdentifierLo());
     update.bind("created_dt", date.withZone(DateTimeZone.UTC).getMillis() / 1000);
     update.bind("version", 1L);
+    update.bind("schema_version", schemaVersionLong);
     update.bind("value", valueBytes);
     int inserted = update.execute();
 
     return inserted;
   }
 
-  private int doUpdate(Handle handle, final ResolvedKey resolvedKey, byte[] valueBytes) {
+  private int doUpdate(Handle handle, final ResolvedKey resolvedKey,
+      final VersionImpl schemaVersion, byte[] valueBytes) {
     Update update =
         JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName, "kv_update");
     update.bind("key_type", resolvedKey.getTypeTag());
     update.bind("key_id_hi", resolvedKey.getIdentifierHi());
     update.bind("key_id_lo", resolvedKey.getIdentifierLo());
+    update.bind("schema_version", schemaVersion.getInternalIdentifier());
     update.bind("updated_dt", getEpochSecondsNow());
     update.bind("value", valueBytes);
     int updated = update.execute();
@@ -1039,7 +1072,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   private int doUpdateVersioned(Handle handle, final ResolvedKey resolvedKey,
-      final VersionImpl version, byte[] valueBytes) {
+      final VersionImpl version, final VersionImpl schemaVersion, byte[] valueBytes) {
     Update update =
         JDBIHelper.getBoundStatement(handle, getPrefix(), "kv_table_name", tableName,
             "kv_update_versioned");
@@ -1050,6 +1083,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
     update.bind("updated_dt", getEpochSecondsNow());
     update.bind("old_version", version.getInternalIdentifier());
     update.bind("new_version", version.getInternalIdentifier() + 1L);
+    update.bind("schema_version", schemaVersion.getInternalIdentifier());
     update.bind("value", valueBytes);
     int updated = update.execute();
 

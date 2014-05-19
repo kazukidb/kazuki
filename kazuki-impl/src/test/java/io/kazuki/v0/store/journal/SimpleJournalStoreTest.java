@@ -28,7 +28,7 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-import io.kazuki.v0.store.sequence.KeyImpl;
+import io.kazuki.v0.store.sequence.VersionImpl;
 
 import javax.sql.DataSource;
 
@@ -68,7 +68,8 @@ public class SimpleJournalStoreTest extends TestSupport {
     lifecycle.init();
     lifecycle.start();
 
-    Assert.assertEquals(manager.createSchema("foo", Foo.FOO_SCHEMA), KeyImpl.valueOf("$schema:2"));
+    Assert.assertEquals(manager.createSchema("foo", Foo.FOO_SCHEMA),
+        VersionImpl.valueOf("$schema:2#2f73aea89adc5337"));
     Assert.assertNotNull(manager.retrieveSchema("foo"));
 
     for (int i = 0; i < 100; i++) {
