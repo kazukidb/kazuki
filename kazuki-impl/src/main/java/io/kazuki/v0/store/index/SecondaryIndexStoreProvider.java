@@ -47,7 +47,7 @@ public class SecondaryIndexStoreProvider implements Provider<SecondaryIndexSuppo
               schemaStore, kvStore, tableHelper, kvConfig.getGroupName(), kvConfig.getStoreName(),
               kvConfig.getPartitionName());
     } else {
-      this.instance = new SecondaryIndexStoreBruteForceImpl(kvStore, schemaStore);
+      this.instance = new SecondaryIndexStoreBruteForceImpl(sequences, kvStore, schemaStore);
     }
 
     this.inject.injectMembers(instance);

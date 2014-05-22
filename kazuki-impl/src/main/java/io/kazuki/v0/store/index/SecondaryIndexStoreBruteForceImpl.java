@@ -20,13 +20,19 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryEvaluator;
 import io.kazuki.v0.store.index.query.QueryHelper;
 import io.kazuki.v0.store.index.query.QueryTerm;
+import io.kazuki.v0.store.index.query.ValueHolder;
+import io.kazuki.v0.store.index.query.ValueType;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreRegistration;
 import io.kazuki.v0.store.schema.SchemaStore;
+import io.kazuki.v0.store.schema.SchemaStoreRegistration;
+import io.kazuki.v0.store.schema.model.IndexDefinition;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.ResolvedKey;
+import io.kazuki.v0.store.sequence.SequenceService;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,16 +52,30 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
 public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport {
+  private final SequenceService sequenceService;
   private final KeyValueStore kvStore;
   private final SchemaStore schemaStore;
 
   @Inject
-  public SecondaryIndexStoreBruteForceImpl(KeyValueStore kvStore, SchemaStore schemaStore) {
+  public SecondaryIndexStoreBruteForceImpl(SequenceService sequenceService, KeyValueStore kvStore,
+      SchemaStore schemaStore) {
+    this.sequenceService = sequenceService;
     this.kvStore = kvStore;
     this.schemaStore = schemaStore;
+  }
+
+  @Inject
+  public void registerKeyValueStore(KeyValueStoreRegistration kvStore) {
+    kvStore.addListener(this);
+  }
+
+  @Inject
+  public void registerSchemaStore(SchemaStoreRegistration schemaStore) {
+    schemaStore.addListener(this);
   }
 
   @Override
@@ -70,11 +90,16 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
 
   @Override
   public <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
-      ResolvedKey resolvedKey, Map<String, Object> instance) {}
+      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
+    enforceUnique(type, clazz, schema, resolvedKey, instance);
+  }
 
   @Override
   public <T> void onUpdate(Handle handle, String type, Class<T> clazz, Schema schema,
-      ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance) {}
+      ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance)
+      throws KazukiException {
+    enforceUnique(type, clazz, schema, resolvedKey, newInstance);
+  }
 
   @Override
   public <T> void onDelete(Handle handle, String type, Class<T> clazz, Schema schema,
@@ -274,5 +299,37 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
       Long limit) {
     return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
         sortDirection, loadResults, token, limit);
+  }
+
+  private <T> void enforceUnique(String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
+    IndexDefinition uniqueIndexDef = getUniqueIndexDef(schema);
+
+    if (uniqueIndexDef != null) {
+      Map<String, ValueHolder> values = new LinkedHashMap<String, ValueHolder>();
+
+      for (String attr : uniqueIndexDef.getAttributeNames()) {
+        values.put(attr, new ValueHolder(ValueType.STRING, instance.get(attr).toString()));
+      }
+
+      UniqueEntityDescription uniqueDesc =
+          new UniqueEntityDescription(type, clazz, uniqueIndexDef.getName(), schema, values);
+
+      Key maybeExists = this.multiRetrieveUniqueKeys(ImmutableList.of(uniqueDesc)).get(uniqueDesc);
+
+      if (maybeExists != null && !sequenceService.resolveKey(maybeExists).equals(resolvedKey)) {
+        throw new KazukiException("unique index constraint violation");
+      }
+    }
+  }
+
+  private IndexDefinition getUniqueIndexDef(Schema schema) {
+    for (IndexDefinition indexDef : schema.getIndexes()) {
+      if (indexDef.isUnique()) {
+        return indexDef;
+      }
+    }
+
+    return null;
   }
 }

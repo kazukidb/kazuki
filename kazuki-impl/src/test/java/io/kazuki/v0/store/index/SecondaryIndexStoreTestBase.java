@@ -2,6 +2,7 @@ package io.kazuki.v0.store.index;
 
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
+import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryBuilder;
 import io.kazuki.v0.store.index.query.QueryOperator;
@@ -61,6 +62,13 @@ public abstract class SecondaryIndexStoreTestBase extends TestSupport {
     Key k3 = store.create("foo", Foo.class, new Foo("k33", "v66"), TypeValidation.STRICT).getKey();
     Key k4 = store.create("foo", Foo.class, new Foo("k44", "v55"), TypeValidation.STRICT).getKey();
     Key k5 = store.create("foo", Foo.class, new Foo("k00", "v55"), TypeValidation.STRICT).getKey();
+
+    try {
+      store.create("foo", Foo.class, new Foo("k00", "v55"), TypeValidation.STRICT).getKey();
+      Assert.fail("should be uniqueness failure");
+    } catch (KazukiException expected) {
+      // awesome - we got it
+    }
 
     try (KeyValueIterator<Key> iter =
         index.queryWithoutPagination(

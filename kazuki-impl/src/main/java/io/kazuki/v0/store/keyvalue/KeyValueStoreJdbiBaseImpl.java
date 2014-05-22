@@ -59,6 +59,7 @@ import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.TransactionCallback;
 import org.skife.jdbi.v2.TransactionStatus;
 import org.skife.jdbi.v2.Update;
+import org.skife.jdbi.v2.exceptions.CallbackFailedException;
 import org.slf4j.Logger;
 
 import com.google.common.base.Preconditions;
@@ -182,38 +183,47 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
       final Schema schema = schemaService.retrieveSchema(type);
 
-      return database.inTransaction(new TransactionCallback<KeyValuePair<T>>() {
-        @Override
-        public KeyValuePair<T> inTransaction(Handle handle, TransactionStatus status)
-            throws Exception {
-          Object storeValue = EncodingHelper.asJsonMap(inValue);
+      try {
+        return database.inTransaction(new TransactionCallback<KeyValuePair<T>>() {
+          @Override
+          public KeyValuePair<T> inTransaction(Handle handle, TransactionStatus status)
+              throws Exception {
+            Object storeValue = EncodingHelper.asJsonMap(inValue);
 
-          if (schema != null) {
-            FieldTransform fieldTransform = new FieldTransform(schema);
-            StructureTransform structureTransform = new StructureTransform(schema);
+            if (schema != null) {
+              FieldTransform fieldTransform = new FieldTransform(schema);
+              StructureTransform structureTransform = new StructureTransform(schema);
 
-            Map<String, Object> fieldTransformed =
-                fieldTransform.pack((Map<String, Object>) storeValue);
+              Map<String, Object> fieldTransformed =
+                  fieldTransform.pack((Map<String, Object>) storeValue);
 
-            for (KeyValueStoreListener kvListener : kvListeners) {
-              kvListener.onCreate(handle, type, clazz, schema, resolvedKey, fieldTransformed);
+              for (KeyValueStoreListener kvListener : kvListeners) {
+                kvListener.onCreate(handle, type, clazz, schema, resolvedKey, fieldTransformed);
+              }
+
+              storeValue = structureTransform.pack(fieldTransformed);
             }
 
-            storeValue = structureTransform.pack(fieldTransformed);
+            byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
+
+            DateTime createdDate = new DateTime();
+            int inserted = doInsert(handle, resolvedKey, storeValueBytes, createdDate);
+
+            if (inserted < 1) {
+              throw new KazukiException("Entity not created!");
+            }
+
+            return new KeyValuePair<T>(newKey, VersionImpl.createInternal(newKey, 1L), inValue);
           }
-
-          byte[] storeValueBytes = EncodingHelper.convertToSmile(storeValue);
-
-          DateTime createdDate = new DateTime();
-          int inserted = doInsert(handle, resolvedKey, storeValueBytes, createdDate);
-
-          if (inserted < 1) {
-            throw new KazukiException("Entity not created!");
-          }
-
-          return new KeyValuePair<T>(newKey, VersionImpl.createInternal(newKey, 1L), inValue);
+        });
+      } catch (CallbackFailedException e) {
+        if (e.getCause() != null || e.getCause().getCause() != null
+            && e.getCause().getCause() instanceof KazukiException) {
+          throw (KazukiException) e.getCause().getCause();
         }
-      });
+
+        throw e;
+      }
     }
   }
 
@@ -464,8 +474,13 @@ public abstract class KeyValueStoreJdbiBaseImpl
             return updatedCount == 1;
           }
         });
-      } catch (Exception e) {
-        throw new KazukiException(e);
+      } catch (CallbackFailedException e) {
+        if (e.getCause() != null || e.getCause().getCause() != null
+            && e.getCause().getCause() instanceof KazukiException) {
+          throw (KazukiException) e.getCause().getCause();
+        }
+
+        throw e;
       }
     }
   }
@@ -521,8 +536,13 @@ public abstract class KeyValueStoreJdbiBaseImpl
                 ((VersionImpl) version).getInternalIdentifier() + 1L) : null;
           }
         });
-      } catch (Exception e) {
-        throw new KazukiException(e);
+      } catch (CallbackFailedException e) {
+        if (e.getCause() != null || e.getCause().getCause() != null
+            && e.getCause().getCause() instanceof KazukiException) {
+          throw (KazukiException) e.getCause().getCause();
+        }
+
+        throw e;
       }
     }
   }

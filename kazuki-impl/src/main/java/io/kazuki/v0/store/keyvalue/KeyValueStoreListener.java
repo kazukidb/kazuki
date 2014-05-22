@@ -14,6 +14,7 @@
  */
 package io.kazuki.v0.store.keyvalue;
 
+import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.schema.model.Schema;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 
@@ -23,10 +24,11 @@ import org.skife.jdbi.v2.Handle;
 
 public interface KeyValueStoreListener {
   <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
-      ResolvedKey resolvedKey, Map<String, Object> instance);
+      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException;
 
   <T> void onUpdate(Handle handle, String type, Class<T> clazz, Schema schema,
-      ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance);
+      ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance)
+      throws KazukiException;
 
   <T> void onDelete(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> oldInstance);

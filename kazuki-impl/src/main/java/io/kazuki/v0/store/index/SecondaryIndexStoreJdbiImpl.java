@@ -26,6 +26,8 @@ import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryHelper;
 import io.kazuki.v0.store.index.query.QueryTerm;
+import io.kazuki.v0.store.index.query.ValueHolder;
+import io.kazuki.v0.store.index.query.ValueType;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
@@ -61,6 +63,7 @@ import org.skife.jdbi.v2.exceptions.UnableToExecuteStatementException;
 import org.slf4j.Logger;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
@@ -247,6 +250,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       ResolvedKey resolvedKey, Map<String, Object> instance) {
     try (LockManager toRelease = lockManager.acquire()) {
       try {
+        enforceUnique(type, clazz, schema, resolvedKey, instance);
+
         for (IndexDefinition indexDef : schema.getIndexes()) {
           this.insertEntity(handle, resolvedKey.getIdentifierLo(), instance, type,
               indexDef.getName(), schema);
@@ -262,6 +267,8 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance) {
     try (LockManager toRelease = lockManager.acquire()) {
       try {
+        enforceUnique(type, clazz, schema, resolvedKey, newInstance);
+
         for (IndexDefinition indexDef : schema.getIndexes()) {
           this.updateEntity(handle, resolvedKey.getIdentifierLo(), newInstance, oldInstance, type,
               indexDef.getName(), schema);
@@ -375,9 +382,15 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
   private void createTable(IDBI database, final String type, final String indexName,
       final Schema schema) {
-    JDBIHelper.createTable(database, tableHelper.getTableDrop(type, indexName, groupName,
-        storeName, partitionName), tableHelper.getTableDefinition(type, indexName, schema,
-        groupName, storeName, partitionName));
+    String tableDefinition =
+        tableHelper
+            .getTableDefinition(type, indexName, schema, groupName, storeName, partitionName);
+
+    log.debug("create table: {}" + tableDefinition);
+
+    JDBIHelper.createTable(database,
+        tableHelper.getTableDrop(type, indexName, groupName, storeName, partitionName),
+        tableDefinition);
   }
 
   private void createIndex(IDBI database, final String type, final String indexName,
@@ -397,9 +410,13 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
           // expected case in mysql - this is just best-effort anyway
         }
 
-        handle.createStatement(
+        String indexDefinition =
             tableHelper.getIndexDefinition(type, indexName, schemaDefinition, groupName, storeName,
-                partitionName)).execute();
+                partitionName);
+
+        log.debug("create index: {}" + indexDefinition);
+
+        handle.createStatement(indexDefinition).execute();
 
         return null;
       }
@@ -614,5 +631,37 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
         tableHelper.getTableName(type, indexName, groupName, storeName, partitionName);
     handle.createStatement(tableHelper.getPrefix() + "truncate_table")
         .define("table_name", indexTableName).execute();
+  }
+
+  private <T> void enforceUnique(String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
+    IndexDefinition uniqueIndexDef = getUniqueIndexDef(schema);
+
+    if (uniqueIndexDef != null) {
+      Map<String, ValueHolder> values = new LinkedHashMap<String, ValueHolder>();
+
+      for (String attr : uniqueIndexDef.getAttributeNames()) {
+        values.put(attr, new ValueHolder(ValueType.STRING, instance.get(attr).toString()));
+      }
+
+      UniqueEntityDescription uniqueDesc =
+          new UniqueEntityDescription(type, clazz, uniqueIndexDef.getName(), schema, values);
+
+      Key maybeExists = this.multiRetrieveUniqueKeys(ImmutableList.of(uniqueDesc)).get(uniqueDesc);
+
+      if (maybeExists != null && !sequence.resolveKey(maybeExists).equals(resolvedKey)) {
+        throw new KazukiException("unique index constraint violation");
+      }
+    }
+  }
+
+  private IndexDefinition getUniqueIndexDef(Schema schema) {
+    for (IndexDefinition indexDef : schema.getIndexes()) {
+      if (indexDef.isUnique()) {
+        return indexDef;
+      }
+    }
+
+    return null;
   }
 }

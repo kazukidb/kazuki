@@ -426,7 +426,9 @@ public class SecondaryIndexTableHelper {
       colDefs.add(getColumnName(column.getName()) + " " + sortDirection);
     }
 
-    colDefs.add(getColumnName("id") + " " + "ASC");
+    if (!indexDefinition.isUnique()) {
+      colDefs.add(getColumnName("id") + " " + "ASC");
+    }
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append("create ");
