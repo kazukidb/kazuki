@@ -114,7 +114,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       @Nullable Long limit) {
     try {
       return this.doIndexQuery(database, type, indexName, query, sortDirection, offset, limit,
-          false, schemaStore.retrieveSchema(type));
+          false, schemaStore.retrieveSchema(type).getValue());
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -147,11 +147,11 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
         for (Map.Entry<Key, KeyValuePair<T>> entry : resultMap.entrySet()) {
           kvPairs.add(new KeyValuePair<T>(entry.getKey(), entry.getValue().getVersion(), entry
-              .getValue().getValue()));
+              .getValue().getSchemaVersion(), entry.getValue().getValue()));
         }
       } else {
         for (Key key : kvIter) {
-          kvPairs.add(new KeyValuePair<T>(key, null, null));
+          kvPairs.add(new KeyValuePair<T>(key, null, null, null));
         }
       }
 
@@ -182,7 +182,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
         Schema schema = schemaMap.get(type);
         if (schema == null) {
-          schema = schemaStore.retrieveSchema(type);
+          schema = schemaStore.retrieveSchema(type).getValue();
           schemaMap.put(type, schema);
         }
 
@@ -221,7 +221,7 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
 
         Schema schema = schemaMap.get(type);
         if (schema == null) {
-          schema = schemaStore.retrieveSchema(type);
+          schema = schemaStore.retrieveSchema(type).getValue();
           schemaMap.put(type, schema);
         }
 

@@ -19,6 +19,8 @@ import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
+import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.schema.model.Schema;
@@ -65,7 +67,7 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
     this.ssListeners.add(listener);
   }
 
-  public Key createSchema(String type, Schema value) throws KazukiException {
+  public Version createSchema(String type, Schema value) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -79,9 +81,9 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
 
       Key realKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
 
-      Schema existing = this.store.retrieve(realKey, Schema.class);
+      KeyValuePair<Schema> existing = this.store.retrieveVersioned(realKey, Schema.class);
       if (existing != null) {
-        return realKey;
+        return existing.getVersion();
       }
 
       try {
@@ -95,13 +97,14 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
       }
 
       ResolvedKey resolvedKey = sequences.resolveKey(realKey);
-      store.create(SCHEMA_PREFIX, Schema.class, value, resolvedKey, TypeValidation.LAX);
+      KeyValuePair<Schema> schemaKv =
+          store.create(SCHEMA_PREFIX, Schema.class, value, resolvedKey, TypeValidation.LAX);
 
-      return realKey;
+      return schemaKv.getVersion();
     }
   }
 
-  public Schema retrieveSchema(String type) throws KazukiException {
+  public KeyValuePair<Schema> retrieveSchema(String type) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -113,12 +116,13 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
         return null;
       }
 
-      return store
-          .retrieve(KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue()), Schema.class);
+      return store.retrieveVersioned(KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue()),
+          Schema.class);
     }
   }
 
-  public boolean updateSchema(final String type, final Schema value) throws KazukiException {
+  public Version updateSchema(final String type, final Version version, final Schema value)
+      throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }
@@ -127,7 +131,7 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
       final Integer typeId = getTypeIdPossiblyNull(type, false);
 
       if (typeId == null) {
-        return false;
+        return null;
       }
 
       Key theKey = KeyImpl.createInternal(SCHEMA_PREFIX, typeId.longValue());
@@ -135,7 +139,7 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
       final Schema original = store.retrieve(theKey, Schema.class);
 
       if (original == null) {
-        return false;
+        return null;
       }
 
       try {
@@ -150,11 +154,11 @@ public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
             this.store.iterators().entries(type, LinkedHashMap.class, SortDirection.ASCENDING));
       }
 
-      return store.update(theKey, Schema.class, value);
+      return store.updateVersioned(theKey, version, Schema.class, value);
     }
   }
 
-  public boolean deleteSchema(final String type) throws KazukiException {
+  public boolean deleteSchema(final String type, final Version version) throws KazukiException {
     if (store == null) {
       throw new IllegalStateException("schemaManager not initialized with KV store");
     }

@@ -37,7 +37,7 @@ import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
-import io.kazuki.v0.store.sequence.KeyImpl;
+import io.kazuki.v0.store.sequence.VersionImpl;
 
 import java.io.File;
 
@@ -100,7 +100,7 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
     assertThat(manager.retrieveSchema("foo"), Matchers.nullValue());
     assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
 
-    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA), is(KeyImpl.valueOf("$schema:3")));
+    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA), is(VersionImpl.valueOf("$schema:3#2f73aea89adc5337")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     log.info(dump(journal.getActivePartition()));

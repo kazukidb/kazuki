@@ -91,10 +91,18 @@ public class KeyValueStoreIteratorJdbiImpl {
         throw new IllegalStateException("iterable may only be used once!");
       }
 
+      Integer maybeTypeId = null;
+      try {
+        maybeTypeId = sequences.getTypeId(type, false);
+      } catch (Exception e) {
+        throw Throwables.propagate(e);
+      }
+      final Integer typeIdInteger = maybeTypeId;
+
       theIter = new KeyValueIterator<KeyValuePair<T>>() {
         private volatile KeyValueIterator<Map<String, Object>> inner = createKeyValueIterator(
             handle, query, sequences, prefix, type, sortDirection, offset, limit, doBind);
-
+        private final Integer typeId = typeIdInteger;
         private KeyValuePair<T> nextKv = advance();
         private KeyValuePair<T> currentKv = null;
 
@@ -104,6 +112,7 @@ public class KeyValueStoreIteratorJdbiImpl {
           Map<String, Object> record = null;
           Key key = null;
           Version version = null;
+          Version schemaVersion = null;
           T value = null;
 
           while (key == null && inner.hasNext()) {
@@ -126,6 +135,9 @@ public class KeyValueStoreIteratorJdbiImpl {
             if (includeValues) {
               version =
                   VersionImpl.createInternal(key, ((Number) record.get("_version")).longValue());
+              schemaVersion =
+                  VersionImpl.createInternal(KeyImpl.valueOf("$schema:" + typeId.toString()),
+                      ((Number) record.get("_schema_version")).longValue());
 
               byte[] resultBytes = (byte[]) record.get("_value");
               Object result = EncodingHelper.parseSmile(resultBytes, Object.class);
@@ -142,7 +154,7 @@ public class KeyValueStoreIteratorJdbiImpl {
             throw Throwables.propagate(e);
           }
 
-          return new KeyValuePair<T>(key, version, value);
+          return new KeyValuePair<T>(key, version, schemaVersion, value);
         }
 
         @Override

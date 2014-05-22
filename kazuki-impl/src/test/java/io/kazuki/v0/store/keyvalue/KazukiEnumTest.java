@@ -16,6 +16,7 @@ package io.kazuki.v0.store.keyvalue;
 
 import static java.util.Arrays.asList;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
 import io.kazuki.v0.store.index.SecondaryIndexStore;
 import io.kazuki.v0.store.index.query.QueryOperator;
@@ -35,6 +36,7 @@ import io.kazuki.v0.store.schema.model.Schema.Builder;
 import io.kazuki.v0.store.sequence.SequenceServiceConfiguration;
 
 import java.io.File;
+import java.util.Iterator;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -91,7 +93,7 @@ public class KazukiEnumTest {
   public void enumSmokeTest() throws Exception {
 
     final String powerIndex = "powerIndex";
-    final Key schema =
+    final Version schema =
         schemaStore.createSchema(
             MyEntity.TYPE_NAME,
             new Builder()
@@ -130,6 +132,25 @@ public class KazukiEnumTest {
     final MyEntity retrievedEntity2 = kvStore.retrieve(firstSearchResult, MyEntity.class);
 
     Assert.assertEquals(retrievedEntity2.getPower(), Power.ON);
+
+    // Search for enums that have power=ON
+    final KeyValueIterable<Key> keys2 =
+        secondaryIndexStore.queryWithoutPagination(MyEntity.TYPE_NAME, MyEntity.class, powerIndex,
+            asList(new QueryTerm(QueryOperator.EQ, "power", new ValueHolder(ValueType.STRING,
+                Power.ON.toString()))), SortDirection.ASCENDING, null, null);
+
+    final Iterator<Key> firstSearchResult2 = keys2.iterator();
+    Assert.assertTrue(firstSearchResult2.hasNext());
+    Assert.assertEquals(key, firstSearchResult2.next());
+
+    // Search for enums that have power=OFF
+    final KeyValueIterable<Key> keys3 =
+        secondaryIndexStore.queryWithoutPagination(MyEntity.TYPE_NAME, MyEntity.class, powerIndex,
+            asList(new QueryTerm(QueryOperator.EQ, "power", new ValueHolder(ValueType.STRING,
+                Power.OFF.toString()))), SortDirection.ASCENDING, null, null);
+
+    final Iterator<Key> firstSearchResult3 = keys3.iterator();
+    Assert.assertFalse(firstSearchResult3.hasNext());
   }
 
   public static enum Power {

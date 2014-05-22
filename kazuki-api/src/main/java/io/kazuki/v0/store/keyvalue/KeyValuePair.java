@@ -17,14 +17,18 @@ package io.kazuki.v0.store.keyvalue;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.Version;
 
+import javax.annotation.Nullable;
+
 public class KeyValuePair<T> {
   private final Key key;
   private final Version version;
+  private final Version schemaVersion;
   private final T value;
 
-  public KeyValuePair(Key key, Version version, T value) {
+  public KeyValuePair(Key key, Version version, @Nullable Version schemaVersion, T value) {
     this.key = key;
     this.version = version;
+    this.schemaVersion = schemaVersion;
     this.value = value;
   }
 
@@ -34,6 +38,10 @@ public class KeyValuePair<T> {
 
   public Version getVersion() {
     return version;
+  }
+
+  public Version getSchemaVersion() {
+    return schemaVersion;
   }
 
   public T getValue() {
