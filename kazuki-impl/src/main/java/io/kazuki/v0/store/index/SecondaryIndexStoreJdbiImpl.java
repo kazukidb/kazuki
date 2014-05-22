@@ -246,12 +246,33 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   }
 
   @Override
+  public <T> void enforceUnique(String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
+    IndexDefinition uniqueIndexDef = getUniqueIndexDef(schema);
+
+    if (uniqueIndexDef != null) {
+      Map<String, ValueHolder> values = new LinkedHashMap<String, ValueHolder>();
+
+      for (String attr : uniqueIndexDef.getAttributeNames()) {
+        values.put(attr, new ValueHolder(ValueType.STRING, instance.get(attr).toString()));
+      }
+
+      UniqueEntityDescription uniqueDesc =
+          new UniqueEntityDescription(type, clazz, uniqueIndexDef.getName(), schema, values);
+
+      Key maybeExists = this.multiRetrieveUniqueKeys(ImmutableList.of(uniqueDesc)).get(uniqueDesc);
+
+      if (maybeExists != null && !sequence.resolveKey(maybeExists).equals(resolvedKey)) {
+        throw new KazukiException("unique index constraint violation");
+      }
+    }
+  }
+
+  @Override
   public <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> instance) {
     try (LockManager toRelease = lockManager.acquire()) {
       try {
-        enforceUnique(type, clazz, schema, resolvedKey, instance);
-
         for (IndexDefinition indexDef : schema.getIndexes()) {
           this.insertEntity(handle, resolvedKey.getIdentifierLo(), instance, type,
               indexDef.getName(), schema);
@@ -267,8 +288,6 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
       ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance) {
     try (LockManager toRelease = lockManager.acquire()) {
       try {
-        enforceUnique(type, clazz, schema, resolvedKey, newInstance);
-
         for (IndexDefinition indexDef : schema.getIndexes()) {
           this.updateEntity(handle, resolvedKey.getIdentifierLo(), newInstance, oldInstance, type,
               indexDef.getName(), schema);
@@ -631,28 +650,6 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
         tableHelper.getTableName(type, indexName, groupName, storeName, partitionName);
     handle.createStatement(tableHelper.getPrefix() + "truncate_table")
         .define("table_name", indexTableName).execute();
-  }
-
-  private <T> void enforceUnique(String type, Class<T> clazz, Schema schema,
-      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
-    IndexDefinition uniqueIndexDef = getUniqueIndexDef(schema);
-
-    if (uniqueIndexDef != null) {
-      Map<String, ValueHolder> values = new LinkedHashMap<String, ValueHolder>();
-
-      for (String attr : uniqueIndexDef.getAttributeNames()) {
-        values.put(attr, new ValueHolder(ValueType.STRING, instance.get(attr).toString()));
-      }
-
-      UniqueEntityDescription uniqueDesc =
-          new UniqueEntityDescription(type, clazz, uniqueIndexDef.getName(), schema, values);
-
-      Key maybeExists = this.multiRetrieveUniqueKeys(ImmutableList.of(uniqueDesc)).get(uniqueDesc);
-
-      if (maybeExists != null && !sequence.resolveKey(maybeExists).equals(resolvedKey)) {
-        throw new KazukiException("unique index constraint violation");
-      }
-    }
   }
 
   private IndexDefinition getUniqueIndexDef(Schema schema) {

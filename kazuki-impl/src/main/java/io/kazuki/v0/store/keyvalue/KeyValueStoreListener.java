@@ -23,6 +23,9 @@ import java.util.Map;
 import org.skife.jdbi.v2.Handle;
 
 public interface KeyValueStoreListener {
+  <T> void enforceUnique(String type, Class<T> clazz, Schema schema, ResolvedKey resolvedKey,
+      Map<String, Object> instance) throws KazukiException;
+
   <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException;
 
