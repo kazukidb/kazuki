@@ -9,6 +9,7 @@ import io.kazuki.v0.store.index.query.QueryOperator;
 import io.kazuki.v0.store.index.query.ValueHolder;
 import io.kazuki.v0.store.index.query.ValueType;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
+import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -56,7 +57,10 @@ public abstract class SecondaryIndexStoreTestBase extends TestSupport {
 
     manager.createSchema("foo", Foo.FOO_SCHEMA);
 
-    Key k0 = store.create("foo", Foo.class, new Foo("k00", "v99"), TypeValidation.STRICT).getKey();
+    KeyValuePair<Foo> kvp0 =
+        store.create("foo", Foo.class, new Foo("k00", "v99"), TypeValidation.STRICT);
+
+    Key k0 = kvp0.getKey();
     Key k1 = store.create("foo", Foo.class, new Foo("k11", "v88"), TypeValidation.STRICT).getKey();
     Key k2 = store.create("foo", Foo.class, new Foo("k22", "v77"), TypeValidation.STRICT).getKey();
     Key k3 = store.create("foo", Foo.class, new Foo("k33", "v66"), TypeValidation.STRICT).getKey();
@@ -65,6 +69,20 @@ public abstract class SecondaryIndexStoreTestBase extends TestSupport {
 
     try {
       store.create("foo", Foo.class, new Foo("k00", "v55"), TypeValidation.STRICT).getKey();
+      Assert.fail("should be uniqueness failure");
+    } catch (KazukiException expected) {
+      // awesome - we got it
+    }
+
+    try {
+      store.update(k0, Foo.class, new Foo("k00", "v55"));
+      Assert.fail("should be uniqueness failure");
+    } catch (KazukiException expected) {
+      // awesome - we got it
+    }
+
+    try {
+      store.updateVersioned(k0, kvp0.getVersion(), Foo.class, new Foo("k00", "v55"));
       Assert.fail("should be uniqueness failure");
     } catch (KazukiException expected) {
       // awesome - we got it
