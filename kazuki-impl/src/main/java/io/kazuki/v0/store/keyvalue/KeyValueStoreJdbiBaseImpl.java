@@ -198,6 +198,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
                   fieldTransform.pack((Map<String, Object>) storeValue);
 
               for (KeyValueStoreListener kvListener : kvListeners) {
+                kvListener.enforceUnique(type, clazz, schema, resolvedKey, fieldTransformed);
                 kvListener.onCreate(handle, type, clazz, schema, resolvedKey, fieldTransformed);
               }
 
@@ -453,6 +454,10 @@ public abstract class KeyValueStoreJdbiBaseImpl
               fieldTransformed = fieldTransform.pack((Map<String, Object>) storeValue);
               storeValue = structureTransform.pack(fieldTransformed);
 
+              for (KeyValueStoreListener kvListener : kvListeners) {
+                kvListener.enforceUnique(type, clazz, schema, resolvedKey, fieldTransformed);
+              }
+
               objectMap = loadObjectMap(handle, resolvedKey);
 
               oldInstance =
@@ -514,6 +519,10 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
               fieldTransformed = fieldTransform.pack((Map<String, Object>) storeValue);
               storeValue = structureTransform.pack(fieldTransformed);
+
+              for (KeyValueStoreListener kvListener : kvListeners) {
+                kvListener.enforceUnique(type, clazz, schema, resolvedKey, fieldTransformed);
+              }
 
               objectMap = loadObjectMap(handle, resolvedKey);
 

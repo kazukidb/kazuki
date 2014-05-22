@@ -89,17 +89,36 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
   public void onSchemaDelete(String type, Schema oldSchema) {}
 
   @Override
-  public <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
+  public <T> void enforceUnique(String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
-    enforceUnique(type, clazz, schema, resolvedKey, instance);
+    IndexDefinition uniqueIndexDef = getUniqueIndexDef(schema);
+
+    if (uniqueIndexDef != null) {
+      Map<String, ValueHolder> values = new LinkedHashMap<String, ValueHolder>();
+
+      for (String attr : uniqueIndexDef.getAttributeNames()) {
+        values.put(attr, new ValueHolder(ValueType.STRING, instance.get(attr).toString()));
+      }
+
+      UniqueEntityDescription uniqueDesc =
+          new UniqueEntityDescription(type, clazz, uniqueIndexDef.getName(), schema, values);
+
+      Key maybeExists = this.multiRetrieveUniqueKeys(ImmutableList.of(uniqueDesc)).get(uniqueDesc);
+
+      if (maybeExists != null && !sequenceService.resolveKey(maybeExists).equals(resolvedKey)) {
+        throw new KazukiException("unique index constraint violation");
+      }
+    }
   }
+
+  @Override
+  public <T> void onCreate(Handle handle, String type, Class<T> clazz, Schema schema,
+      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {}
 
   @Override
   public <T> void onUpdate(Handle handle, String type, Class<T> clazz, Schema schema,
       ResolvedKey resolvedKey, Map<String, Object> newInstance, Map<String, Object> oldInstance)
-      throws KazukiException {
-    enforceUnique(type, clazz, schema, resolvedKey, newInstance);
-  }
+      throws KazukiException {}
 
   @Override
   public <T> void onDelete(Handle handle, String type, Class<T> clazz, Schema schema,
@@ -299,28 +318,6 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
       Long limit) {
     return queryWithPagination(type, clazz, indexName, QueryHelper.parseQuery(queryString),
         sortDirection, loadResults, token, limit);
-  }
-
-  private <T> void enforceUnique(String type, Class<T> clazz, Schema schema,
-      ResolvedKey resolvedKey, Map<String, Object> instance) throws KazukiException {
-    IndexDefinition uniqueIndexDef = getUniqueIndexDef(schema);
-
-    if (uniqueIndexDef != null) {
-      Map<String, ValueHolder> values = new LinkedHashMap<String, ValueHolder>();
-
-      for (String attr : uniqueIndexDef.getAttributeNames()) {
-        values.put(attr, new ValueHolder(ValueType.STRING, instance.get(attr).toString()));
-      }
-
-      UniqueEntityDescription uniqueDesc =
-          new UniqueEntityDescription(type, clazz, uniqueIndexDef.getName(), schema, values);
-
-      Key maybeExists = this.multiRetrieveUniqueKeys(ImmutableList.of(uniqueDesc)).get(uniqueDesc);
-
-      if (maybeExists != null && !sequenceService.resolveKey(maybeExists).equals(resolvedKey)) {
-        throw new KazukiException("unique index constraint violation");
-      }
-    }
   }
 
   private IndexDefinition getUniqueIndexDef(Schema schema) {
