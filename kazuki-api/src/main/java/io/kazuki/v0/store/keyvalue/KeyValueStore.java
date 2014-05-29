@@ -28,7 +28,9 @@ import javax.annotation.Nullable;
 public interface KeyValueStore {
   void initialize();
 
-  Key toKey(String keyString);
+  Key parseKey(String keyString) throws KazukiException;
+
+  Version parseVersion(String versionString) throws KazukiException;
 
   <T> KeyValuePair<T> create(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)
       throws KazukiException;

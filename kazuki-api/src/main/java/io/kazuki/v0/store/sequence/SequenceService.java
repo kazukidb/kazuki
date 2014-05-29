@@ -16,6 +16,7 @@ package io.kazuki.v0.store.sequence;
 
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 
 public interface SequenceService {
   String getTypeName(final Integer id) throws KazukiException;
@@ -28,6 +29,10 @@ public interface SequenceService {
 
   Key unresolveKey(ResolvedKey key) throws KazukiException;
 
+  Key parseKey(String keyString) throws KazukiException;
+  
+  Version parseVersion(String versionString) throws KazukiException;
+  
   void clear(boolean clearTypes, boolean clearCounters);
 
   void resetCounter(String type) throws KazukiException;

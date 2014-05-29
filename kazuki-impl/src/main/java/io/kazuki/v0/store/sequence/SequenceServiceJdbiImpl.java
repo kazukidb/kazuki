@@ -23,6 +23,7 @@ import io.kazuki.v0.internal.helper.LogTranslation;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
@@ -281,6 +282,16 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         }
       });
     }
+  }
+
+  @Override
+  public Key parseKey(String keyString) throws KazukiException {
+    return KeyImpl.valueOf(keyString);
+  }
+
+  @Override
+  public Version parseVersion(String versionString) throws KazukiException {
+    return VersionImpl.valueOf(versionString);
   }
 
   public void clear(final boolean preserveTypes, final boolean preserveCounters) {
