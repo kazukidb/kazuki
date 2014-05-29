@@ -149,8 +149,13 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
-  public Key toKey(String keyString) {
-    return KeyImpl.valueOf(keyString);
+  public Key parseKey(String keyString) throws KazukiException {
+    return sequences.parseKey(keyString);
+  }
+
+  @Override
+  public Version parseVersion(String versionString) throws KazukiException {
+    return sequences.parseVersion(versionString);
   }
 
   @Override
