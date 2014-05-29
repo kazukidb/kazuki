@@ -24,10 +24,22 @@ import org.slf4j.Logger;
  */
 public abstract class LifecycleSupportBase implements LifecycleRegistration, LifecycleAware {
   protected final Logger log = LogTranslation.getLogger(getClass());
+  protected volatile Lifecycle lifecycle;
+
+  @Override
+  public Lifecycle getLifecycle() {
+    return this.lifecycle;
+  }
 
   @Override
   public void register(Lifecycle lifecycle) {
-    lifecycle.register(this);
+    if (this.lifecycle != null && !this.lifecycle.equals(lifecycle)) {
+      throw new IllegalStateException("lifecycle already registered with "
+          + System.identityHashCode(this.lifecycle));
+    }
+
+    this.lifecycle = lifecycle;
+    this.lifecycle.register(this);
   }
 
   public void init() {}

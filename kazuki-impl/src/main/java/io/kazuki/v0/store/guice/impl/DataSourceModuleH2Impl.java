@@ -12,19 +12,15 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.jdbi;
+package io.kazuki.v0.store.guice.impl;
 
-import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.MaskProxy;
 import io.kazuki.v0.internal.helper.ResourceHelper;
-import io.kazuki.v0.store.config.ConfigurationProvider;
+import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 
-import java.util.concurrent.atomic.AtomicReference;
-
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.sql.DataSource;
 
@@ -38,58 +34,35 @@ import com.google.inject.Provider;
 import com.google.inject.Scopes;
 import com.google.inject.name.Names;
 
-public class H2DataSourceModule extends PrivateModule {
+public class DataSourceModuleH2Impl extends PrivateModule {
   private final String name;
-  private final String propertiesPath;
-  private final String[] additionalNames;
-  private final AtomicReference<JdbiDataSourceConfiguration> config;
+  private final Key<Lifecycle> lifecycleKey;
+  private final Key<JdbiDataSourceConfiguration> configKey;
 
-  public H2DataSourceModule(String name, @Nullable String propertiesPath, String... additionalNames) {
+  public DataSourceModuleH2Impl(String name, Key<Lifecycle> lifecycleKey,
+      Key<JdbiDataSourceConfiguration> configKey) {
     this.name = name;
-    this.propertiesPath = propertiesPath;
-    this.additionalNames = additionalNames;
-    this.config = new AtomicReference<JdbiDataSourceConfiguration>();
-  }
-
-  public H2DataSourceModule withConfiguration(JdbiDataSourceConfiguration config) {
-    this.config.set(config);
-
-    return this;
+    this.lifecycleKey = lifecycleKey;
+    this.configKey = configKey;
   }
 
   @Override
   protected void configure() {
-    JdbiDataSourceConfiguration theConfig = this.config.get();
+    binder().requireExplicitBindings();
 
-    if (theConfig != null) {
-      bind(JdbiDataSourceConfiguration.class).toInstance(theConfig);
-    } else if (propertiesPath != null) {
-      bind(JdbiDataSourceConfiguration.class).toProvider(
-          new ConfigurationProvider<JdbiDataSourceConfiguration>(name,
-              JdbiDataSourceConfiguration.class, propertiesPath, true));
-    } else {
-      bind(JdbiDataSourceConfiguration.class).to(
-          Key.get(JdbiDataSourceConfiguration.class, Names.named(name)));
-    }
+    bind(JdbiDataSourceConfiguration.class).to(configKey);
+    bind(Lifecycle.class).to(lifecycleKey);
 
-    bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name)));
+    Key<DataSource> dsKey = Key.get(DataSource.class, Names.named(name));
 
-    bind(DataSource.class).annotatedWith(Names.named(name)).toProvider(H2DataSourceProvider.class)
-        .in(Scopes.SINGLETON);
-    expose(DataSource.class).annotatedWith(Names.named(name));
-
-    if (additionalNames != null) {
-      for (String otherName : additionalNames) {
-        bind(DataSource.class).annotatedWith(Names.named(otherName)).to(
-            Key.get(DataSource.class, Names.named(name)));
-        expose(DataSource.class).annotatedWith(Names.named(otherName));
-      }
-    }
+    bind(dsKey).toProvider(H2DataSourceProvider.class).in(Scopes.SINGLETON);
+    expose(dsKey);
   }
 
   private static class H2DataSourceProvider implements Provider<DataSource>, LifecycleRegistration {
     private final JdbiDataSourceConfiguration config;
     private final MaskProxy<DataSource, JdbcConnectionPool> instance;
+    private volatile Lifecycle lifecycle;
 
     @Inject
     public H2DataSourceProvider(JdbiDataSourceConfiguration config) {
@@ -98,9 +71,21 @@ public class H2DataSourceModule extends PrivateModule {
     }
 
     @Override
+    public Lifecycle getLifecycle() {
+      return this.lifecycle;
+    }
+
+    @Override
     @Inject
     public void register(Lifecycle lifecycle) {
-      lifecycle.register(new LifecycleSupportBase() {
+      if (this.lifecycle != null && !this.lifecycle.equals(lifecycle)) {
+        throw new IllegalStateException("lifecycle already registered with "
+            + System.identityHashCode(this.lifecycle));
+      }
+
+      this.lifecycle = lifecycle;
+
+      this.lifecycle.register(new LifecycleSupportBase() {
         @Override
         public void init() {
           instance.getAndSet(createDataSource());

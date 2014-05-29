@@ -16,8 +16,11 @@ package io.kazuki.v0.store.lifecycle;
 
 import io.kazuki.v0.internal.helper.LogTranslation;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.slf4j.Logger;
@@ -35,6 +38,9 @@ public class Lifecycle {
       LifecycleEvent.STOP, LifecycleEvent.SHUTDOWN);
 
   private final ConcurrentLinkedDeque<LifecycleAware> listeners = new ConcurrentLinkedDeque<>();
+
+  private final ConcurrentHashMap<LifecycleAware, LifecycleEvent> lastEvent =
+      new ConcurrentHashMap<>();
 
   private final String name;
 
@@ -95,6 +101,10 @@ public class Lifecycle {
     return name;
   }
 
+  public Map<LifecycleAware, LifecycleEvent> getLastEvents() {
+    return Collections.unmodifiableMap(lastEvent);
+  }
+
   /**
    * Sends the event synchronously to each listener in order.
    */
@@ -110,6 +120,7 @@ public class Lifecycle {
       log.trace("Firing lifecycle event {} to listener {}", event.name(), listener);
 
       listener.eventFired(event);
+      lastEvent.put(listener, event);
     }
 
     log.debug("Fired lifecycle event {}", event.name());

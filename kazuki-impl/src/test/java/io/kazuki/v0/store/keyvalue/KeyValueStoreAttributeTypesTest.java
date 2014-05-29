@@ -17,12 +17,11 @@ package io.kazuki.v0.store.keyvalue;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.store.Everything;
-import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Everything.TestEnum;
+import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Version;
-import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
+import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 
@@ -53,16 +52,16 @@ public class KeyValueStoreAttributeTypesTest {
   @BeforeMethod
   public void prepare() throws Exception {
     Injector injector =
-        Guice.createInjector(
-            new LifecycleModule(ExampleStore.STORE_NAME),
-            new EasyKeyValueStoreModule(ExampleStore.STORE_NAME, null)
-                .withJdbiConfig(Configurations.getJdbi().build())
-                .withKeyValueStoreConfig(
-                    Configurations.getKeyValue(ExampleStore.GROUP_NAME, ExampleStore.STORE_NAME)
-                        .build())
-                .withSequenceConfig(
-                    Configurations.getSequence(ExampleStore.GROUP_NAME, ExampleStore.STORE_NAME)
-                        .build()));
+        Guice.createInjector(new KazukiModule.Builder(ExampleStore.STORE_NAME)
+            .withJdbiConfiguration(ExampleStore.STORE_NAME, Configurations.getJdbi().build())
+            .withSequenceServiceConfiguration(
+                ExampleStore.STORE_NAME,
+                Configurations.getSequence(ExampleStore.GROUP_NAME, ExampleStore.STORE_NAME)
+                    .build())
+            .withKeyValueStoreConfiguration(
+                ExampleStore.STORE_NAME,
+                Configurations.getKeyValue(ExampleStore.GROUP_NAME, ExampleStore.STORE_NAME)
+                    .build()).build());
 
     lifecycle =
         injector.getBinding(Key.get(Lifecycle.class, Names.named(ExampleStore.STORE_NAME)))

@@ -32,7 +32,6 @@ import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Schema;
-import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 import io.kazuki.v0.store.sequence.SequenceService;
 import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl;

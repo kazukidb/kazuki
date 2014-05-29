@@ -15,26 +15,24 @@
 package io.kazuki.v0.store.keyvalue;
 
 import static java.util.Arrays.asList;
+import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.store.Key;
-import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
+import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.index.SecondaryIndexStore;
 import io.kazuki.v0.store.index.query.QueryOperator;
 import io.kazuki.v0.store.index.query.QueryTerm;
 import io.kazuki.v0.store.index.query.ValueHolder;
 import io.kazuki.v0.store.index.query.ValueType;
-import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreBasicOperationsTest.ExampleStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Attribute.Type;
 import io.kazuki.v0.store.schema.model.AttributeTransform;
 import io.kazuki.v0.store.schema.model.IndexAttribute;
 import io.kazuki.v0.store.schema.model.Schema.Builder;
-import io.kazuki.v0.store.sequence.SequenceServiceConfiguration;
 
-import java.io.File;
 import java.util.Iterator;
 
 import javax.inject.Inject;
@@ -45,13 +43,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import com.google.common.io.Files;
-import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Provider;
-import com.google.inject.Scopes;
-import com.google.inject.name.Names;
 
 public class KazukiEnumTest {
   public static final String ENUM_SMOKE_TEST = "enumsmoketest";
@@ -74,7 +67,17 @@ public class KazukiEnumTest {
 
   @BeforeMethod
   public void init() {
-    Injector injector = Guice.createInjector(new EnumSmokeTestModule());
+    Injector injector =
+        Guice.createInjector(new KazukiModule.Builder(ENUM_SMOKE_TEST)
+            .withJdbiConfiguration(ENUM_SMOKE_TEST, Configurations.getJdbi().build())
+            .withSequenceServiceConfiguration(
+                ENUM_SMOKE_TEST,
+                Configurations.getSequence(ExampleStore.GROUP_NAME, ExampleStore.STORE_NAME)
+                    .build())
+            .withKeyValueStoreConfiguration(
+                ENUM_SMOKE_TEST,
+                Configurations.getKeyValue(ExampleStore.GROUP_NAME, ExampleStore.STORE_NAME)
+                    .build()).build());
 
     injector.injectMembers(this);
 
@@ -186,66 +189,6 @@ public class KazukiEnumTest {
 
     public void setName(final String name) {
       this.name = name;
-    }
-  }
-
-  public static class EnumSmokeTestModule extends AbstractModule {
-    @Override
-    protected void configure() {
-      bind(JdbiDataSourceConfiguration.class).annotatedWith(Names.named(ENUM_SMOKE_TEST))
-          .toProvider(JdbiConfigurationProvider.class).in(Scopes.SINGLETON);
-
-      // Kazuki lifecycle management
-      install(new LifecycleModule(ENUM_SMOKE_TEST));
-
-      // Kazuki key-value store
-      install(new EasyKeyValueStoreModule(ENUM_SMOKE_TEST, null).withSequenceConfig(
-          getSequenceServiceConfiguration()).withKeyValueStoreConfig(
-          getKeyValueStoreConfiguration()));
-    }
-
-    private SequenceServiceConfiguration getSequenceServiceConfiguration() {
-      SequenceServiceConfiguration.Builder builder = new SequenceServiceConfiguration.Builder();
-
-      builder.withDbType("h2");
-      builder.withGroupName("example");
-      builder.withStoreName(ENUM_SMOKE_TEST);
-      builder.withStrictTypeCreation(true);
-
-      return builder.build();
-    }
-
-    private KeyValueStoreConfiguration getKeyValueStoreConfiguration() {
-      KeyValueStoreConfiguration.Builder builder = new KeyValueStoreConfiguration.Builder();
-
-      builder.withDbType("h2");
-      builder.withGroupName("example");
-      builder.withStoreName(ENUM_SMOKE_TEST);
-      builder.withPartitionName("default");
-      builder.withPartitionSize(100_000L);
-      builder.withStrictTypeCreation(true);
-      builder.withDataType(MyEntity.TYPE_NAME);
-      builder.withSecondaryIndex(true);
-
-      return builder.build();
-    }
-  }
-
-  private static class JdbiConfigurationProvider implements Provider<JdbiDataSourceConfiguration> {
-    @Override
-    public JdbiDataSourceConfiguration get() {
-      JdbiDataSourceConfiguration.Builder builder = new JdbiDataSourceConfiguration.Builder();
-
-      builder.withJdbcDriver("org.h2.Driver");
-      File file = Files.createTempDir();
-      builder.withJdbcUrl("jdbc:h2:" + file.getAbsolutePath());
-
-      builder.withJdbcUser("root");
-      builder.withJdbcPassword("not_really_used");
-      builder.withPoolMinConnections(25);
-      builder.withPoolMaxConnections(25);
-
-      return builder.build();
     }
   }
 }

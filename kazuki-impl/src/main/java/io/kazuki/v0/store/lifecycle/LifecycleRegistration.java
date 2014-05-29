@@ -34,5 +34,7 @@ package io.kazuki.v0.store.lifecycle;
  * </pre>
  */
 public interface LifecycleRegistration {
-  public void register(Lifecycle lifecycle);
+  Lifecycle getLifecycle();
+
+  void register(Lifecycle lifecycle);
 }

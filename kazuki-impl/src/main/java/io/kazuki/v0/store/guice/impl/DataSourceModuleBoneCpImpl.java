@@ -12,18 +12,15 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.jdbi;
+package io.kazuki.v0.store.guice.impl;
 
 import io.kazuki.v0.internal.helper.MaskProxy;
 import io.kazuki.v0.internal.helper.ResourceHelper;
-import io.kazuki.v0.store.config.ConfigurationProvider;
+import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
 
-import java.util.concurrent.atomic.AtomicReference;
-
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.sql.DataSource;
 
@@ -35,54 +32,29 @@ import com.google.inject.Scopes;
 import com.google.inject.name.Names;
 import com.jolbox.bonecp.BoneCPDataSource;
 
-public class BoneCpDataSourceModule extends PrivateModule {
+public class DataSourceModuleBoneCpImpl extends PrivateModule {
   private final String name;
-  private final String propertiesPath;
-  private final String[] additionalNames;
-  private final AtomicReference<JdbiDataSourceConfiguration> config;
+  private final Key<Lifecycle> lifecycleKey;
+  private final Key<JdbiDataSourceConfiguration> configKey;
 
-  public BoneCpDataSourceModule(String name, @Nullable String propertiesPath,
-      String... additionalNames) {
+  public DataSourceModuleBoneCpImpl(String name, Key<Lifecycle> lifecycleKey,
+      Key<JdbiDataSourceConfiguration> configKey) {
     this.name = name;
-    this.propertiesPath = propertiesPath;
-    this.additionalNames = additionalNames;
-    this.config = new AtomicReference<JdbiDataSourceConfiguration>();
-  }
-
-  public BoneCpDataSourceModule withConfiguration(JdbiDataSourceConfiguration config) {
-    this.config.set(config);
-
-    return this;
+    this.lifecycleKey = lifecycleKey;
+    this.configKey = configKey;
   }
 
   @Override
   protected void configure() {
-    JdbiDataSourceConfiguration theConfig = this.config.get();
+    binder().requireExplicitBindings();
 
-    if (theConfig != null) {
-      bind(JdbiDataSourceConfiguration.class).toInstance(theConfig);
-    } else if (propertiesPath != null) {
-      bind(JdbiDataSourceConfiguration.class).toProvider(
-          new ConfigurationProvider<JdbiDataSourceConfiguration>(name,
-              JdbiDataSourceConfiguration.class, propertiesPath, true));
-    } else {
-      bind(JdbiDataSourceConfiguration.class).to(
-          Key.get(JdbiDataSourceConfiguration.class, Names.named(name)));
-    }
+    bind(JdbiDataSourceConfiguration.class).to(configKey);
+    bind(Lifecycle.class).to(lifecycleKey);
 
-    bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name)));
+    Key<DataSource> dsKey = Key.get(DataSource.class, Names.named(name));
 
-    bind(DataSource.class).annotatedWith(Names.named(name))
-        .toProvider(BoneCPDataSourceProvider.class).in(Scopes.SINGLETON);
-    expose(DataSource.class).annotatedWith(Names.named(name));
-
-    if (additionalNames != null) {
-      for (String otherName : additionalNames) {
-        bind(DataSource.class).annotatedWith(Names.named(otherName)).to(
-            Key.get(DataSource.class, Names.named(name)));
-        expose(DataSource.class).annotatedWith(Names.named(otherName));
-      }
-    }
+    bind(dsKey).toProvider(BoneCPDataSourceProvider.class).in(Scopes.SINGLETON);
+    expose(dsKey);
   }
 
   private static class BoneCPDataSourceProvider
@@ -91,6 +63,7 @@ public class BoneCpDataSourceModule extends PrivateModule {
         LifecycleRegistration {
     private final JdbiDataSourceConfiguration config;
     private final MaskProxy<DataSource, BoneCPDataSource> instance;
+    private volatile Lifecycle lifecycle;
 
     @Inject
     public BoneCPDataSourceProvider(JdbiDataSourceConfiguration config) {
@@ -99,9 +72,21 @@ public class BoneCpDataSourceModule extends PrivateModule {
     }
 
     @Override
+    public Lifecycle getLifecycle() {
+      return this.lifecycle;
+    }
+
+    @Override
     @Inject
     public void register(Lifecycle lifecycle) {
-      lifecycle.register(new LifecycleSupportBase() {
+      if (this.lifecycle != null && !this.lifecycle.equals(lifecycle)) {
+        throw new IllegalStateException("lifecycle already registered with "
+            + System.identityHashCode(this.lifecycle));
+      }
+
+      this.lifecycle = lifecycle;
+
+      this.lifecycle.register(new LifecycleSupportBase() {
         @Override
         public void init() {
           instance.getAndSet(createDataSource());

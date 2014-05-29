@@ -27,11 +27,10 @@ import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
-import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
+import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.KeyImpl;
@@ -39,8 +38,8 @@ import io.kazuki.v0.store.sequence.KeyImpl;
 import java.io.File;
 
 import org.hamcrest.Matchers;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import com.google.inject.Guice;
@@ -55,14 +54,20 @@ public class PartitionedJournalStoreClearTest extends TestSupport {
   private SchemaStore manager;
   private JournalStore journal;
 
-  @BeforeTest(alwaysRun = true)
+  @BeforeMethod(alwaysRun = true)
   public void setUp() throws Exception {
     config = Configurations.getJdbi().build();
     dbName = config.getJdbcUrl().substring("jdbc:h2:".length());
 
     inject =
-        Guice.createInjector(new LifecycleModule("bar"), new EasyPartitionedJournalStoreModule(
-            "bar", "test/io/kazuki/v0/store/sequence").withJdbiConfig(config));
+        Guice.createInjector(new KazukiModule.Builder("bar")
+            .withJdbiConfiguration("bar", config)
+            .withSequenceServiceConfiguration("bar",
+                Configurations.getSequence("bar", "barstore").build())
+            .withJournalStoreConfiguration(
+                "bar",
+                Configurations.getKeyValue("bar", "barstore").withDataType("foo")
+                    .withPartitionName("default").withPartitionSize(10L).build()).build());
 
     lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("bar")));
     manager = inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("bar")));
@@ -80,7 +85,7 @@ public class PartitionedJournalStoreClearTest extends TestSupport {
     lifecycle.start();
   }
 
-  @AfterTest(alwaysRun = true)
+  @AfterMethod(alwaysRun = true)
   public void tearDown() throws Exception {
     lifecycle.stop();
     lifecycle.shutdown();

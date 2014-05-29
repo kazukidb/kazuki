@@ -15,11 +15,10 @@
 package io.kazuki.v0.store.index;
 
 
-import org.testng.annotations.Test;
-
 import io.kazuki.v0.internal.helper.Configurations;
-import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
+import io.kazuki.v0.store.guice.KazukiModule;
+
+import org.testng.annotations.Test;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -28,10 +27,10 @@ import com.google.inject.Injector;
 public class SecondaryIndexStoreJdbiImplTest extends SecondaryIndexStoreTestBase {
   @Override
   protected Injector getInjector() {
-    return Guice.createInjector(
-        new LifecycleModule("foo"),
-        new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence").withJdbiConfig(
-            Configurations.getJdbi().build()).withKeyValueStoreConfig(
-            Configurations.getKeyValue("foo", "foo").withSecondaryIndex(true).build()));
+    return Guice.createInjector(new KazukiModule.Builder("foo")
+        .withJdbiConfiguration("foo", Configurations.getJdbi().build())
+        .withSequenceServiceConfiguration("foo", Configurations.getSequence("foo", "foo").build())
+        .withKeyValueStoreConfiguration("foo", Configurations.getKeyValue("foo", "foo").build())
+        .build());
   }
 }

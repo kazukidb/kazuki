@@ -20,10 +20,9 @@ import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.Version;
-import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
+import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Schema;
@@ -40,9 +39,11 @@ import com.google.inject.Injector;
 import com.google.inject.name.Names;
 
 public class H2KeyValueVersionedStorageTest extends TestSupport {
-  private final Injector inject = Guice.createInjector(new LifecycleModule("foo"),
-      new EasyKeyValueStoreModule("foo", "test/io/kazuki/v0/store/sequence")
-          .withJdbiConfig(Configurations.getJdbi().build()));
+  private final Injector inject = Guice.createInjector(new KazukiModule.Builder("foo")
+      .withJdbiConfiguration("foo", Configurations.getJdbi().build())
+      .withSequenceServiceConfiguration("foo", Configurations.getSequence("foo", "foo").build())
+      .withKeyValueStoreConfiguration("foo", Configurations.getKeyValue("foo", "foo").build())
+      .build());
 
   private final ObjectMapper mapper = new ObjectMapper();
 
