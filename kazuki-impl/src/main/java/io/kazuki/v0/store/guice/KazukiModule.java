@@ -17,10 +17,10 @@ package io.kazuki.v0.store.guice;
 import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.LockManagerImpl;
 import io.kazuki.v0.store.guice.impl.DataSourceModuleH2Impl;
-import io.kazuki.v0.store.guice.impl.SequenceServiceModuleJdbiH2Impl;
+import io.kazuki.v0.store.guice.impl.JournalStoreModulePartitionedImpl;
 import io.kazuki.v0.store.guice.impl.KeyValueStoreModuleJdbiH2Impl;
 import io.kazuki.v0.store.guice.impl.LifecycleModuleDefaultImpl;
-import io.kazuki.v0.store.guice.impl.JournalStoreModulePartitionedImpl;
+import io.kazuki.v0.store.guice.impl.SequenceServiceModuleJdbiH2Impl;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
@@ -93,8 +93,8 @@ public class KazukiModule extends AbstractModule {
     // bind JournalStore (if applicable)
     if (jsConfig != null) {
       bindObject(jsConfig);
-      install(new JournalStoreModulePartitionedImpl(name, lifecycleKey, lockManagerKey, dataSourceKey,
-          sequenceServiceKey));
+      install(new JournalStoreModulePartitionedImpl(name, lifecycleKey, lockManagerKey,
+          dataSourceKey, sequenceServiceKey));
     }
   }
 
@@ -104,7 +104,7 @@ public class KazukiModule extends AbstractModule {
     Object instance = config.getInstance();
 
     if (instance instanceof Key) {
-      bind(bindKey).to((Key) instance).in(Scopes.SINGLETON);
+      // sweet - it's already bound
     } else if (instance instanceof Provider) {
       bind(bindKey).toProvider((Provider) instance).in(Scopes.SINGLETON);
     } else {
