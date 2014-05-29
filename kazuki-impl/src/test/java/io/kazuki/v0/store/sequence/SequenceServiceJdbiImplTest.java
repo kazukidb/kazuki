@@ -15,13 +15,13 @@
 package io.kazuki.v0.store.sequence;
 
 
+import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestHelper;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.config.ConfigurationProvider;
-import io.kazuki.v0.store.jdbi.H2DataSourceModule;
+import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl.Counter;
 
 import java.util.Map;
@@ -40,9 +40,11 @@ public class SequenceServiceJdbiImplTest extends TestSupport {
 
   public SequenceServiceJdbiImplTest() {
     inject =
-        Guice.createInjector(new LifecycleModule("foo"), new H2DataSourceModule("foo",
-            "test/io/kazuki/v0/store/sequence/jdbi.properties"), new H2SequenceServiceModule("foo",
-            "test/io/kazuki/v0/store/sequence/sequence.properties"));
+        Guice.createInjector(new KazukiModule.Builder("foo")
+            .withJdbiConfiguration("foo", Configurations.getJdbi().build())
+            .withSequenceServiceConfiguration("foo",
+                Configurations.getSequence("foo", "foo").withIncrementBlockSize(100_000L).build())
+            .build());
   }
 
   @Test

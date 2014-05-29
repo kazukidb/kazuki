@@ -12,37 +12,31 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.lifecycle;
+package io.kazuki.v0.store.guice.impl;
+
+import io.kazuki.v0.store.lifecycle.Lifecycle;
 
 import com.google.common.base.Preconditions;
-import com.google.inject.AbstractModule;
-import com.google.inject.Key;
+import com.google.inject.PrivateModule;
 import com.google.inject.name.Names;
 
 /**
  * The LifecycleModule is a Guice module that installs the Lifecycle instance into the Guice
  * context.
  */
-public class LifecycleModule extends AbstractModule {
+public class LifecycleModuleDefaultImpl extends PrivateModule {
   private final String name;
-  private final String[] additionalNames;
 
-  public LifecycleModule(String name, String... additionalNames) {
+  public LifecycleModuleDefaultImpl(String name) {
     Preconditions.checkNotNull(name, "name");
-
     this.name = name;
-    this.additionalNames = additionalNames;
   }
 
   @Override
   protected void configure() {
-    bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle(this.name));
+    binder().requireExplicitBindings();
 
-    if (additionalNames != null) {
-      for (String additionalName : additionalNames) {
-        bind(Lifecycle.class).annotatedWith(Names.named(additionalName)).to(
-            Key.get(Lifecycle.class, Names.named(name)));
-      }
-    }
+    bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle(this.name));
+    expose(Lifecycle.class).annotatedWith(Names.named(name));
   }
 }

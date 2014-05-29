@@ -25,8 +25,9 @@ import io.kazuki.v0.internal.helper.EncodingHelper;
 import io.kazuki.v0.store.cmd.impl.SqlCommandHelper;
 import io.kazuki.v0.store.cmd.impl.SqlCommandHelper.ResultHandler;
 import io.kazuki.v0.store.cmd.impl.SqlCommandHelper.RowHandler;
-import io.kazuki.v0.store.easy.EasyKeyValueStoreModule;
-import io.kazuki.v0.store.jdbi.H2DataSourceModule;
+import io.kazuki.v0.store.guice.KazukiModule;
+import io.kazuki.v0.store.guice.impl.DataSourceModuleH2Impl;
+import io.kazuki.v0.store.guice.impl.LifecycleModuleDefaultImpl;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
@@ -35,7 +36,6 @@ import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.SequenceService;
 import io.kazuki.v0.store.sequence.SequenceServiceConfiguration;
@@ -120,17 +120,23 @@ public class Main {
     }
 
     public List<Module> getModules() {
-      return ImmutableList.<Module>of(new LifecycleModule(STORE_NAME), new H2DataSourceModule(
-          STORE_NAME, "ex").withConfiguration(getJdbiConfig()), new AbstractModule() {
-        @Override
-        protected void configure() {
-          Provider<DataSource> provider =
-              binder().getProvider(Key.get(DataSource.class, Names.named(STORE_NAME)));
+      return ImmutableList.<Module>of(
+          new LifecycleModuleDefaultImpl(STORE_NAME),
+          new DataSourceModuleH2Impl(STORE_NAME, Key.get(Lifecycle.class, Names.named(STORE_NAME)), Key
+              .get(JdbiDataSourceConfiguration.class, Names.named(STORE_NAME))),
+          new AbstractModule() {
+            @Override
+            protected void configure() {
+              bind(Key.get(JdbiDataSourceConfiguration.class, Names.named(STORE_NAME))).toInstance(
+                  getJdbiConfig());
 
-          bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider)).in(
-              Scopes.SINGLETON);
-        }
-      });
+              Provider<DataSource> provider =
+                  binder().getProvider(Key.get(DataSource.class, Names.named(STORE_NAME)));
+
+              bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider)).in(
+                  Scopes.SINGLETON);
+            }
+          });
     }
 
     public JdbiDataSourceConfiguration getJdbiConfig() {
@@ -280,10 +286,10 @@ public class Main {
 
     @Override
     public List<Module> getModules() {
-      return ImmutableList
-          .<Module>of(new LifecycleModule(STORE_NAME), new EasyKeyValueStoreModule(STORE_NAME, "")
-              .withJdbiConfig(getJdbiConfig()).withKeyValueStoreConfig(getKeyValueConfig())
-              .withSequenceConfig(getSequenceConfig()));
+      return ImmutableList.<Module>of(new KazukiModule.Builder(STORE_NAME)
+          .withJdbiConfiguration(STORE_NAME, getJdbiConfig())
+          .withSequenceServiceConfiguration(STORE_NAME, getSequenceConfig())
+          .withKeyValueStoreConfiguration(STORE_NAME, getKeyValueConfig()).build());
     }
 
     public KeyValueStoreConfiguration getKeyValueConfig() {

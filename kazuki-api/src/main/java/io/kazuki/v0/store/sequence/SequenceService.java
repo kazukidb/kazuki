@@ -23,6 +23,8 @@ public interface SequenceService {
 
   Integer getTypeId(final String type, final boolean create) throws KazukiException;
 
+  boolean hasType(final String type) throws KazukiException;
+
   Key nextKey(String type) throws KazukiException;
 
   ResolvedKey resolveKey(Key key) throws KazukiException;
@@ -30,9 +32,9 @@ public interface SequenceService {
   Key unresolveKey(ResolvedKey key) throws KazukiException;
 
   Key parseKey(String keyString) throws KazukiException;
-  
+
   Version parseVersion(String versionString) throws KazukiException;
-  
+
   void clear(boolean clearTypes, boolean clearCounters);
 
   void resetCounter(String type) throws KazukiException;

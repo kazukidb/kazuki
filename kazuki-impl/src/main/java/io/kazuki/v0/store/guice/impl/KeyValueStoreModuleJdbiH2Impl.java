@@ -12,26 +12,26 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.keyvalue;
+package io.kazuki.v0.store.guice.impl;
 
 import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.H2TypeHelper;
 import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
-import io.kazuki.v0.store.config.ConfigurationProvider;
 import io.kazuki.v0.store.index.SecondaryIndexStore;
 import io.kazuki.v0.store.index.SecondaryIndexStoreProvider;
 import io.kazuki.v0.store.index.SecondaryIndexTableHelper;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
+import io.kazuki.v0.store.keyvalue.KeyValueStore;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Impl;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreRegistration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.SchemaStoreImpl;
 import io.kazuki.v0.store.schema.SchemaStoreRegistration;
 import io.kazuki.v0.store.sequence.SequenceService;
 
-import java.util.concurrent.atomic.AtomicReference;
-
-import javax.annotation.Nullable;
 import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.IDBI;
@@ -42,21 +42,21 @@ import com.google.inject.Provider;
 import com.google.inject.Scopes;
 import com.google.inject.name.Names;
 
-public class KeyValueStoreJdbiH2Module extends PrivateModule {
+public class KeyValueStoreModuleJdbiH2Impl extends PrivateModule {
   protected final String name;
-  protected final String propertiesPath;
-  private final AtomicReference<KeyValueStoreConfiguration> config;
+  protected final Key<Lifecycle> lifecycleKey;
+  protected final Key<LockManager> lockManagerKey;
+  protected final Key<DataSource> dataSourceKey;
+  protected final Key<SequenceService> sequenceServiceKey;
 
-  public KeyValueStoreJdbiH2Module(String name, @Nullable String propertiesPath) {
+  public KeyValueStoreModuleJdbiH2Impl(String name, Key<Lifecycle> lifecycleKey,
+      Key<LockManager> lockManagerKey, Key<DataSource> dataSourceKey,
+      Key<SequenceService> sequenceServiceKey) {
     this.name = name;
-    this.propertiesPath = propertiesPath;
-    this.config = new AtomicReference<KeyValueStoreConfiguration>();
-  }
-
-  public KeyValueStoreJdbiH2Module withConfiguration(KeyValueStoreConfiguration config) {
-    this.config.set(config);
-
-    return this;
+    this.lifecycleKey = lifecycleKey;
+    this.lockManagerKey = lockManagerKey;
+    this.dataSourceKey = dataSourceKey;
+    this.sequenceServiceKey = sequenceServiceKey;
   }
 
   protected void includeInternal() {}
@@ -65,40 +65,30 @@ public class KeyValueStoreJdbiH2Module extends PrivateModule {
 
   @Override
   public void configure() {
-    bind(Lifecycle.class).to(Key.get(Lifecycle.class, Names.named(name))).in(Scopes.SINGLETON);
+    binder().requireExplicitBindings();
 
-    KeyValueStoreConfiguration theConfig = this.config.get();
+    bind(Lifecycle.class).to(lifecycleKey);
 
-    if (theConfig != null) {
-      bind(KeyValueStoreConfiguration.class).toInstance(theConfig);
-    } else if (propertiesPath != null) {
-      bind(KeyValueStoreConfiguration.class).toProvider(
-          new ConfigurationProvider<KeyValueStoreConfiguration>(name,
-              KeyValueStoreConfiguration.class, propertiesPath, true));
-    } else {
-      bind(KeyValueStoreConfiguration.class).to(
-          Key.get(KeyValueStoreConfiguration.class, Names.named(name)));
-    }
+    bind(KeyValueStoreConfiguration.class).to(
+        Key.get(KeyValueStoreConfiguration.class, Names.named(name)));
+
+    Provider<DataSource> dsProvider = binder().getProvider(dataSourceKey);
+
+    bind(DataSource.class).to(dataSourceKey);
+    bind(IDBI.class).toProvider(new IdbiProvider(KeyValueStore.class, dsProvider)).in(
+        Scopes.SINGLETON);
+
+    bind(LockManager.class).to(lockManagerKey);
+    bind(SequenceService.class).to(sequenceServiceKey);
 
     bind(SqlTypeHelper.class).to(H2TypeHelper.class).in(Scopes.SINGLETON);
     bind(AvailabilityManager.class).in(Scopes.SINGLETON);
 
-    Provider<SequenceService> seqProvider =
-        binder().getProvider(Key.<SequenceService>get(SequenceService.class, Names.named(name)));
-    Provider<DataSource> dsProvider =
-        binder().getProvider(Key.get(DataSource.class, Names.named(name)));
-
-    bind(DataSource.class).toProvider(dsProvider);
-    bind(IDBI.class).toProvider(new IdbiProvider(KeyValueStore.class, dsProvider)).in(
-        Scopes.SINGLETON);
-
-    bind(SequenceService.class).toProvider(seqProvider).in(Scopes.SINGLETON);
-    bind(LockManager.class).to(Key.get(LockManager.class, Names.named(name)));
 
     bind(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);
     bind(KeyValueStore.class).to(KeyValueStoreJdbiH2Impl.class).in(Scopes.SINGLETON);
     bind(KeyValueStoreRegistration.class).to(Key.get(KeyValueStoreJdbiH2Impl.class)).in(
-        Scopes.SINGLETON);;
+        Scopes.SINGLETON);
     bind(KeyValueStore.class).annotatedWith(Names.named(name))
         .toProvider(binder().getProvider(Key.get(KeyValueStore.class))).in(Scopes.SINGLETON);
 

@@ -78,6 +78,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   private final String typeName;
   private final AtomicReference<KeyValueStore> activePartitionStore;
   private final AtomicReference<PartitionInfoImpl> activePartitionInfo;
+  private volatile Lifecycle lifecycle;
 
   public PartitionedJournalStore(AvailabilityManager availability, LockManager lockManager,
       IDBI database, SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
@@ -111,9 +112,21 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
             .getDataType(), config.isStrictTypeCreation());
   }
 
+  @Override
+  public Lifecycle getLifecycle() {
+    return this.lifecycle;
+  }
+
   @Inject
   public void register(Lifecycle lifecycle) {
-    lifecycle.register(new LifecycleSupportBase() {
+    if (this.lifecycle != null && !this.lifecycle.equals(lifecycle)) {
+      throw new IllegalStateException("lifecycle already registered with "
+          + System.identityHashCode(this.lifecycle));
+    }
+
+    this.lifecycle = lifecycle;
+
+    this.lifecycle.register(new LifecycleSupportBase() {
       @Override
       public void init() {
         PartitionedJournalStore.this.initialize();
@@ -368,8 +381,14 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
           }
         }
 
-        sequence.resetCounter(this.dataType);
-        sequence.resetCounter(this.typeName);
+        if (sequence.hasType(this.dataType)) {
+          sequence.resetCounter(this.dataType);
+        }
+
+        if (sequence.hasType(this.typeName)) {
+          sequence.resetCounter(this.typeName);
+        }
+
         metaStore.destroy();
 
         this.activePartitionInfo.set(null);

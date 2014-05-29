@@ -59,6 +59,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   protected final LockManager lockManager;
   protected final IDBI dataSource;
   protected final long incrementBlockSize;
+  protected volatile Lifecycle lifecycle;
 
   @Inject
   public SequenceServiceJdbiImpl(SequenceServiceConfiguration sequenceConfiguration,
@@ -81,9 +82,16 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         incrementBlockSize != null ? incrementBlockSize : DEFAULT_INCREMENT_BLOCK_SIZE;
   }
 
+  @Override
+  public Lifecycle getLifecycle() {
+    return this.lifecycle;
+  }
+
   @Inject
   public void register(Lifecycle lifecycle) {
-    lifecycle.register(new LifecycleSupportBase() {
+    this.lifecycle = lifecycle;
+
+    this.lifecycle.register(new LifecycleSupportBase() {
       @Override
       public void init() {
         SequenceServiceJdbiImpl.this.initialize();
@@ -236,7 +244,18 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     }
   }
 
+  @Override
   public Integer getTypeId(final String type, final boolean create) throws KazukiException {
+    return getTypeId(type, create, true);
+  }
+
+  @Override
+  public boolean hasType(String type) throws KazukiException {
+    return getTypeId(type, false, false) != null;
+  }
+
+  public Integer getTypeId(final String type, final boolean create, final boolean strict)
+      throws KazukiException {
     if (type == null) {
       throw new IllegalArgumentException("Invalid entity 'type'");
     }
@@ -255,7 +274,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         }
       });
 
-      if (result == null) {
+      if (result == null && strict) {
         throw new KazukiException("unknown type: " + type);
       }
 
@@ -353,6 +372,10 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   public void resetCounter(final String type) throws KazukiException {
     try (LockManager toRelease = lockManager.acquire()) {
       final Integer typeId = SequenceServiceJdbiImpl.this.getTypeId(type, false);
+
+      if (typeId == null) {
+        return;
+      }
 
       dataSource.inTransaction(new TransactionCallback<Void>() {
         @Override

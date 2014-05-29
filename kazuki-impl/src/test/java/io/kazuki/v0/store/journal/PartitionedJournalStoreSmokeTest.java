@@ -27,14 +27,13 @@ import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
-import io.kazuki.v0.store.easy.EasyPartitionedJournalStoreModule;
+import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
-import io.kazuki.v0.store.lifecycle.LifecycleModule;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.VersionImpl;
@@ -64,8 +63,14 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
     dbName = config.getJdbcUrl().substring("jdbc:h2:".length());
 
     inject =
-        Guice.createInjector(new LifecycleModule("foo"), new EasyPartitionedJournalStoreModule(
-            "foo", "test/io/kazuki/v0/store/sequence").withJdbiConfig(config));
+        Guice.createInjector(new KazukiModule.Builder("foo")
+            .withJdbiConfiguration("foo", Configurations.getJdbi().build())
+            .withSequenceServiceConfiguration("foo",
+                Configurations.getSequence("foo", "foostore").build())
+            .withJournalStoreConfiguration(
+                "foo",
+                Configurations.getKeyValue("foo", "foostore").withDataType("foo")
+                    .withPartitionSize(10L).build()).build());
 
     lifecycle = inject.getInstance(com.google.inject.Key.get(Lifecycle.class, Names.named("foo")));
     manager = inject.getInstance(com.google.inject.Key.get(SchemaStore.class, Names.named("foo")));

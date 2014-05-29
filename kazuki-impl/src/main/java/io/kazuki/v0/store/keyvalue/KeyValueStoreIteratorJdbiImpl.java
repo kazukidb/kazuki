@@ -43,7 +43,6 @@ import com.google.common.base.Throwables;
 public class KeyValueStoreIteratorJdbiImpl {
   private static final Logger log = LogTranslation.getLogger(KeyValueStoreIteratorJdbiImpl.class);
 
-
   public static class KeyValueIterableJdbiImpl<T> implements KeyValueIterable<KeyValuePair<T>> {
     private final AvailabilityManager availability;
     private final Handle handle;
