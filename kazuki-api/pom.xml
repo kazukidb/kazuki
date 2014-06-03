@@ -4,7 +4,7 @@
   <parent>
     <groupId>io.kazuki</groupId>
     <artifactId>kazuki-parent</artifactId>
-    <version>0.5.11-SNAPSHOT</version>
+    <version>0.5.11</version>
   </parent>
   <artifactId>kazuki-api</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
