@@ -34,7 +34,8 @@ public class LifecycleModuleDefaultImpl extends PrivateModule {
 
   @Override
   protected void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
     bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle(this.name));
     expose(Lifecycle.class).annotatedWith(Names.named(name));

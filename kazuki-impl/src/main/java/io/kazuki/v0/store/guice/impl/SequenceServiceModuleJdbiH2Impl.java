@@ -57,7 +57,8 @@ public class SequenceServiceModuleJdbiH2Impl extends PrivateModule {
 
   @Override
   protected void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
     bind(Lifecycle.class).to(lifecycleKey);
 

@@ -46,7 +46,8 @@ public class DataSourceModuleBoneCpImpl extends PrivateModule {
 
   @Override
   protected void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
     bind(JdbiDataSourceConfiguration.class).to(configKey);
     bind(Lifecycle.class).to(lifecycleKey);

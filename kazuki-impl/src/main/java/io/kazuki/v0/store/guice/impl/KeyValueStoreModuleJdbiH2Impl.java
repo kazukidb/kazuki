@@ -65,7 +65,8 @@ public class KeyValueStoreModuleJdbiH2Impl extends PrivateModule {
 
   @Override
   public void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
     bind(Lifecycle.class).to(lifecycleKey);
 

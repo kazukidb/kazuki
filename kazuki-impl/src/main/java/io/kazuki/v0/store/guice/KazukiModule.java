@@ -58,7 +58,8 @@ public class KazukiModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
     Key<Lifecycle> lifecycleKey = Key.get(Lifecycle.class, Names.named(name));
     Key<LockManager> lockManagerKey = Key.get(LockManager.class, Names.named(name));
