@@ -122,9 +122,9 @@ public class Main {
     public List<Module> getModules() {
       return ImmutableList.<Module>of(
           new LifecycleModuleDefaultImpl(STORE_NAME),
-          new DataSourceModuleH2Impl(STORE_NAME, Key.get(Lifecycle.class, Names.named(STORE_NAME)), Key
-              .get(JdbiDataSourceConfiguration.class, Names.named(STORE_NAME))),
-          new AbstractModule() {
+          new DataSourceModuleH2Impl(STORE_NAME, null, Key.get(Lifecycle.class,
+              Names.named(STORE_NAME)), Key.get(JdbiDataSourceConfiguration.class,
+              Names.named(STORE_NAME))), new AbstractModule() {
             @Override
             protected void configure() {
               bind(Key.get(JdbiDataSourceConfiguration.class, Names.named(STORE_NAME))).toInstance(

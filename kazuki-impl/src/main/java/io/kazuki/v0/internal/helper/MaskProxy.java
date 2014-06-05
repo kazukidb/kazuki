@@ -22,6 +22,7 @@ import java.lang.reflect.Proxy;
 public class MaskProxy<T, U extends T> implements InvocationHandler {
   private final Class<T> iface;
   private volatile U delegate;
+  private volatile T proxyInstance;
   private final InvocationHandler finalHandler;
 
   public static final InvocationHandler UNSUPPORTED_OPERATION_HANDLER = new InvocationHandler() {
@@ -49,7 +50,12 @@ public class MaskProxy<T, U extends T> implements InvocationHandler {
 
   @SuppressWarnings("unchecked")
   public T asProxyInstance() {
-    return (T) Proxy.newProxyInstance(iface.getClassLoader(), new Class[] {iface}, this);
+    if (this.proxyInstance == null) {
+      this.proxyInstance =
+          (T) Proxy.newProxyInstance(iface.getClassLoader(), new Class[] {iface}, this);
+    }
+
+    return this.proxyInstance;
   }
 
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {

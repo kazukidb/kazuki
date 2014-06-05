@@ -15,33 +15,36 @@
 package io.kazuki.v0.store.guice.impl;
 
 import io.kazuki.v0.internal.helper.LockManager;
-import io.kazuki.v0.store.journal.JournalStore;
-import io.kazuki.v0.store.journal.PartitionedJournalStore;
-import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.internal.helper.LockManagerImpl;
 import io.kazuki.v0.store.management.ComponentRegistrar;
-import io.kazuki.v0.store.sequence.SequenceService;
 
-import javax.sql.DataSource;
-
+import com.google.common.base.Preconditions;
 import com.google.inject.Key;
-import com.google.inject.Scopes;
+import com.google.inject.PrivateModule;
 import com.google.inject.name.Names;
 
+public class LockManagerModuleImpl extends PrivateModule {
+  private final String name;
+  private final Key<ComponentRegistrar> registrarKey;
 
-public class JournalStoreModulePartitionedImpl extends KeyValueStoreModuleJdbiH2Impl {
-  public JournalStoreModulePartitionedImpl(String name, Key<ComponentRegistrar> registrarKey,
-      Key<Lifecycle> lifecycleKey, Key<LockManager> lockManagerKey, Key<DataSource> dataSourceKey,
-      Key<SequenceService> sequenceServiceKey) {
-    super(name, registrarKey, lifecycleKey, lockManagerKey, dataSourceKey, sequenceServiceKey);
-  }
+  public LockManagerModuleImpl(String name, Key<ComponentRegistrar> registrarKey) {
+    Preconditions.checkNotNull(name, "name");
+    Preconditions.checkNotNull(registrarKey, "registrarKey");
 
-  protected void includeInternal() {
-    bind(JournalStore.class).annotatedWith(Names.named(name)).to(PartitionedJournalStore.class)
-        .in(Scopes.SINGLETON);
+    this.name = name;
+    this.registrarKey = registrarKey;
   }
 
   @Override
-  protected void includeExposures() {
-    expose(Key.get(JournalStore.class, Names.named(name)));
+  protected void configure() {
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
+
+    bind(ComponentRegistrar.class).to(registrarKey);
+
+    Key<LockManager> lockManagerKey = Key.get(LockManager.class, Names.named(name));
+
+    bind(lockManagerKey).toInstance(new LockManagerImpl(name));
+    expose(lockManagerKey);
   }
 }

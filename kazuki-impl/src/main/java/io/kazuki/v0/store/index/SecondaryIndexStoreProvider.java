@@ -18,11 +18,13 @@ import io.kazuki.v0.internal.availability.AvailabilityManager;
 import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
+import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.sequence.SequenceService;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.IDBI;
 
@@ -36,18 +38,20 @@ public class SecondaryIndexStoreProvider implements Provider<SecondaryIndexSuppo
 
   @Inject
   public SecondaryIndexStoreProvider(KeyValueStoreConfiguration kvConfig,
-      AvailabilityManager availability, LockManager lockManager, IDBI database,
-      SequenceService sequences, SchemaStore schemaStore, KeyValueStore kvStore,
-      SecondaryIndexTableHelper tableHelper, Injector injector) {
+      AvailabilityManager availability, LockManager lockManager,
+      KazukiComponent<DataSource> dataSource, IDBI database, SequenceService sequences,
+      SchemaStore schemaStore, KeyValueStore kvStore, SecondaryIndexTableHelper tableHelper,
+      Injector injector) {
     this.inject = injector;
 
     if (kvConfig.isSecondaryIndex()) {
       this.instance =
-          new SecondaryIndexStoreJdbiImpl(availability, lockManager, database, sequences,
-              schemaStore, kvStore, tableHelper, kvConfig.getGroupName(), kvConfig.getStoreName(),
-              kvConfig.getPartitionName());
+          new SecondaryIndexStoreJdbiImpl(availability, lockManager, dataSource, database,
+              sequences, schemaStore, kvStore, tableHelper, kvConfig.getGroupName(),
+              kvConfig.getStoreName(), kvConfig.getPartitionName());
     } else {
-      this.instance = new SecondaryIndexStoreBruteForceImpl(sequences, kvStore, schemaStore);
+      this.instance =
+          new SecondaryIndexStoreBruteForceImpl(kvConfig, sequences, kvStore, schemaStore);
     }
 
     this.inject.injectMembers(instance);

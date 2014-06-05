@@ -14,11 +14,37 @@
  */
 package io.kazuki.v0.internal.helper;
 
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.collect.ImmutableList;
 
-public class LockManagerImpl implements LockManager {
+
+public class LockManagerImpl implements LockManager, KazukiComponent<LockManager> {
   private final ReentrantLock lock = new ReentrantLock();
+  private final String name;
+  private final ComponentDescriptor<LockManager> componentDescriptor;
+
+  public LockManagerImpl(String name) {
+    this.name = name;
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<LockManager>("KZ:LockManager:" + this.name, LockManager.class,
+            (LockManager) this, new ImmutableList.Builder().build());
+  }
+
+  @Override
+  public ComponentDescriptor<LockManager> getComponentDescriptor() {
+    return this.componentDescriptor;
+  }
+
+  @Override
+  public void registerAsComponent(ComponentRegistrar manager) {
+    manager.register(this.componentDescriptor);
+  }
 
   @Override
   public LockManagerImpl acquire() {
