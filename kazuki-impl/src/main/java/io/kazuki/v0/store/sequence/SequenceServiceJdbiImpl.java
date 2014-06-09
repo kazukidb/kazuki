@@ -27,6 +27,10 @@ import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
 
 import java.util.Collections;
 import java.util.Map;
@@ -35,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
@@ -43,9 +48,14 @@ import org.skife.jdbi.v2.TransactionStatus;
 import org.slf4j.Logger;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 
 
-public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegistration {
+public class SequenceServiceJdbiImpl
+    implements
+      SequenceService,
+      LifecycleRegistration,
+      KazukiComponent<SequenceService> {
   public static final long DEFAULT_INCREMENT_BLOCK_SIZE = 100000L;
 
   private final Logger log = LogTranslation.getLogger(getClass());
@@ -57,27 +67,37 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
   protected final SqlTypeHelper typeHelper;
   protected final AvailabilityManager availabilityManager;
   protected final LockManager lockManager;
-  protected final IDBI dataSource;
+  protected final IDBI idbi;
   protected final long incrementBlockSize;
+  protected final ComponentDescriptor<SequenceService> componentDescriptor;
   protected volatile Lifecycle lifecycle;
 
   @Inject
   public SequenceServiceJdbiImpl(SequenceServiceConfiguration sequenceConfiguration,
       AvailabilityManager availabilityManager, LockManager lockManager,
-      SequenceHelper sequenceHelper, IDBI dataSource, SqlTypeHelper typeHelper) {
-    this(sequenceHelper, availabilityManager, lockManager, dataSource, typeHelper,
+      SequenceHelper sequenceHelper, KazukiComponent<DataSource> dataSource, IDBI idbi,
+      SqlTypeHelper typeHelper) {
+    this(sequenceHelper, availabilityManager, lockManager, dataSource, idbi, typeHelper,
         sequenceConfiguration.getGroupName(), sequenceConfiguration.getStoreName(),
         sequenceConfiguration.getIncrementBlockSize());
   }
 
   public SequenceServiceJdbiImpl(SequenceHelper sequenceHelper,
-      AvailabilityManager availabilityManager, LockManager lockManager, IDBI dataSource,
-      SqlTypeHelper typeHelper, String groupName, String storeName, Long incrementBlockSize) {
+      AvailabilityManager availabilityManager, LockManager lockManager,
+      KazukiComponent<DataSource> dataSource, IDBI idbi, SqlTypeHelper typeHelper,
+      String groupName, String storeName, Long incrementBlockSize) {
     this.sequenceHelper = sequenceHelper;
     this.availabilityManager = availabilityManager;
     this.lockManager = lockManager;
-    this.dataSource = dataSource;
+    this.idbi = idbi;
     this.typeHelper = typeHelper;
+
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<SequenceService>("KZ:SequenceService:" + groupName + "-"
+            + storeName, SequenceService.class, (SequenceService) this, new ImmutableList.Builder()
+            .add(((KazukiComponent) lockManager).getComponentDescriptor(),
+                dataSource.getComponentDescriptor()).build());
+
     this.incrementBlockSize =
         incrementBlockSize != null ? incrementBlockSize : DEFAULT_INCREMENT_BLOCK_SIZE;
   }
@@ -104,13 +124,23 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     });
   }
 
+  @Override
+  public ComponentDescriptor<SequenceService> getComponentDescriptor() {
+    return componentDescriptor;
+  }
+
+  @Inject
+  public void registerAsComponent(ComponentRegistrar registrar) {
+    registrar.register(this.componentDescriptor);
+  }
+
   public void initialize() {
     log.debug("Initializing Sequence Service {}", this);
 
     availabilityManager.setAvailable(false);
 
     try (LockManager toRelease = lockManager.acquire()) {
-      dataSource.inTransaction(new TransactionCallback<Void>() {
+      idbi.inTransaction(new TransactionCallback<Void>() {
         @Override
         public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
           JDBIHelper.getBoundStatement(handle, sequenceHelper.getDbPrefix(),
@@ -156,7 +186,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     availabilityManager.setAvailable(false);
 
     try (LockManager toRelease = lockManager.acquire()) {
-      dataSource.inTransaction(new TransactionCallback<Void>() {
+      idbi.inTransaction(new TransactionCallback<Void>() {
         @Override
         public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
           for (Counter counter : SequenceServiceJdbiImpl.this.counters.values()) {
@@ -267,7 +297,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
       availabilityManager.assertAvailable();
 
-      Integer result = dataSource.inTransaction(new TransactionCallback<Integer>() {
+      Integer result = idbi.inTransaction(new TransactionCallback<Integer>() {
         @Override
         public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
           return sequenceHelper.validateType(handle, typeCodes, typeNames, type, create);
@@ -290,7 +320,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
     availabilityManager.assertAvailable();
 
     try (LockManager toRelease = lockManager.acquire()) {
-      return dataSource.inTransaction(new TransactionCallback<String>() {
+      return idbi.inTransaction(new TransactionCallback<String>() {
         @Override
         public String inTransaction(Handle handle, TransactionStatus status) throws Exception {
           try {
@@ -330,7 +360,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
               SequenceServiceJdbiImpl.this.counters.clear();
             }
 
-            dataSource.inTransaction(new TransactionCallback<Void>() {
+            idbi.inTransaction(new TransactionCallback<Void>() {
               @Override
               public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
                 if (!preserveCounters) {
@@ -377,7 +407,7 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
         return;
       }
 
-      dataSource.inTransaction(new TransactionCallback<Void>() {
+      idbi.inTransaction(new TransactionCallback<Void>() {
         @Override
         public Void inTransaction(Handle handle, TransactionStatus status) throws Exception {
           SequenceServiceJdbiImpl.this.sequenceHelper.setNextId(handle, typeId, 0L);
@@ -395,14 +425,14 @@ public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegist
 
   private Counter createCounter(final String type) {
     try (LockManager toRelease = lockManager.acquire()) {
-      final int typeId = this.dataSource.inTransaction(new TransactionCallback<Integer>() {
+      final int typeId = this.idbi.inTransaction(new TransactionCallback<Integer>() {
         @Override
         public Integer inTransaction(Handle handle, TransactionStatus status) throws Exception {
           return sequenceHelper.validateType(handle, typeCodes, typeNames, type, true);
         }
       });
 
-      long nextBase = this.dataSource.inTransaction(new TransactionCallback<Long>() {
+      long nextBase = this.idbi.inTransaction(new TransactionCallback<Long>() {
         @Override
         public Long inTransaction(Handle handle, TransactionStatus status) throws Exception {
           return sequenceHelper.getNextId(handle, typeId, incrementBlockSize);

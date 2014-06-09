@@ -20,6 +20,8 @@ import io.kazuki.v0.internal.helper.LockManager;
 import io.kazuki.v0.internal.helper.SqlTypeHelper;
 import io.kazuki.v0.store.jdbi.IdbiProvider;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.sequence.SequenceHelper;
 import io.kazuki.v0.store.sequence.SequenceService;
 import io.kazuki.v0.store.sequence.SequenceServiceConfiguration;
@@ -34,22 +36,26 @@ import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
 import com.google.inject.Scopes;
+import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 
 public class SequenceServiceModuleJdbiH2Impl extends PrivateModule {
   private final String name;
+  private final Key<ComponentRegistrar> registrarKey;
   private final Key<Lifecycle> lifecycleKey;
   private final Key<DataSource> dataSourceKey;
   private final Key<LockManager> lockManagerKey;
 
-  public SequenceServiceModuleJdbiH2Impl(String name, Key<Lifecycle> lifecycleKey,
-      Key<DataSource> dataSourceKey, Key<LockManager> lockManagerKey) {
+  public SequenceServiceModuleJdbiH2Impl(String name, Key<ComponentRegistrar> registrarKey,
+      Key<Lifecycle> lifecycleKey, Key<DataSource> dataSourceKey, Key<LockManager> lockManagerKey) {
     Preconditions.checkNotNull(name, "name");
+    Preconditions.checkNotNull(registrarKey, "registrarKey");
     Preconditions.checkNotNull(lifecycleKey, "lifecycleKey");
     Preconditions.checkNotNull(dataSourceKey, "dataSourceKey");
     Preconditions.checkNotNull(lockManagerKey, "lockManagerKey");
 
     this.name = name;
+    this.registrarKey = registrarKey;
     this.lifecycleKey = lifecycleKey;
     this.dataSourceKey = dataSourceKey;
     this.lockManagerKey = lockManagerKey;
@@ -60,9 +66,16 @@ public class SequenceServiceModuleJdbiH2Impl extends PrivateModule {
     // TODO: re-enable ASAP
     // binder().requireExplicitBindings();
 
+    bind(ComponentRegistrar.class).to(registrarKey);
     bind(Lifecycle.class).to(lifecycleKey);
 
     Provider<DataSource> provider = binder().getProvider(dataSourceKey);
+
+    Key<KazukiComponent<DataSource>> kcKey =
+        Key.get(new TypeLiteral<KazukiComponent<DataSource>>() {});
+    Key<KazukiComponent<DataSource>> kcKeyNamed =
+        Key.get(new TypeLiteral<KazukiComponent<DataSource>>() {}, Names.named(name));
+    bind(kcKey).to(kcKeyNamed);
 
     bind(IDBI.class).toProvider(new IdbiProvider(SequenceService.class, provider)).in(
         Scopes.SINGLETON);

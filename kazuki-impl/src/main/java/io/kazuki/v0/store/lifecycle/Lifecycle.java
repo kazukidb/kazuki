@@ -15,6 +15,10 @@
 package io.kazuki.v0.store.lifecycle;
 
 import io.kazuki.v0.internal.helper.LogTranslation;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -25,13 +29,15 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.slf4j.Logger;
 
+import com.google.common.collect.ImmutableList;
+
 
 /**
  * The Lifecycle is a singleton instance (as hopefully enforced by the DI container) through which
  * application lifecycle is controlled. This Lifecycle instance is used by a controller object in
  * the app that invokes Lifecycle methods to inform components of application state changes.
  */
-public class Lifecycle {
+public class Lifecycle implements KazukiComponent<Lifecycle> {
   private final Logger log = LogTranslation.getLogger(getClass());
 
   private static final EnumSet<LifecycleEvent> reverseOrder = EnumSet.of(LifecycleEvent.UNANNOUNCE,
@@ -44,8 +50,13 @@ public class Lifecycle {
 
   private final String name;
 
+  private final ComponentDescriptor<Lifecycle> componentDescriptor;
+
   public Lifecycle(String name) {
     this.name = name;
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<Lifecycle>("KZ:Lifecycle:" + name, Lifecycle.class, this,
+            new ImmutableList.Builder().build());
   }
 
   /** Registers a listener with the lifecycle, thus 'subscribing' to events */
@@ -53,6 +64,16 @@ public class Lifecycle {
     log.debug("Registering Lifecycle listener {}", listener);
 
     listeners.add(listener);
+  }
+
+  @Override
+  public ComponentDescriptor<Lifecycle> getComponentDescriptor() {
+    return this.componentDescriptor;
+  }
+
+  @Override
+  public void registerAsComponent(ComponentRegistrar manager) {
+    manager.register(this.componentDescriptor);
   }
 
   /**
