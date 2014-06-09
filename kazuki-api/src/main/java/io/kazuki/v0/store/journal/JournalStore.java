@@ -19,11 +19,12 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
+import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.schema.TypeValidation;
 
 import javax.annotation.Nullable;
 
-public interface JournalStore {
+public interface JournalStore extends KazukiComponent<JournalStore> {
   void initialize() throws KazukiException;
 
   <T> Key append(String type, Class<T> clazz, T inValue, TypeValidation typeSafety)

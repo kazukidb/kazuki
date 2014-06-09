@@ -15,8 +15,10 @@
 package io.kazuki.v0.store.guice.impl;
 
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentRegistrar;
 
 import com.google.common.base.Preconditions;
+import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.name.Names;
 
@@ -26,16 +28,20 @@ import com.google.inject.name.Names;
  */
 public class LifecycleModuleDefaultImpl extends PrivateModule {
   private final String name;
+  private final Key<ComponentRegistrar> registrarKey;
 
-  public LifecycleModuleDefaultImpl(String name) {
+  public LifecycleModuleDefaultImpl(String name, Key<ComponentRegistrar> registrarKey) {
     Preconditions.checkNotNull(name, "name");
     this.name = name;
+    this.registrarKey = registrarKey;
   }
 
   @Override
   protected void configure() {
     // TODO: re-enable ASAP
     // binder().requireExplicitBindings();
+
+    bind(ComponentRegistrar.class).to(registrarKey);
 
     bind(Lifecycle.class).annotatedWith(Names.named(name)).toInstance(new Lifecycle(this.name));
     expose(Lifecycle.class).annotatedWith(Names.named(name));

@@ -17,6 +17,7 @@ package io.kazuki.v0.store.keyvalue;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.Version;
+import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.ResolvedKey;
 
@@ -25,7 +26,7 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-public interface KeyValueStore {
+public interface KeyValueStore extends KazukiComponent<KeyValueStore> {
   void initialize();
 
   Key parseKey(String keyString) throws KazukiException;

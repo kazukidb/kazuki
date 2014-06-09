@@ -34,13 +34,19 @@ import io.kazuki.v0.store.keyvalue.KeyValueIterator;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.KazukiManager;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.sequence.KeyImpl;
 
 import java.io.File;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.hamcrest.Matchers;
+import org.junit.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -102,6 +108,23 @@ public class PartitionedJournalStoreSmokeTest extends TestSupport {
 
   @Test(singleThreaded = true)
   public void testDemo() throws Exception {
+    KazukiManager kzManager =
+        inject.getBinding(com.google.inject.Key.get(KazukiManager.class, Names.named("foo")))
+            .getProvider().get();
+
+    Map<Class, Object> components = new LinkedHashMap<Class, Object>();
+
+    for (ComponentDescriptor desc : kzManager.getComponents()) {
+      components.put(desc.getClazz(), desc.getInstance());
+    }
+
+    Assert.assertEquals(components.get(Lifecycle.class), ((KazukiComponent) lifecycle)
+        .getComponentDescriptor().getInstance());
+    Assert.assertEquals(components.get(JournalStore.class), ((KazukiComponent) journal)
+        .getComponentDescriptor().getInstance());
+    Assert.assertEquals(components.get(SchemaStore.class), ((KazukiComponent) manager)
+        .getComponentDescriptor().getInstance());
+
     assertThat(manager.retrieveSchema("foo"), Matchers.nullValue());
     assertThat(journal.getAllPartitions().iterator(), isEmptyIter());
 

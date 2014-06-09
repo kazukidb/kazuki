@@ -21,6 +21,8 @@ import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
 
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.inject.Inject;
+
 import com.google.common.collect.ImmutableList;
 
 
@@ -42,6 +44,7 @@ public class LockManagerImpl implements LockManager, KazukiComponent<LockManager
   }
 
   @Override
+  @Inject
   public void registerAsComponent(ComponentRegistrar manager) {
     manager.register(this.componentDescriptor);
   }

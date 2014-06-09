@@ -24,6 +24,7 @@ import io.kazuki.v0.store.management.ComponentDescriptor;
 import io.kazuki.v0.store.management.ComponentRegistrar;
 import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 
 import javax.inject.Inject;
 import javax.sql.DataSource;
@@ -91,7 +92,12 @@ public class DataSourceModuleH2Impl extends PrivateModule {
       this.componentDescriptor =
           new ComponentDescriptorImpl<DataSource>("KZ:DataSource:" + config.getJdbcUrl(),
               DataSource.class, (DataSource) instance.asProxyInstance(),
-              new ImmutableList.Builder().build());
+              new ImmutableList.Builder().add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+                @Override
+                public KazukiComponent<Lifecycle> get() {
+                  return (KazukiComponent<Lifecycle>) H2DataSourceProvider.this.lifecycle;
+                }
+              })).build());
     }
 
     @Override

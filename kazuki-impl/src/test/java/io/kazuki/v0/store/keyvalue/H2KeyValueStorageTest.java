@@ -22,10 +22,14 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.KazukiManager;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Schema;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.junit.Assert;
@@ -65,6 +69,23 @@ public class H2KeyValueStorageTest extends TestSupport {
     lifecycle.shutdown();
     lifecycle.init();
     lifecycle.start();
+
+    KazukiManager kzManager =
+        inject.getBinding(com.google.inject.Key.get(KazukiManager.class, Names.named("foo")))
+            .getProvider().get();
+
+    Map<Class, Object> components = new LinkedHashMap<Class, Object>();
+
+    for (ComponentDescriptor desc : kzManager.getComponents()) {
+      components.put(desc.getClazz(), desc.getInstance());
+    }
+
+    Assert.assertEquals(components.get(Lifecycle.class), ((KazukiComponent) lifecycle)
+        .getComponentDescriptor().getInstance());
+    Assert.assertEquals(components.get(KeyValueStore.class), ((KazukiComponent) store)
+        .getComponentDescriptor().getInstance());
+    Assert.assertEquals(components.get(SchemaStore.class), ((KazukiComponent) manager)
+        .getComponentDescriptor().getInstance());
 
     Assert.assertFalse(store.iterators().iterator("$schema", Schema.class, SortDirection.ASCENDING)
         .hasNext());

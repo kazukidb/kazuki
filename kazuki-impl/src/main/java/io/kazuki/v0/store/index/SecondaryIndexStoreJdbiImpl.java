@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.Handle;
@@ -70,12 +71,8 @@ import org.slf4j.Logger;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.inject.Inject;
 
-public class SecondaryIndexStoreJdbiImpl
-    implements
-      SecondaryIndexSupport,
-      KazukiComponent<SecondaryIndexStore> {
+public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final Logger log = LogTranslation.getLogger(getClass());
 
   private final AvailabilityManager availability;
@@ -123,6 +120,7 @@ public class SecondaryIndexStoreJdbiImpl
   }
 
   @Override
+  @Inject
   public void registerAsComponent(ComponentRegistrar manager) {
     manager.register(this.componentDescriptor);
   }

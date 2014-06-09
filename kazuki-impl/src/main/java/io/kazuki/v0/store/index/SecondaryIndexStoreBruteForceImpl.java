@@ -60,10 +60,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
-public class SecondaryIndexStoreBruteForceImpl
-    implements
-      SecondaryIndexSupport,
-      KazukiComponent<SecondaryIndexStore> {
+public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport {
   private final SequenceService sequenceService;
   private final KeyValueStore kvStore;
   private final SchemaStore schemaStore;

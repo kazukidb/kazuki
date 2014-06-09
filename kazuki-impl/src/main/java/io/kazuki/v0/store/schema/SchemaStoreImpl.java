@@ -44,11 +44,7 @@ import org.slf4j.Logger;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 
-public class SchemaStoreImpl
-    implements
-      SchemaStore,
-      SchemaStoreRegistration,
-      KazukiComponent<SchemaStore> {
+public class SchemaStoreImpl implements SchemaStore, SchemaStoreRegistration {
   public static final String SCHEMA_PREFIX = "$schema";
 
   private final Logger log = LogTranslation.getLogger(getClass());
@@ -95,6 +91,7 @@ public class SchemaStoreImpl
   }
 
   @Override
+  @Inject
   public void registerAsComponent(ComponentRegistrar manager) {
     manager.register(this.componentDescriptor);
   }

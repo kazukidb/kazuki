@@ -24,6 +24,8 @@ import io.kazuki.v0.store.management.ComponentDescriptor;
 import io.kazuki.v0.store.management.ComponentRegistrar;
 import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
+import io.kazuki.v0.store.sequence.SequenceServiceJdbiImpl;
 
 import javax.inject.Inject;
 import javax.sql.DataSource;
@@ -39,12 +41,14 @@ import com.jolbox.bonecp.BoneCPDataSource;
 
 public class DataSourceModuleBoneCpImpl extends PrivateModule {
   private final String name;
+  private final Key<ComponentRegistrar> registrarKey;
   private final Key<Lifecycle> lifecycleKey;
   private final Key<JdbiDataSourceConfiguration> configKey;
 
-  public DataSourceModuleBoneCpImpl(String name, Key<Lifecycle> lifecycleKey,
-      Key<JdbiDataSourceConfiguration> configKey) {
+  public DataSourceModuleBoneCpImpl(String name, Key<ComponentRegistrar> registrarKey,
+      Key<Lifecycle> lifecycleKey, Key<JdbiDataSourceConfiguration> configKey) {
     this.name = name;
+    this.registrarKey = registrarKey;
     this.lifecycleKey = lifecycleKey;
     this.configKey = configKey;
   }
@@ -54,9 +58,10 @@ public class DataSourceModuleBoneCpImpl extends PrivateModule {
     // TODO: re-enable ASAP
     // binder().requireExplicitBindings();
 
-    bind(JdbiDataSourceConfiguration.class).to(configKey);
+    bind(ComponentRegistrar.class).to(registrarKey);
     bind(Lifecycle.class).to(lifecycleKey);
 
+    bind(JdbiDataSourceConfiguration.class).to(configKey);
     Key<DataSource> dsKey = Key.get(DataSource.class, Names.named(name));
 
     bind(dsKey).toProvider(BoneCPDataSourceProvider.class).in(Scopes.SINGLETON);
@@ -80,7 +85,12 @@ public class DataSourceModuleBoneCpImpl extends PrivateModule {
       this.componentDescriptor =
           new ComponentDescriptorImpl<DataSource>("KZ:DataSource:" + config.getJdbcUrl(),
               DataSource.class, (DataSource) instance.asProxyInstance(),
-              new ImmutableList.Builder().build());
+              new ImmutableList.Builder().add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+                @Override
+                public KazukiComponent<Lifecycle> get() {
+                  return (KazukiComponent<Lifecycle>) BoneCPDataSourceProvider.this.lifecycle;
+                }
+              })).build());
     }
 
     @Override

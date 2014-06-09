@@ -34,6 +34,7 @@ import io.kazuki.v0.store.management.ComponentDescriptor;
 import io.kazuki.v0.store.management.ComponentRegistrar;
 import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Attribute;
@@ -64,11 +65,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Provider;
 
-public class PartitionedJournalStore
-    implements
-      JournalStore,
-      LifecycleRegistration,
-      KazukiComponent<JournalStore> {
+public class PartitionedJournalStore implements JournalStore, LifecycleRegistration {
   private final Logger log = LogTranslation.getLogger(getClass());
   private final AvailabilityManager availability;
   private final LockManager lockManager;
@@ -126,7 +123,12 @@ public class PartitionedJournalStore
     this.componentDescriptor =
         new ComponentDescriptorImpl<JournalStore>("KZ:JournalStore:" + groupName + "-" + storeName,
             JournalStore.class, (JournalStore) this, new ImmutableList.Builder().add(
-                ((KazukiComponent) lockManager).getComponentDescriptor(),
+                (new LateBindingComponentDescriptorImpl<Lifecycle>() {
+                  @Override
+                  public KazukiComponent<Lifecycle> get() {
+                    return (KazukiComponent<Lifecycle>) PartitionedJournalStore.this.lifecycle;
+                  }
+                }), ((KazukiComponent) lockManager).getComponentDescriptor(),
                 dataSource.getComponentDescriptor(),
                 ((KazukiComponent) sequence).getComponentDescriptor(),
                 ((KazukiComponent) schema).getComponentDescriptor()).build());
@@ -160,6 +162,7 @@ public class PartitionedJournalStore
   }
 
   @Override
+  @Inject
   public void registerAsComponent(ComponentRegistrar manager) {
     manager.register(this.componentDescriptor);
   }

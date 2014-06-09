@@ -18,6 +18,7 @@ import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.index.query.QueryTerm;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
+import io.kazuki.v0.store.management.KazukiComponent;
 
 import java.util.Collection;
 import java.util.List;
@@ -25,7 +26,7 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-public interface SecondaryIndexStore {
+public interface SecondaryIndexStore extends KazukiComponent<SecondaryIndexStore> {
   <T> QueryResultsPage<T> queryWithPagination(String type, Class<T> clazz, String indexName,
       String queryString, SortDirection sortDirection, @Nullable Boolean loadResults,
       @Nullable PageToken token, @Nullable Long limit);

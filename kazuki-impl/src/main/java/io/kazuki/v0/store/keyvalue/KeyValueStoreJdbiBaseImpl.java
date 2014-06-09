@@ -33,6 +33,7 @@ import io.kazuki.v0.store.management.ComponentDescriptor;
 import io.kazuki.v0.store.management.ComponentRegistrar;
 import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Schema;
@@ -78,8 +79,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
     implements
       KeyValueStore,
       KeyValueStoreIteration,
-      KeyValueStoreRegistration,
-      KazukiComponent<KeyValueStore> {
+      KeyValueStoreRegistration {
   public static int MULTIGET_MAX_KEYS = 3000;
 
   protected final Logger log = LogTranslation.getLogger(getClass());
@@ -108,6 +108,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
   protected final ComponentDescriptor<KeyValueStore> componentDescriptor;
 
+  protected volatile Lifecycle lifecycle;
+
   public KeyValueStoreJdbiBaseImpl(AvailabilityManager availability, LockManager lockManager,
       KazukiComponent<DataSource> dataSource, IDBI database, SqlTypeHelper typeHelper,
       SchemaStore schemaService, SequenceService sequences, String groupName, String storeName,
@@ -125,8 +127,12 @@ public abstract class KeyValueStoreJdbiBaseImpl
     this.componentDescriptor =
         new ComponentDescriptorImpl<KeyValueStore>("KZ:KeyValueStore:" + groupName + "-"
             + storeName + "-" + partitionName, KeyValueStore.class, (KeyValueStore) this,
-            new ImmutableList.Builder().add(
-                ((KazukiComponent) this.lockManager).getComponentDescriptor(),
+            new ImmutableList.Builder().add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+              @Override
+              public KazukiComponent<Lifecycle> get() {
+                return (KazukiComponent<Lifecycle>) KeyValueStoreJdbiBaseImpl.this.lifecycle;
+              }
+            }), ((KazukiComponent) this.lockManager).getComponentDescriptor(),
                 this.dataSource.getComponentDescriptor(),
                 ((KazukiComponent) this.sequences).getComponentDescriptor(),
                 ((KazukiComponent) this.schemaService).getComponentDescriptor()).build());
@@ -134,6 +140,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
   @Inject
   public void register(Lifecycle lifecycle) {
+    this.lifecycle = lifecycle;
+
     lifecycle.register(new LifecycleSupportBase() {
       @Override
       public void init() {
@@ -158,6 +166,7 @@ public abstract class KeyValueStoreJdbiBaseImpl
   }
 
   @Override
+  @Inject
   public void registerAsComponent(ComponentRegistrar manager) {
     manager.register(this.componentDescriptor);
   }

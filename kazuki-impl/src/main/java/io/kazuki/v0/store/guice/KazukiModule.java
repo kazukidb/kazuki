@@ -97,7 +97,7 @@ public class KazukiModule extends AbstractModule {
     }
 
     // install Lifecycle
-    install(new LifecycleModuleDefaultImpl(name));
+    install(new LifecycleModuleDefaultImpl(name, registrarKey));
 
     // bind lock manager
     install(new LockManagerModuleImpl(name, registrarKey));

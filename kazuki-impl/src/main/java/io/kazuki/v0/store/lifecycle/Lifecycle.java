@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import javax.inject.Inject;
+
 import org.slf4j.Logger;
 
 import com.google.common.collect.ImmutableList;
@@ -72,6 +74,7 @@ public class Lifecycle implements KazukiComponent<Lifecycle> {
   }
 
   @Override
+  @Inject
   public void registerAsComponent(ComponentRegistrar manager) {
     manager.register(this.componentDescriptor);
   }

@@ -31,6 +31,7 @@ import io.kazuki.v0.store.management.ComponentDescriptor;
 import io.kazuki.v0.store.management.ComponentRegistrar;
 import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 
 import java.util.Collections;
 import java.util.Map;
@@ -51,11 +52,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 
 
-public class SequenceServiceJdbiImpl
-    implements
-      SequenceService,
-      LifecycleRegistration,
-      KazukiComponent<SequenceService> {
+public class SequenceServiceJdbiImpl implements SequenceService, LifecycleRegistration {
   public static final long DEFAULT_INCREMENT_BLOCK_SIZE = 100000L;
 
   private final Logger log = LogTranslation.getLogger(getClass());
@@ -95,7 +92,12 @@ public class SequenceServiceJdbiImpl
     this.componentDescriptor =
         new ComponentDescriptorImpl<SequenceService>("KZ:SequenceService:" + groupName + "-"
             + storeName, SequenceService.class, (SequenceService) this, new ImmutableList.Builder()
-            .add(((KazukiComponent) lockManager).getComponentDescriptor(),
+            .add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+              @Override
+              public KazukiComponent<Lifecycle> get() {
+                return (KazukiComponent<Lifecycle>) SequenceServiceJdbiImpl.this.lifecycle;
+              }
+            }), ((KazukiComponent) lockManager).getComponentDescriptor(),
                 dataSource.getComponentDescriptor()).build());
 
     this.incrementBlockSize =
@@ -129,6 +131,7 @@ public class SequenceServiceJdbiImpl
     return componentDescriptor;
   }
 
+  @Override
   @Inject
   public void registerAsComponent(ComponentRegistrar registrar) {
     registrar.register(this.componentDescriptor);

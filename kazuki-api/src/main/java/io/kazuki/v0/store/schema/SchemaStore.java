@@ -16,9 +16,10 @@ package io.kazuki.v0.store.schema;
 
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
+import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.schema.model.Schema;
 
-public interface SchemaStore {
+public interface SchemaStore extends KazukiComponent<SchemaStore> {
   Key createSchema(String type, Schema value) throws KazukiException;
 
   Schema retrieveSchema(String type) throws KazukiException;
