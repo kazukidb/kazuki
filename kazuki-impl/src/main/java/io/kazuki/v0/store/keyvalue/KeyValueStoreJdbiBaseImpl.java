@@ -29,6 +29,11 @@ import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteratorJdbiImpl.KeyValueIterableJdbiImpl;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Schema;
@@ -49,6 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.sql.DataSource;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -63,6 +69,7 @@ import org.slf4j.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 
 
 /**
@@ -78,6 +85,8 @@ public abstract class KeyValueStoreJdbiBaseImpl
   protected final Logger log = LogTranslation.getLogger(getClass());
 
   protected final AvailabilityManager availability;
+
+  protected final KazukiComponent<DataSource> dataSource;
 
   protected final IDBI database;
 
@@ -97,21 +106,42 @@ public abstract class KeyValueStoreJdbiBaseImpl
 
   protected final String tableName;
 
+  protected final ComponentDescriptor<KeyValueStore> componentDescriptor;
+
+  protected volatile Lifecycle lifecycle;
+
   public KeyValueStoreJdbiBaseImpl(AvailabilityManager availability, LockManager lockManager,
-      IDBI database, SqlTypeHelper typeHelper, SchemaStore schemaService,
-      SequenceService sequences, String groupName, String storeName, String partitionName) {
+      KazukiComponent<DataSource> dataSource, IDBI database, SqlTypeHelper typeHelper,
+      SchemaStore schemaService, SequenceService sequences, String groupName, String storeName,
+      String partitionName) {
     this.availability = availability;
     this.lockManager = lockManager;
+    this.dataSource = dataSource;
     this.database = database;
     this.schemaService = schemaService;
     this.sequences = sequences;
     this.typeHelper = typeHelper;
     this.kvListeners = new ArrayList<KeyValueStoreListener>();
     this.tableName = "_" + groupName + "_" + storeName + "__kv__" + partitionName;
+
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<KeyValueStore>("KZ:KeyValueStore:" + groupName + "-"
+            + storeName + "-" + partitionName, KeyValueStore.class, (KeyValueStore) this,
+            new ImmutableList.Builder().add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+              @Override
+              public KazukiComponent<Lifecycle> get() {
+                return (KazukiComponent<Lifecycle>) KeyValueStoreJdbiBaseImpl.this.lifecycle;
+              }
+            }), ((KazukiComponent) this.lockManager).getComponentDescriptor(),
+                this.dataSource.getComponentDescriptor(),
+                ((KazukiComponent) this.sequences).getComponentDescriptor(),
+                ((KazukiComponent) this.schemaService).getComponentDescriptor()).build());
   }
 
   @Inject
   public void register(Lifecycle lifecycle) {
+    this.lifecycle = lifecycle;
+
     lifecycle.register(new LifecycleSupportBase() {
       @Override
       public void init() {
@@ -128,6 +158,17 @@ public abstract class KeyValueStoreJdbiBaseImpl
   @Override
   public void addListener(KeyValueStoreListener listener) {
     this.kvListeners.add(listener);
+  }
+
+  @Override
+  public ComponentDescriptor<KeyValueStore> getComponentDescriptor() {
+    return this.componentDescriptor;
+  }
+
+  @Override
+  @Inject
+  public void registerAsComponent(ComponentRegistrar manager) {
+    manager.register(this.componentDescriptor);
   }
 
   @Override

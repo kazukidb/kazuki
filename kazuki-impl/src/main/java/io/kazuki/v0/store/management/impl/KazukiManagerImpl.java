@@ -12,23 +12,27 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.schema;
+package io.kazuki.v0.store.management.impl;
 
-import io.kazuki.v0.store.KazukiException;
-import io.kazuki.v0.store.Version;
-import io.kazuki.v0.store.keyvalue.KeyValuePair;
-import io.kazuki.v0.store.management.KazukiComponent;
-import io.kazuki.v0.store.schema.model.Schema;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiManager;
 
-public interface SchemaStore extends KazukiComponent<SchemaStore> {
-  KeyValuePair<Schema> retrieveSchema(String type) throws KazukiException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
-  Version createSchema(String type, Schema value) throws KazukiException;
+public class KazukiManagerImpl implements KazukiManager, ComponentRegistrar {
+  private final List<ComponentDescriptor> components = new ArrayList<ComponentDescriptor>();
 
-  Version updateSchema(final String type, final Version version, final Schema value)
-      throws KazukiException;
+  @Override
+  public Collection<ComponentDescriptor> getComponents() {
+    return Collections.unmodifiableList(this.components);
+  }
 
-  boolean deleteSchema(final String type, final Version version) throws KazukiException;
-
-  void clear() throws KazukiException;
+  @Override
+  public void register(ComponentDescriptor component) {
+    this.components.add(component);
+  }
 }

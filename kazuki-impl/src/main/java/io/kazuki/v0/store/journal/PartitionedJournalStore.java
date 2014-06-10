@@ -30,6 +30,11 @@ import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Impl;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.TypeValidation;
 import io.kazuki.v0.store.schema.model.Attribute;
@@ -50,6 +55,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.IDBI;
 import org.slf4j.Logger;
@@ -63,6 +69,7 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   private final Logger log = LogTranslation.getLogger(getClass());
   private final AvailabilityManager availability;
   private final LockManager lockManager;
+  private final KazukiComponent<DataSource> dataSource;
   private final IDBI database;
   private final SqlTypeHelper typeHelper;
   private final SequenceService sequence;
@@ -79,15 +86,26 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
   private final AtomicReference<KeyValueStore> activePartitionStore;
   private final AtomicReference<PartitionInfoImpl> activePartitionInfo;
   private volatile Lifecycle lifecycle;
+  private final ComponentDescriptor<JournalStore> componentDescriptor;
+
+  @Inject
+  public PartitionedJournalStore(AvailabilityManager availability, LockManager lockManager,
+      KazukiComponent<DataSource> dataSource, IDBI database, SqlTypeHelper typeHelper,
+      SchemaStore schema, SequenceService sequence, KeyValueStoreConfiguration config) {
+    this(availability, lockManager, dataSource, database, typeHelper, schema, sequence, config
+        .getDbType(), config.getGroupName(), config.getStoreName(), config.getPartitionSize(),
+        config.getDataType(), config.isStrictTypeCreation());
+  }
 
   public PartitionedJournalStore(AvailabilityManager availability, LockManager lockManager,
-      IDBI database, SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
-      String dbType, String groupName, String storeName, Long partitionSize, String dataType,
-      boolean strictTypeCreation) {
+      KazukiComponent<DataSource> dataSource, IDBI database, SqlTypeHelper typeHelper,
+      SchemaStore schema, SequenceService sequence, String dbType, String groupName,
+      String storeName, Long partitionSize, String dataType, boolean strictTypeCreation) {
     Preconditions.checkNotNull(dataType, "dataType");
 
     this.availability = availability;
     this.lockManager = lockManager;
+    this.dataSource = dataSource;
     this.database = database;
     this.typeHelper = typeHelper;
     this.schema = schema;
@@ -101,15 +119,19 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     this.typeName = "PartitionInfo-" + groupName + "-" + storeName;
     this.activePartitionInfo = new AtomicReference<PartitionInfoImpl>();
     this.activePartitionStore = new AtomicReference<KeyValueStore>();
-  }
 
-  @Inject
-  public PartitionedJournalStore(AvailabilityManager availability, LockManager lockManager,
-      IDBI database, SqlTypeHelper typeHelper, SchemaStore schema, SequenceService sequence,
-      KeyValueStoreConfiguration config) {
-    this(availability, lockManager, database, typeHelper, schema, sequence, config.getDbType(),
-        config.getGroupName(), config.getStoreName(), config.getPartitionSize(), config
-            .getDataType(), config.isStrictTypeCreation());
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<JournalStore>("KZ:JournalStore:" + groupName + "-" + storeName,
+            JournalStore.class, (JournalStore) this, new ImmutableList.Builder().add(
+                (new LateBindingComponentDescriptorImpl<Lifecycle>() {
+                  @Override
+                  public KazukiComponent<Lifecycle> get() {
+                    return (KazukiComponent<Lifecycle>) PartitionedJournalStore.this.lifecycle;
+                  }
+                }), ((KazukiComponent) lockManager).getComponentDescriptor(),
+                dataSource.getComponentDescriptor(),
+                ((KazukiComponent) sequence).getComponentDescriptor(),
+                ((KazukiComponent) schema).getComponentDescriptor()).build());
   }
 
   @Override
@@ -132,6 +154,17 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
         PartitionedJournalStore.this.initialize();
       }
     });
+  }
+
+  @Override
+  public ComponentDescriptor<JournalStore> getComponentDescriptor() {
+    return this.componentDescriptor;
+  }
+
+  @Override
+  @Inject
+  public void registerAsComponent(ComponentRegistrar manager) {
+    manager.register(this.componentDescriptor);
   }
 
   @Override
@@ -500,8 +533,8 @@ public class PartitionedJournalStore implements JournalStore, LifecycleRegistrat
     config.withStrictTypeCreation(this.strictTypeCreation);
 
     KeyValueStore keyValueStore =
-        new KeyValueStoreJdbiH2Impl(availability, lockManager, database, typeHelper, schema,
-            sequence, config.build());
+        new KeyValueStoreJdbiH2Impl(availability, lockManager, dataSource, database, typeHelper,
+            schema, sequence, config.build());
 
     if (initialize) {
       keyValueStore.initialize();

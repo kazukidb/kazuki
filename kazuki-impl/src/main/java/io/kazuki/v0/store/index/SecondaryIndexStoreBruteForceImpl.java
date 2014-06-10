@@ -25,8 +25,13 @@ import io.kazuki.v0.store.index.query.ValueType;
 import io.kazuki.v0.store.keyvalue.KeyValueIterable;
 import io.kazuki.v0.store.keyvalue.KeyValuePair;
 import io.kazuki.v0.store.keyvalue.KeyValueStore;
+import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreRegistration;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.SchemaStoreRegistration;
 import io.kazuki.v0.store.schema.model.IndexDefinition;
@@ -59,13 +64,31 @@ public class SecondaryIndexStoreBruteForceImpl implements SecondaryIndexSupport 
   private final SequenceService sequenceService;
   private final KeyValueStore kvStore;
   private final SchemaStore schemaStore;
+  private final ComponentDescriptor<SecondaryIndexStore> componentDescriptor;
 
   @Inject
-  public SecondaryIndexStoreBruteForceImpl(SequenceService sequenceService, KeyValueStore kvStore,
-      SchemaStore schemaStore) {
+  public SecondaryIndexStoreBruteForceImpl(KeyValueStoreConfiguration config,
+      SequenceService sequenceService, KeyValueStore kvStore, SchemaStore schemaStore) {
     this.sequenceService = sequenceService;
     this.kvStore = kvStore;
     this.schemaStore = schemaStore;
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<SecondaryIndexStore>("KZ:SecondaryIndexStore:"
+            + config.getGroupName() + "-" + config.getStoreName(), SecondaryIndexStore.class,
+            (SecondaryIndexStore) this, new ImmutableList.Builder().add(
+                ((KazukiComponent) this.sequenceService).getComponentDescriptor(),
+                ((KazukiComponent) this.kvStore).getComponentDescriptor(),
+                ((KazukiComponent) this.schemaStore).getComponentDescriptor()).build());
+  }
+
+  @Override
+  public ComponentDescriptor<SecondaryIndexStore> getComponentDescriptor() {
+    return this.componentDescriptor;
+  }
+
+  @Override
+  public void registerAsComponent(ComponentRegistrar manager) {
+    manager.register(this.componentDescriptor);
   }
 
   @Inject

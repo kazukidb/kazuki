@@ -35,6 +35,10 @@ import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteratorJdbiImpl.KeyValueIterableJdbiImpl;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreRegistration;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.SchemaStoreRegistration;
 import io.kazuki.v0.store.schema.model.Attribute;
@@ -52,6 +56,8 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.sql.DataSource;
 
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
@@ -65,13 +71,13 @@ import org.slf4j.Logger;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.inject.Inject;
 
 public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final Logger log = LogTranslation.getLogger(getClass());
 
   private final AvailabilityManager availability;
   private final LockManager lockManager;
+  private final KazukiComponent<DataSource> dataSource;
   private final IDBI database;
   private final SequenceService sequence;
   private final SchemaStore schemaStore;
@@ -80,14 +86,16 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
   private final String groupName;
   private final String storeName;
   private final String partitionName;
+  private final ComponentDescriptor<SecondaryIndexStore> componentDescriptor;
 
   @Inject
   public SecondaryIndexStoreJdbiImpl(AvailabilityManager availability, LockManager lockManager,
-      IDBI database, SequenceService sequence, SchemaStore schemaStore, KeyValueStore kvStore,
-      SecondaryIndexTableHelper tableHelper, String groupName, String storeName,
-      String partitionName) {
+      KazukiComponent<DataSource> dataSource, IDBI database, SequenceService sequence,
+      SchemaStore schemaStore, KeyValueStore kvStore, SecondaryIndexTableHelper tableHelper,
+      String groupName, String storeName, String partitionName) {
     this.availability = availability;
     this.lockManager = lockManager;
+    this.dataSource = dataSource;
     this.database = database;
     this.sequence = sequence;
     this.schemaStore = schemaStore;
@@ -96,6 +104,25 @@ public class SecondaryIndexStoreJdbiImpl implements SecondaryIndexSupport {
     this.groupName = groupName;
     this.storeName = storeName;
     this.partitionName = partitionName;
+    this.componentDescriptor =
+        new ComponentDescriptorImpl<SecondaryIndexStore>("KZ:SecondaryIndexStore:" + groupName
+            + "-" + storeName + "-" + partitionName, SecondaryIndexStore.class,
+            (SecondaryIndexStore) this, new ImmutableList.Builder().add(
+                ((KazukiComponent) this.lockManager).getComponentDescriptor(),
+                this.dataSource.getComponentDescriptor(),
+                ((KazukiComponent) this.sequence).getComponentDescriptor(),
+                ((KazukiComponent) this.kvStore).getComponentDescriptor()).build());
+  }
+
+  @Override
+  public ComponentDescriptor<SecondaryIndexStore> getComponentDescriptor() {
+    return this.componentDescriptor;
+  }
+
+  @Override
+  @Inject
+  public void registerAsComponent(ComponentRegistrar manager) {
+    manager.register(this.componentDescriptor);
   }
 
   @Inject

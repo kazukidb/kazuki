@@ -20,11 +20,17 @@ import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 
 import javax.inject.Inject;
 import javax.sql.DataSource;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
@@ -34,23 +40,27 @@ import com.jolbox.bonecp.BoneCPDataSource;
 
 public class DataSourceModuleBoneCpImpl extends PrivateModule {
   private final String name;
+  private final Key<ComponentRegistrar> registrarKey;
   private final Key<Lifecycle> lifecycleKey;
   private final Key<JdbiDataSourceConfiguration> configKey;
 
-  public DataSourceModuleBoneCpImpl(String name, Key<Lifecycle> lifecycleKey,
-      Key<JdbiDataSourceConfiguration> configKey) {
+  public DataSourceModuleBoneCpImpl(String name, Key<ComponentRegistrar> registrarKey,
+      Key<Lifecycle> lifecycleKey, Key<JdbiDataSourceConfiguration> configKey) {
     this.name = name;
+    this.registrarKey = registrarKey;
     this.lifecycleKey = lifecycleKey;
     this.configKey = configKey;
   }
 
   @Override
   protected void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
-    bind(JdbiDataSourceConfiguration.class).to(configKey);
+    bind(ComponentRegistrar.class).to(registrarKey);
     bind(Lifecycle.class).to(lifecycleKey);
 
+    bind(JdbiDataSourceConfiguration.class).to(configKey);
     Key<DataSource> dsKey = Key.get(DataSource.class, Names.named(name));
 
     bind(dsKey).toProvider(BoneCPDataSourceProvider.class).in(Scopes.SINGLETON);
@@ -60,15 +70,26 @@ public class DataSourceModuleBoneCpImpl extends PrivateModule {
   private static class BoneCPDataSourceProvider
       implements
         Provider<DataSource>,
-        LifecycleRegistration {
+        LifecycleRegistration,
+        KazukiComponent<DataSource> {
     private final JdbiDataSourceConfiguration config;
     private final MaskProxy<DataSource, BoneCPDataSource> instance;
+    private final ComponentDescriptor<DataSource> componentDescriptor;
     private volatile Lifecycle lifecycle;
 
     @Inject
     public BoneCPDataSourceProvider(JdbiDataSourceConfiguration config) {
       this.config = config;
       this.instance = new MaskProxy<DataSource, BoneCPDataSource>(DataSource.class, null);
+      this.componentDescriptor =
+          new ComponentDescriptorImpl<DataSource>("KZ:DataSource:" + config.getJdbcUrl(),
+              DataSource.class, (DataSource) instance.asProxyInstance(),
+              new ImmutableList.Builder().add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+                @Override
+                public KazukiComponent<Lifecycle> get() {
+                  return (KazukiComponent<Lifecycle>) BoneCPDataSourceProvider.this.lifecycle;
+                }
+              })).build());
     }
 
     @Override
@@ -103,6 +124,16 @@ public class DataSourceModuleBoneCpImpl extends PrivateModule {
           }
         }
       });
+    }
+
+    @Override
+    public ComponentDescriptor<DataSource> getComponentDescriptor() {
+      return this.componentDescriptor;
+    }
+
+    @Override
+    public void registerAsComponent(ComponentRegistrar manager) {
+      manager.register(this.componentDescriptor);
     }
 
     @Override

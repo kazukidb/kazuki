@@ -20,6 +20,11 @@ import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
 import io.kazuki.v0.store.lifecycle.LifecycleRegistration;
 import io.kazuki.v0.store.lifecycle.LifecycleSupportBase;
+import io.kazuki.v0.store.management.ComponentDescriptor;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
+import io.kazuki.v0.store.management.impl.ComponentDescriptorImpl;
+import io.kazuki.v0.store.management.impl.LateBindingComponentDescriptorImpl;
 
 import javax.inject.Inject;
 import javax.sql.DataSource;
@@ -28,20 +33,24 @@ import org.h2.jdbcx.JdbcConnectionPool;
 import org.h2.jdbcx.JdbcDataSource;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
 import com.google.inject.Scopes;
+import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 
 public class DataSourceModuleH2Impl extends PrivateModule {
   private final String name;
+  private final Key<ComponentRegistrar> registrarKey;
   private final Key<Lifecycle> lifecycleKey;
   private final Key<JdbiDataSourceConfiguration> configKey;
 
-  public DataSourceModuleH2Impl(String name, Key<Lifecycle> lifecycleKey,
-      Key<JdbiDataSourceConfiguration> configKey) {
+  public DataSourceModuleH2Impl(String name, Key<ComponentRegistrar> registrarKey,
+      Key<Lifecycle> lifecycleKey, Key<JdbiDataSourceConfiguration> configKey) {
     this.name = name;
+    this.registrarKey = registrarKey;
     this.lifecycleKey = lifecycleKey;
     this.configKey = configKey;
   }
@@ -50,24 +59,45 @@ public class DataSourceModuleH2Impl extends PrivateModule {
   protected void configure() {
     binder().requireExplicitBindings();
 
-    bind(JdbiDataSourceConfiguration.class).to(configKey);
+    bind(ComponentRegistrar.class).to(registrarKey);
     bind(Lifecycle.class).to(lifecycleKey);
 
+    bind(JdbiDataSourceConfiguration.class).to(configKey);
+
     Key<DataSource> dsKey = Key.get(DataSource.class, Names.named(name));
+    Key<KazukiComponent<DataSource>> kcKey =
+        Key.get(new TypeLiteral<KazukiComponent<DataSource>>() {}, Names.named(name));
 
     bind(dsKey).toProvider(H2DataSourceProvider.class).in(Scopes.SINGLETON);
+    bind(kcKey).to(H2DataSourceProvider.class).in(Scopes.SINGLETON);
+
     expose(dsKey);
+    expose(kcKey);
   }
 
-  private static class H2DataSourceProvider implements Provider<DataSource>, LifecycleRegistration {
+  private static class H2DataSourceProvider
+      implements
+        Provider<DataSource>,
+        LifecycleRegistration,
+        KazukiComponent<DataSource> {
     private final JdbiDataSourceConfiguration config;
     private final MaskProxy<DataSource, JdbcConnectionPool> instance;
+    private final ComponentDescriptor<DataSource> componentDescriptor;
     private volatile Lifecycle lifecycle;
 
     @Inject
     public H2DataSourceProvider(JdbiDataSourceConfiguration config) {
       this.config = config;
       this.instance = new MaskProxy<DataSource, JdbcConnectionPool>(DataSource.class, null);
+      this.componentDescriptor =
+          new ComponentDescriptorImpl<DataSource>("KZ:DataSource:" + config.getJdbcUrl(),
+              DataSource.class, (DataSource) instance.asProxyInstance(),
+              new ImmutableList.Builder().add((new LateBindingComponentDescriptorImpl<Lifecycle>() {
+                @Override
+                public KazukiComponent<Lifecycle> get() {
+                  return (KazukiComponent<Lifecycle>) H2DataSourceProvider.this.lifecycle;
+                }
+              })).build());
     }
 
     @Override
@@ -102,6 +132,16 @@ public class DataSourceModuleH2Impl extends PrivateModule {
           }
         }
       });
+    }
+
+    @Override
+    public ComponentDescriptor<DataSource> getComponentDescriptor() {
+      return this.componentDescriptor;
+    }
+
+    @Override
+    public void registerAsComponent(ComponentRegistrar manager) {
+      manager.register(this.componentDescriptor);
     }
 
     @Override

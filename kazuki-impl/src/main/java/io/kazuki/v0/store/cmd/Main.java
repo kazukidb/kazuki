@@ -36,6 +36,7 @@ import io.kazuki.v0.store.keyvalue.KeyValueStore;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreIteration.SortDirection;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentRegistrar;
 import io.kazuki.v0.store.sequence.KeyImpl;
 import io.kazuki.v0.store.sequence.SequenceService;
 import io.kazuki.v0.store.sequence.SequenceServiceConfiguration;
@@ -121,10 +122,11 @@ public class Main {
 
     public List<Module> getModules() {
       return ImmutableList.<Module>of(
-          new LifecycleModuleDefaultImpl(STORE_NAME),
-          new DataSourceModuleH2Impl(STORE_NAME, Key.get(Lifecycle.class, Names.named(STORE_NAME)), Key
-              .get(JdbiDataSourceConfiguration.class, Names.named(STORE_NAME))),
-          new AbstractModule() {
+          new LifecycleModuleDefaultImpl(STORE_NAME, Key.get(ComponentRegistrar.class,
+              Names.named(STORE_NAME))),
+          new DataSourceModuleH2Impl(STORE_NAME, null, Key.get(Lifecycle.class,
+              Names.named(STORE_NAME)), Key.get(JdbiDataSourceConfiguration.class,
+              Names.named(STORE_NAME))), new AbstractModule() {
             @Override
             protected void configure() {
               bind(Key.get(JdbiDataSourceConfiguration.class, Names.named(STORE_NAME))).toInstance(

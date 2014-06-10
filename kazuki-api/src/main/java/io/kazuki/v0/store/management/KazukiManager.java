@@ -12,23 +12,18 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.kazuki.v0.store.schema;
+package io.kazuki.v0.store.management;
 
-import io.kazuki.v0.store.KazukiException;
-import io.kazuki.v0.store.Version;
-import io.kazuki.v0.store.keyvalue.KeyValuePair;
-import io.kazuki.v0.store.management.KazukiComponent;
-import io.kazuki.v0.store.schema.model.Schema;
+import java.util.Collection;
 
-public interface SchemaStore extends KazukiComponent<SchemaStore> {
-  KeyValuePair<Schema> retrieveSchema(String type) throws KazukiException;
-
-  Version createSchema(String type, Schema value) throws KazukiException;
-
-  Version updateSchema(final String type, final Version version, final Schema value)
-      throws KazukiException;
-
-  boolean deleteSchema(final String type, final Version version) throws KazukiException;
-
-  void clear() throws KazukiException;
+/**
+ * The primary entry point for managed Kazuki components.
+ */
+public interface KazukiManager {
+  /**
+   * Returns an unmodifiable collection of registered component instances.
+   * 
+   * @return Collection of ComponentDescriptor instances
+   */
+  Collection<ComponentDescriptor> getComponents();
 }

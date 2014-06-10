@@ -15,15 +15,18 @@
 package io.kazuki.v0.store.guice;
 
 import io.kazuki.v0.internal.helper.LockManager;
-import io.kazuki.v0.internal.helper.LockManagerImpl;
 import io.kazuki.v0.store.guice.impl.DataSourceModuleH2Impl;
 import io.kazuki.v0.store.guice.impl.JournalStoreModulePartitionedImpl;
 import io.kazuki.v0.store.guice.impl.KeyValueStoreModuleJdbiH2Impl;
 import io.kazuki.v0.store.guice.impl.LifecycleModuleDefaultImpl;
+import io.kazuki.v0.store.guice.impl.LockManagerModuleImpl;
 import io.kazuki.v0.store.guice.impl.SequenceServiceModuleJdbiH2Impl;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiManager;
+import io.kazuki.v0.store.management.impl.KazukiManagerImpl;
 import io.kazuki.v0.store.sequence.SequenceService;
 import io.kazuki.v0.store.sequence.SequenceServiceConfiguration;
 
@@ -38,27 +41,32 @@ import com.google.inject.name.Names;
 
 public class KazukiModule extends AbstractModule {
   private final String name;
+  private final String managerName;
   private final BindingConfig jdbiConfig;
   private final BindingConfig seqConfig;
   private final BindingConfig kvConfig;
   private final BindingConfig jsConfig;
 
-  private KazukiModule(String name, BindingConfig jdbiConfig, BindingConfig seqConfig,
-      BindingConfig kvConfig, BindingConfig jsConfig) {
+  private KazukiModule(String name, String managerName, BindingConfig jdbiConfig,
+      BindingConfig seqConfig, BindingConfig kvConfig, BindingConfig jsConfig) {
     Preconditions.checkNotNull(name, "name");
     Preconditions.checkNotNull(jdbiConfig, "jdbiConfig");
     Preconditions.checkNotNull(seqConfig, "seqConfig");
+    Preconditions.checkArgument(kvConfig == null || jsConfig == null,
+        "must specify one KeyValueStore, one JournalStore, or neither");
 
     this.name = name;
     this.jdbiConfig = jdbiConfig;
     this.seqConfig = seqConfig;
     this.kvConfig = kvConfig;
     this.jsConfig = jsConfig;
+    this.managerName = managerName;
   }
 
   @Override
   protected void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
     Key<Lifecycle> lifecycleKey = Key.get(Lifecycle.class, Names.named(name));
     Key<LockManager> lockManagerKey = Key.get(LockManager.class, Names.named(name));
@@ -68,33 +76,53 @@ public class KazukiModule extends AbstractModule {
     Key<SequenceService> sequenceServiceKey =
         Key.get(SequenceService.class, Names.named(seqConfig.getName()));
 
+    // bind the manager & component registrar
+    Key<KazukiManager> managerKey = null;
+    Key<ComponentRegistrar> registrarKey = null;
+
+    if (this.managerName != null) {
+      managerKey = Key.get(KazukiManager.class, Names.named(this.managerName));
+      registrarKey = Key.get(ComponentRegistrar.class, Names.named(this.managerName));
+
+      bindObject(new BindingConfig(this.managerName, KazukiManager.class, managerKey));
+      bindObject(new BindingConfig(this.managerName, ComponentRegistrar.class, registrarKey));
+    } else {
+      managerKey = Key.get(KazukiManager.class, Names.named(this.name));
+      registrarKey = Key.get(ComponentRegistrar.class, Names.named(this.name));
+
+      KazukiManagerImpl manager = new KazukiManagerImpl();
+
+      bindObject(new BindingConfig(this.name, KazukiManager.class, manager));
+      bindObject(new BindingConfig(this.name, ComponentRegistrar.class, manager));
+    }
+
     // install Lifecycle
-    install(new LifecycleModuleDefaultImpl(name));
+    install(new LifecycleModuleDefaultImpl(name, registrarKey));
 
     // bind lock manager
-    bind(lockManagerKey).to(LockManagerImpl.class).in(Scopes.SINGLETON);
+    install(new LockManagerModuleImpl(name, registrarKey));
 
     // bind JDBI config
     bindObject(jdbiConfig);
-    install(new DataSourceModuleH2Impl(name, lifecycleKey, jdbiConfigKey));
+    install(new DataSourceModuleH2Impl(name, registrarKey, lifecycleKey, jdbiConfigKey));
 
     // bind SequenceService
     bindObject(seqConfig);
-    install(new SequenceServiceModuleJdbiH2Impl(seqConfig.getName(), lifecycleKey, dataSourceKey,
-        lockManagerKey));
+    install(new SequenceServiceModuleJdbiH2Impl(seqConfig.getName(), registrarKey, lifecycleKey,
+        dataSourceKey, lockManagerKey));
 
     // bind KeyValueStore (if applicable)
     if (kvConfig != null) {
       bindObject(kvConfig);
-      install(new KeyValueStoreModuleJdbiH2Impl(name, lifecycleKey, lockManagerKey, dataSourceKey,
-          sequenceServiceKey));
+      install(new KeyValueStoreModuleJdbiH2Impl(name, registrarKey, lifecycleKey, lockManagerKey,
+          dataSourceKey, sequenceServiceKey));
     }
 
     // bind JournalStore (if applicable)
     if (jsConfig != null) {
       bindObject(jsConfig);
-      install(new JournalStoreModulePartitionedImpl(name, lifecycleKey, lockManagerKey,
-          dataSourceKey, sequenceServiceKey));
+      install(new JournalStoreModulePartitionedImpl(name, registrarKey, lifecycleKey,
+          lockManagerKey, dataSourceKey, sequenceServiceKey));
     }
   }
 
@@ -114,6 +142,7 @@ public class KazukiModule extends AbstractModule {
 
   public static class Builder {
     private final String name;
+    private String managerName;
     private BindingConfig jdbiConfig;
     private BindingConfig seqConfig;
     private BindingConfig kvConfig;
@@ -121,6 +150,12 @@ public class KazukiModule extends AbstractModule {
 
     public Builder(String name) {
       this.name = name;
+    }
+
+    public Builder withComponentManager(String managerName) {
+      this.managerName = managerName;
+
+      return this;
     }
 
     public Builder withJdbiConfiguration(String name, JdbiDataSourceConfiguration jdbiConfig) {
@@ -204,8 +239,8 @@ public class KazukiModule extends AbstractModule {
     }
 
     public KazukiModule build() {
-      return new KazukiModule(this.name, this.jdbiConfig, this.seqConfig, this.kvConfig,
-          this.jsConfig);
+      return new KazukiModule(this.name, this.managerName, this.jdbiConfig, this.seqConfig,
+          this.kvConfig, this.jsConfig);
     }
   }
 

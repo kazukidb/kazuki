@@ -27,6 +27,8 @@ import io.kazuki.v0.store.keyvalue.KeyValueStoreConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreJdbiH2Impl;
 import io.kazuki.v0.store.keyvalue.KeyValueStoreRegistration;
 import io.kazuki.v0.store.lifecycle.Lifecycle;
+import io.kazuki.v0.store.management.ComponentRegistrar;
+import io.kazuki.v0.store.management.KazukiComponent;
 import io.kazuki.v0.store.schema.SchemaStore;
 import io.kazuki.v0.store.schema.SchemaStoreImpl;
 import io.kazuki.v0.store.schema.SchemaStoreRegistration;
@@ -40,19 +42,22 @@ import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provider;
 import com.google.inject.Scopes;
+import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 
 public class KeyValueStoreModuleJdbiH2Impl extends PrivateModule {
   protected final String name;
+  protected final Key<ComponentRegistrar> registrarKey;
   protected final Key<Lifecycle> lifecycleKey;
   protected final Key<LockManager> lockManagerKey;
   protected final Key<DataSource> dataSourceKey;
   protected final Key<SequenceService> sequenceServiceKey;
 
-  public KeyValueStoreModuleJdbiH2Impl(String name, Key<Lifecycle> lifecycleKey,
-      Key<LockManager> lockManagerKey, Key<DataSource> dataSourceKey,
+  public KeyValueStoreModuleJdbiH2Impl(String name, Key<ComponentRegistrar> registrarKey,
+      Key<Lifecycle> lifecycleKey, Key<LockManager> lockManagerKey, Key<DataSource> dataSourceKey,
       Key<SequenceService> sequenceServiceKey) {
     this.name = name;
+    this.registrarKey = registrarKey;
     this.lifecycleKey = lifecycleKey;
     this.lockManagerKey = lockManagerKey;
     this.dataSourceKey = dataSourceKey;
@@ -65,12 +70,20 @@ public class KeyValueStoreModuleJdbiH2Impl extends PrivateModule {
 
   @Override
   public void configure() {
-    binder().requireExplicitBindings();
+    // TODO: re-enable ASAP
+    // binder().requireExplicitBindings();
 
+    bind(ComponentRegistrar.class).to(registrarKey);
     bind(Lifecycle.class).to(lifecycleKey);
 
     bind(KeyValueStoreConfiguration.class).to(
         Key.get(KeyValueStoreConfiguration.class, Names.named(name)));
+
+    Key<KazukiComponent<DataSource>> kcKey =
+        Key.get(new TypeLiteral<KazukiComponent<DataSource>>() {});
+    Key<KazukiComponent<DataSource>> kcKeyNamed =
+        Key.get(new TypeLiteral<KazukiComponent<DataSource>>() {}, Names.named(name));
+    bind(kcKey).to(kcKeyNamed);
 
     Provider<DataSource> dsProvider = binder().getProvider(dataSourceKey);
 

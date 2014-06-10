@@ -27,7 +27,6 @@ import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import io.kazuki.v0.internal.helper.Configurations;
 import io.kazuki.v0.internal.helper.TestSupport;
 import io.kazuki.v0.store.Foo;
-import io.kazuki.v0.store.Version;
 import io.kazuki.v0.store.guice.KazukiModule;
 import io.kazuki.v0.store.jdbi.JdbiDataSourceConfiguration;
 import io.kazuki.v0.store.keyvalue.KeyValueIterator;
@@ -99,7 +98,8 @@ public class PartitionedJournalStoreClearTest extends TestSupport {
   @Test
   public void testClear() throws Exception {
     assertThat(manager.retrieveSchema("foo"), Matchers.nullValue());
-    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA), is(VersionImpl.valueOf("$schema:3#2f73aea89adc5337")));
+    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA),
+        is(VersionImpl.valueOf("$schema:3#2f73aea89adc5337")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     assertThat(journal.getActivePartition(), nullValue());
@@ -135,7 +135,8 @@ public class PartitionedJournalStoreClearTest extends TestSupport {
 
     journal.clear();
 
-    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA), is(VersionImpl.valueOf("$schema:3#2f73aea89adc5337")));
+    assertThat(manager.createSchema("foo", Foo.FOO_SCHEMA),
+        is(VersionImpl.valueOf("$schema:3#2f73aea89adc5337")));
     assertThat(manager.retrieveSchema("foo"), notNullValue());
 
     for (int i = 0; i < 100; i++) {

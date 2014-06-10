@@ -17,8 +17,9 @@ package io.kazuki.v0.store.sequence;
 import io.kazuki.v0.store.KazukiException;
 import io.kazuki.v0.store.Key;
 import io.kazuki.v0.store.Version;
+import io.kazuki.v0.store.management.KazukiComponent;
 
-public interface SequenceService {
+public interface SequenceService extends KazukiComponent<SequenceService> {
   String getTypeName(final Integer id) throws KazukiException;
 
   Integer getTypeId(final String type, final boolean create) throws KazukiException;
