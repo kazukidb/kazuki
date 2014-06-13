@@ -4,3 +4,12 @@ bin
 .settings
 target
 test-output
+
+# Intellij
+*.ipr
+*.iml
+*.iws
+.idea/
+
+# Other
+.DS_Store
