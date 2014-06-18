@@ -129,21 +129,34 @@ public class Schema {
     private List<IndexDefinition> indexes = new ArrayList<IndexDefinition>();
 
     public Builder addAttribute(String name, Type type, boolean nullable) {
-      this.attributes.add(new Attribute(name, type, null, nullable));
+      return this.addAttribute(name, type, nullable, null);
+    }
+
+    public Builder addAttribute(String name, Type type, boolean nullable, String renameOf) {
+      this.attributes.add(new Attribute(name, type, null, nullable, renameOf));
 
       return this;
     }
 
     public Builder addAttribute(String name, Type type, List<Object> values, boolean nullable) {
-      this.attributes.add(new Attribute(name, type, values, nullable));
+      return this.addAttribute(name, type, values, nullable, null);
+    }
+
+    public Builder addAttribute(String name, Type type, List<Object> values, boolean nullable,
+        String renameOf) {
+      this.attributes.add(new Attribute(name, type, values, nullable, renameOf));
+
+      return this;
+    }
+
+    public Builder addIndex(String name, List<IndexAttribute> cols, Boolean unique, String renameOf) {
+      this.indexes.add(new IndexDefinition(name, cols, unique, renameOf));
 
       return this;
     }
 
     public Builder addIndex(String name, List<IndexAttribute> cols, Boolean unique) {
-      this.indexes.add(new IndexDefinition(name, cols, unique));
-
-      return this;
+      return this.addIndex(name, cols, unique, null);
     }
 
     public Schema build() {

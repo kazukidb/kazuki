@@ -28,13 +28,13 @@ import com.google.common.collect.ImmutableList;
 
 public class Foo {
   public static final Schema FOO_SCHEMA = new Schema(ImmutableList.of(new Attribute("fooKey",
-      Attribute.Type.UTF8_SMALLSTRING, null, true), new Attribute("fooValue",
-      Attribute.Type.UTF8_SMALLSTRING, null, true)), ImmutableList.<IndexDefinition>of(
+      Attribute.Type.UTF8_SMALLSTRING, null, true, null), new Attribute("fooValue",
+      Attribute.Type.UTF8_SMALLSTRING, null, true, null)), ImmutableList.<IndexDefinition>of(
       new IndexDefinition("uniqueFooKeyValue", ImmutableList.of(new IndexAttribute("fooKey",
           SortDirection.ASCENDING, AttributeTransform.NONE), new IndexAttribute("fooValue",
-          SortDirection.ASCENDING, AttributeTransform.NONE)), true),
+          SortDirection.ASCENDING, AttributeTransform.NONE)), true, null),
       new IndexDefinition("fooKey", ImmutableList.of(new IndexAttribute("fooKey",
-          SortDirection.ASCENDING, AttributeTransform.NONE)), false)));
+          SortDirection.ASCENDING, AttributeTransform.NONE)), false, null)));
 
   private final String fooKey;
   private final String fooValue;

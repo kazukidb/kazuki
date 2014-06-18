@@ -41,32 +41,33 @@ public class Everything {
   static {
     List<Attribute> attrs = new ArrayList<Attribute>();
 
-    attrs.add(new Attribute("theAny", Attribute.Type.ANY, null, true));
-    attrs.add(new Attribute("theMap", Attribute.Type.MAP, null, true));
-    attrs.add(new Attribute("theArray", Attribute.Type.ARRAY, null, true));
-    attrs.add(new Attribute("theBoolean", Attribute.Type.BOOLEAN, null, true));
-    attrs.add(new Attribute("theCharOne", Attribute.Type.CHAR_ONE, null, true));
+    attrs.add(new Attribute("theAny", Attribute.Type.ANY, null, true, null));
+    attrs.add(new Attribute("theMap", Attribute.Type.MAP, null, true, null));
+    attrs.add(new Attribute("theArray", Attribute.Type.ARRAY, null, true, null));
+    attrs.add(new Attribute("theBoolean", Attribute.Type.BOOLEAN, null, true, null));
+    attrs.add(new Attribute("theCharOne", Attribute.Type.CHAR_ONE, null, true, null));
 
     //
     // BEWARE: enums aren't auto linked to Java enums because it's important
     // that schema enum values are never removed!
     //
     attrs.add(new Attribute("theEnum", Attribute.Type.ENUM, ImmutableList.<Object>of("ZERO", "ONE",
-        "TWO", "THREE", "FOUR"), false));
+        "TWO", "THREE", "FOUR"), false, null));
 
-    attrs.add(new Attribute("theU8", Attribute.Type.U8, null, true));
-    attrs.add(new Attribute("theU16", Attribute.Type.U16, null, true));
-    attrs.add(new Attribute("theU32", Attribute.Type.U32, null, true));
-    attrs.add(new Attribute("theU64", Attribute.Type.U64, null, true));
+    attrs.add(new Attribute("theU8", Attribute.Type.U8, null, true, null));
+    attrs.add(new Attribute("theU16", Attribute.Type.U16, null, true, null));
+    attrs.add(new Attribute("theU32", Attribute.Type.U32, null, true, null));
+    attrs.add(new Attribute("theU64", Attribute.Type.U64, null, true, null));
 
-    attrs.add(new Attribute("theI8", Attribute.Type.I8, null, true));
-    attrs.add(new Attribute("theI16", Attribute.Type.I16, null, true));
-    attrs.add(new Attribute("theI32", Attribute.Type.I32, null, true));
-    attrs.add(new Attribute("theI64", Attribute.Type.I64, null, true));
+    attrs.add(new Attribute("theI8", Attribute.Type.I8, null, true, null));
+    attrs.add(new Attribute("theI16", Attribute.Type.I16, null, true, null));
+    attrs.add(new Attribute("theI32", Attribute.Type.I32, null, true, null));
+    attrs.add(new Attribute("theI64", Attribute.Type.I64, null, true, null));
 
-    attrs.add(new Attribute("theUtcDate", Attribute.Type.UTC_DATE_SECS, null, true));
-    attrs.add(new Attribute("theUtf8SmallString", Attribute.Type.UTF8_SMALLSTRING, null, true));
-    attrs.add(new Attribute("theUtf8Text", Attribute.Type.UTF8_SMALLSTRING, null, true));
+    attrs.add(new Attribute("theUtcDate", Attribute.Type.UTC_DATE_SECS, null, true, null));
+    attrs
+        .add(new Attribute("theUtf8SmallString", Attribute.Type.UTF8_SMALLSTRING, null, true, null));
+    attrs.add(new Attribute("theUtf8Text", Attribute.Type.UTF8_SMALLSTRING, null, true, null));
 
     List<IndexDefinition> indexDefs = new ArrayList<IndexDefinition>();
 
@@ -75,7 +76,7 @@ public class Everything {
     // SortDirection.ASCENDING, AttributeTransform.NONE)), true));
 
     indexDefs.add(new IndexDefinition("theEnum", ImmutableList.of(new IndexAttribute("theEnum",
-        SortDirection.ASCENDING, AttributeTransform.NONE)), false));
+        SortDirection.ASCENDING, AttributeTransform.NONE)), false, null));
 
     EVERYTHING_SCHEMA =
         new Schema(Collections.unmodifiableList(attrs), Collections.unmodifiableList(indexDefs));

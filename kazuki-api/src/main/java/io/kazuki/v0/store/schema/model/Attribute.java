@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -63,10 +65,12 @@ public class Attribute {
   private final Type type;
   private final List<String> values;
   private final boolean nullable;
+  private final String renameOf;
 
   @JsonCreator
   public Attribute(@JsonProperty("name") String name, @JsonProperty("type") Type type,
-      @JsonProperty("values") List<Object> values, @JsonProperty("nullable") Boolean nullable) {
+      @JsonProperty("values") List<Object> values, @JsonProperty("nullable") Boolean nullable,
+      @JsonProperty("renameOf") @Nullable String renameOf) {
     if (name == null) {
       throw new IllegalArgumentException("Attribute 'name' must not be null");
     }
@@ -78,6 +82,7 @@ public class Attribute {
     this.name = name;
     this.type = type;
     this.nullable = (nullable == null) || nullable;
+    this.renameOf = renameOf;
 
     if (values != null) {
       List<String> newVals = new ArrayList<String>();
@@ -106,5 +111,10 @@ public class Attribute {
 
   public boolean isNullable() {
     return nullable;
+  }
+
+  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  public String getRenameOf() {
+    return renameOf;
   }
 }

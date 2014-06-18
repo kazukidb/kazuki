@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 
 
@@ -38,11 +39,13 @@ public class IndexDefinition {
   private final List<String> attributeNames;
   private final boolean unique;
   private final Map<String, IndexAttribute> indexAttributeMap;
+  private final String renameOf;
 
   @JsonCreator
   public IndexDefinition(@JsonProperty("name") String name,
       @JsonProperty("cols") List<IndexAttribute> cols,
-      @JsonProperty("unique") @Nullable Boolean unique) {
+      @JsonProperty("unique") @Nullable Boolean unique,
+      @JsonProperty("renameOf") @Nullable String renameOf) {
     Preconditions.checkNotNull(name, "name");
     Preconditions.checkNotNull(cols, "cols");
     Preconditions.checkArgument(!cols.isEmpty(), "cols");
@@ -72,6 +75,7 @@ public class IndexDefinition {
     this.indexColumns = Collections.unmodifiableList(cols);
     this.attributeNames = Collections.unmodifiableList(newAttributeNames);
     this.indexAttributeMap = Collections.unmodifiableMap(newIndexAttributeMap);
+    this.renameOf = renameOf;
   }
 
   public String getName() {
@@ -100,5 +104,10 @@ public class IndexDefinition {
   @JsonIgnore
   public Map<String, IndexAttribute> getIndexAttributeMap() {
     return indexAttributeMap;
+  }
+
+  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  public String getRenameOf() {
+    return renameOf;
   }
 }

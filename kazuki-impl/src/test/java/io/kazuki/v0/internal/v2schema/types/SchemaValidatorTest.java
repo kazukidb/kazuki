@@ -17,8 +17,8 @@ package io.kazuki.v0.internal.v2schema.types;
 
 import io.kazuki.v0.internal.v2schema.SchemaValidator;
 import io.kazuki.v0.store.schema.model.Attribute;
-import io.kazuki.v0.store.schema.model.TransformException;
 import io.kazuki.v0.store.schema.model.Attribute.Type;
+import io.kazuki.v0.store.schema.model.TransformException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -96,7 +96,7 @@ public class SchemaValidatorTest {
   private static Attribute a(String name, Type type, Object... values) {
     List<Object> valueList = values == null ? null : Arrays.asList(values);
 
-    return new Attribute(name, type, valueList, true);
+    return new Attribute(name, type, valueList, true, null);
   }
 
   private void validateNumericType(Type[] possibleTypes) {
