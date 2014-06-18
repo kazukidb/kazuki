@@ -1,6 +1,14 @@
 # Changelog
 
 =======
+v0.6.1
+* fix explicit bindings reference that creeped in
+
+---
+v0.6.0
+* initial implementation of Schema version
+* initial implementation of Schema diff
+
 v0.5.12
 ---
 * initial implementation of KazukiManager component introspection API
