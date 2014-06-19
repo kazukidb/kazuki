@@ -15,6 +15,9 @@
  */
 package io.kazuki.v0.store.schema;
 
+/**
+ * Specifies whether type checking against the Schema should be strict or lax.
+ */
 public enum TypeValidation {
   STRICT, LAX;
 }

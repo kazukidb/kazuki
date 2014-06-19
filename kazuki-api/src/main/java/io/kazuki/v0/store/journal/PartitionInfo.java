@@ -15,15 +15,32 @@
  */
 package io.kazuki.v0.store.journal;
 
-
+/**
+ * Encapsulates metadata about a JournalStore partition.
+ */
 public interface PartitionInfo {
+  /**
+   * String opaque partition identifier
+   */
   String getPartitionId();
 
+  /**
+   * The minimum identifier in the partition (inclusive)
+   */
   long getMinId();
 
+  /**
+   * The maximum identifier in the partition (inclusive)
+   */
   long getMaxId();
 
+  /**
+   * The approximate number of entries in the partition
+   */
   long getSize();
 
+  /**
+   * True if this partition is closed (no longer active)
+   */
   boolean isClosed();
 }

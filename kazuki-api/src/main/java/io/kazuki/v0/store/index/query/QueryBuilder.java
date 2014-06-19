@@ -19,9 +19,23 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Helper class for creating Kazuki Secondary index queries. Queries represent a conjunction (AND) of
+ * query terms.
+ */
 public class QueryBuilder {
   public List<QueryTerm> query = new ArrayList<QueryTerm>();
 
+  /**
+   * Adds a single comparison clause to the query.
+   * 
+   * @param field String field to query
+   * @param op QueryOperator representing the comparison operation
+   * @param valueType ValueType of the literal
+   * @param literal String containing the literal value
+   * 
+   * @return QueryBuilder self to allow fluent query building
+   */
   public QueryBuilder andMatchesSingle(String field, QueryOperator op, ValueType valueType,
       String literal) {
     query.add(new QueryTerm(op, field, new ValueHolder(valueType, literal)));
@@ -29,6 +43,16 @@ public class QueryBuilder {
     return this;
   }
 
+  /**
+   * Adds a single "IN" clause to the query.
+   * 
+   * @param field String field to query
+   * @param op QueryOperator representing the comparison operation
+   * @param valueType ValueType of the literal
+   * @param literal List of String instances containing the literal values
+   * 
+   * @return QueryBuilder self to allow fluent query building
+   */
   public QueryBuilder andMatchesIn(String field, QueryOperator op, ValueType valueType,
       List<String> literalList) {
     List<ValueHolder> newValueHolders = new ArrayList<ValueHolder>();
@@ -42,6 +66,9 @@ public class QueryBuilder {
     return this;
   }
 
+  /**
+   * Returns the list of QueryTerm instances representing the query
+   */
   public List<QueryTerm> build() {
     return Collections.unmodifiableList(query);
   }

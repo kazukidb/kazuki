@@ -17,6 +17,9 @@ package io.kazuki.v0.store.journal;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+/**
+ * Immutable value class to implement the PartitionInfo interface.
+ */
 public class PartitionInfoSnapshot implements PartitionInfo {
   private final String partitionId;
   private final long maxId;
@@ -34,26 +37,41 @@ public class PartitionInfoSnapshot implements PartitionInfo {
     this.closed = closed;
   }
 
+  /**
+   * The maximum identifier in the partition (inclusive)
+   */
   @Override
   public long getMaxId() {
     return this.maxId;
   }
 
+  /**
+   * The minimum identifier in the partition (inclusive)
+   */
   @Override
   public long getMinId() {
     return this.minId;
   }
-
+  
+  /**
+   * String opaque partition identifier
+   */
   @Override
   public String getPartitionId() {
     return this.partitionId;
   }
 
+  /**
+   * The approximate number of entries in the partition
+   */
   @Override
   public long getSize() {
     return this.size;
   }
 
+  /**
+   * True if this partition is closed (no longer active)
+   */
   @Override
   public boolean isClosed() {
     return this.closed;

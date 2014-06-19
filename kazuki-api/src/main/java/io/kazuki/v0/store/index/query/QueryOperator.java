@@ -19,5 +19,38 @@ package io.kazuki.v0.store.index.query;
  * All the supported Query operators.
  */
 public enum QueryOperator {
-  EQ, NE, GT, GE, LT, LE, IN;
+  /**
+   * Equality comparison operator
+   */
+  EQ,
+  
+  /**
+   * Inequality comparison operator
+   */
+  NE,
+  
+  /**
+   * Greater-than comparison operator
+   */
+  GT,
+  
+  /**
+   * Greater-than-or-equal-to comparison operator
+   */
+  GE,
+  
+  /**
+   * Less-than comparison operator
+   */
+  LT,
+  
+  /**
+   * Less-than-or-equal-to comparison operator
+   */
+  LE,
+  
+  /**
+   * "IN" comparison operator (value contained within set)
+   */
+  IN;
 }
