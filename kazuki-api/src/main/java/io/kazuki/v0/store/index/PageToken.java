@@ -15,6 +15,13 @@
  */
 package io.kazuki.v0.store.index;
 
+/**
+ * Encapsulates a PageToken - effectively a self-contained cursor reference into
+ * a range-based index.
+ */
 public interface PageToken {
+  /**
+   * String containing the opaque token.
+   */
   String getToken();
 }

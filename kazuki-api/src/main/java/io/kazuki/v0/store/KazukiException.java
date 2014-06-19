@@ -15,6 +15,9 @@
  */
 package io.kazuki.v0.store;
 
+/**
+ * The general Exception class for Kazuki
+ */
 public class KazukiException extends Exception {
   private static final long serialVersionUID = -8942530541508421814L;
 

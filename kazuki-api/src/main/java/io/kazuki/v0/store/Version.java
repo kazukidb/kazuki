@@ -17,10 +17,18 @@ package io.kazuki.v0.store;
 
 
 /**
- * Opaque Version Identifier
+ * Opaque Version Identifier.
  */
 public interface Version {
+  /**
+   * Returns a String representing the opaque version of the entity. This String is only meaningful within the
+   * context of a single entity - it should not be used by itself except for informational purposes.
+   */
   String getVersionPart();
 
+  /**
+   * The fully qualified version identifier. This is the String that should be used to fully identify a version
+   * of a particular entity, unless the application has a mechanism to reconstruct it implicitly.
+   */
   String getIdentifier();
 }

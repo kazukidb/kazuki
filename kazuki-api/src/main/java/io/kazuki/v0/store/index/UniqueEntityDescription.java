@@ -28,6 +28,10 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 
+/**
+ * Encapsulates a set of attribute values that uniquely identify an entity for a given unique index. This
+ * is essentially a composite unique key.
+ */
 public class UniqueEntityDescription<T> {
   private final String type;
   private final Class<T> clazz;
