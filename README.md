@@ -36,27 +36,6 @@ Notable Features:
 * Compression: using LZF
 
 
-# Roadmap
-
-Persistence Interfaces:
-
-* Secondary Index (including Unique index support)
-* Full-Text Search
-* KV Cache (for KV and unique indexes)
-* Counters
-
-Upcoming Backends:
-
-* ElasticSearch: KV Store, Journal Store, Full-Text indexes
-* LevelDB: Sequence, KV Store, Journal Store
-* Java Chronicle: Journal Store
-* Sqlite3 (via jdbi): Sequence, KV Store, Journal Store
-* MS SQL: Sequence, KV Store, Journal Store
-* Riak: KV Store
-* RocksDB: Sequence, KV Store, Journal Store
-* Amazon DynamoDB: Sequence, KV Store, Journal Store
-
-
 # Sequence Service
 
 The sequence store is an interface around identifier allocation. In a
